@@ -16,17 +16,16 @@ int main() {
     Vector pos{2};
     Vector axis{2};
 
-    pos(0) = 10;
-    pos(1) = 10;
+    pos(0) = 12;
+    pos(1) = 34;
 
-    axis(0) = 0;
+    axis(0) = 1;
     axis(1) = 1;
 
     axis.matrix().normalize();
 
-    dimerSearch<Grad>(pos, axis);
+    dimerSearch(Grad{}, pos, axis);
 
-    pp(pos);
     pp(axis);
 
     std::cout << "working" << std::endl;
