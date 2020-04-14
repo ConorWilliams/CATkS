@@ -47,12 +47,12 @@ template <long M = M_DEFAULT> class CoreLBFGS {
         // compute k-1 th y,s,rho
         if (m_k > 0) {
             m_s.col(idx) = pos - m_prev_pos;
-            m_y.col(idx) = q - m_prev_grad;
+            m_y.col(idx) = grad - m_prev_grad;
             m_rho(idx) = 1 / dot(m_s.col(idx), m_y.col(idx));
         }
 
         m_prev_pos = pos;
-        m_prev_grad = q;
+        m_prev_grad = grad;
 
         long incr = m_k - M;
         long bound = M;

@@ -12,6 +12,21 @@ struct Grad {
     }
 };
 
+inline constexpr double A = 1.5;
+
+double gauss(double x, double y) { return std::exp(-(x * x) - (y * y)); }
+
+struct Grad2 {
+    inline void operator()(Vector const &pos, Vector &result) {
+        auto x = pos(0);
+        auto y = pos(1);
+
+        result(0) =
+            2 * (x - A) * gauss(x - A, y) + 2 * (x + A) * gauss(x + A, y);
+
+        result(1) = 2 * y * gauss(x - A, y) + 2 * y * gauss(x + A, y);
+    }
+};
 int main() {
     Vector pos{2};
     Vector axis{2};
@@ -20,15 +35,29 @@ int main() {
     pos(1) = 34;
 
     axis(0) = 1;
-    axis(1) = 1;
+    axis(1) = 0;
 
     axis.matrix().normalize();
 
-    dimerSearch(Grad{}, pos, axis);
+    std::cout << "first" << std::endl;
 
+    dimerSearch(Grad{}, pos, axis);
     pp(axis);
 
-    std::cout << "working" << std::endl;
+    pos(0) = 1.3;
+    pos(1) = 0;
+
+    axis(0) = 1;
+    axis(1) = 0;
+
+    axis.matrix().normalize();
+
+    std::cout << "second" << std::endl;
+
+    dimerSearch(Grad2{}, pos, axis);
+
+    pp(pos);
+    pp(axis);
 
     return 0;
 }

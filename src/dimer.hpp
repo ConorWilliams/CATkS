@@ -12,9 +12,9 @@
 
 inline constexpr int IT_MAX = 2000;
 inline constexpr int IR_MAX = 10;
-inline constexpr double F_TOL = 0.0001;
-inline constexpr double DELTA_R = 0.0001;
-inline constexpr double S_MAX = 10;
+inline constexpr double F_TOL = 0.000001;
+inline constexpr double DELTA_R = 0.001;
+inline constexpr double S_MAX = 1;
 inline constexpr double THETA_TOL = 0.0035; // 2deg
 
 void pp(Vector const &v) { std::cout << v.transpose() << std::endl; }
@@ -39,6 +39,13 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
 
     for (int i = 0; i < IT_MAX; ++i) {
         grad(R_0, g_0);
+
+        N.matrix().normalize();
+
+        std::cout << "R: " << R_0.transpose() << " N: " << N.transpose()
+                  << " g_0: " << g_0.transpose()
+                  << " g*: " << (g_0 - 2 * dot(g_0, N) * N).transpose()
+                  << std::endl;
 
         // reversing perpendicular component does not change magnitude
         if (g_0.matrix().squaredNorm() < F_TOL * F_TOL) {
@@ -77,7 +84,8 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
                 }
 
                 N = N * std::cos(theta_min) + theta * std::sin(theta_min);
-                if (abs(theta_min) < THETA_TOL || j == IR_MAX) {
+
+                if (abs(theta_min) < THETA_TOL || j == IR_MAX - 1) {
                     break;
                 } else {
                     g_1 = std::sin(theta_1 - theta_min) / std::sin(theta_1) *
@@ -89,20 +97,22 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
                 }
             }
 
-            pp(N);
+            // pp(N);
         }
 
         //////////////////////////// Translate Dimer ///////////////////////////
 
-        lbfgs_trnslt(R_0, g_0 - 2 * dot(g_0, N) * N, p); // grad is neg of force
+        lbfgs_trnslt(R_0, g_0 - 2 * dot(g_0, N) * N, p); // grad is neg of f
 
-        if (double s = std::sqrt(dot(p, p)); s < S_MAX) {
+        pp(p);
+
+        if (double s = dot(p, p); s < S_MAX * S_MAX) {
             R_0 -= p;
         } else {
-            R_0 -= p * S_MAX / s;
+            R_0 -= p * S_MAX / std::sqrt(s);
         }
 
-        std::cout << "iteration: " << R_0.transpose() << std::endl;
+        // R_0 -= g_0 - 2 * dot(g_0, N) * N;
     }
 
     return false;
