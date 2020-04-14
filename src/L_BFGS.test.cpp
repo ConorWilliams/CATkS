@@ -1,4 +1,3 @@
-#pragma once
 
 #include <iostream>
 
@@ -45,7 +44,7 @@ int main() {
     while (f2(pos) > 0.001) {
         count++;
 
-        core(step, pos, grad(pos));
+        core(pos, grad(pos), step);
 
         // while (f2(pos - step) > f2(pos) + 0.001 * (step * grad(pos)).sum()) {
         //     std::cout << "yes" << std::endl;

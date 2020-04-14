@@ -47,3 +47,6 @@ include_directories(src)
 # add the executables
 add_executable(bfgs src/L_BFGS.test.cpp)
 target_compile_options(bfgs PRIVATE -Wall -Wextra -pedantic -Werror -O2 -march=native)
+
+add_executable(dimer src/dimer.test.cpp)
+target_compile_options(dimer PRIVATE -Wall -Wextra -pedantic -Werror -O2 -march=native)

@@ -5,9 +5,11 @@
 
 #include "Eigen/Core"
 
-using Vector = Eigen::Array<double, Eigen::Dynamic, 1>;
+#include "utils.hpp"
 
-template <long M> class CoreLBFGS {
+inline constexpr long M_DEFAULT = 6;
+
+template <long M = M_DEFAULT> class CoreLBFGS {
   private:
     static_assert(M > 0, "Invalid amount of history");
 
@@ -37,7 +39,7 @@ template <long M> class CoreLBFGS {
      * param pos    x_k current coordinate
      * param grad   g-k current gradient
      */
-    inline void operator()(Vector &q, Vector const &pos, Vector const &grad) {
+    inline void operator()(Vector const &pos, Vector const &grad, Vector &q) {
         q = grad;
 
         long idx = (m_k - 1) % M;
@@ -46,7 +48,7 @@ template <long M> class CoreLBFGS {
         if (m_k > 0) {
             m_s.col(idx) = pos - m_prev_pos;
             m_y.col(idx) = grad - m_prev_grad;
-            m_rho(idx) = 1 / (m_s.col(idx) * m_y.col(idx)).sum();
+            m_rho(idx) = 1 / dot(m_s.col(idx), m_y.col(idx));
         }
 
         long incr = m_k - M;
@@ -62,13 +64,13 @@ template <long M> class CoreLBFGS {
             long j = (i + incr) % M;
             // std::cout << "one: " << j << std::endl;
 
-            m_a(j) = m_rho(j) * (m_s.col(j) * q).sum();
+            m_a(j) = m_rho(j) * dot(m_s.col(j), q);
             q += m_a(j) * m_y.col(j);
         }
 
         // scaling
         if (m_k > 0) {
-            q *= 1 / (m_rho(idx) * (m_y.col(idx) * m_y.col(idx)).sum());
+            q *= 1 / (m_rho(idx) * dot(m_y.col(idx), m_y.col(idx)));
         }
 
         // loop 2
@@ -76,7 +78,7 @@ template <long M> class CoreLBFGS {
             long j = (i + incr) % M;
             // std::cout << "two: " << j << std::endl;
 
-            double b = m_rho(j) * (m_y.col(j) * q).sum();
+            double b = m_rho(j) * dot(m_y.col(j), q);
             q += (m_a(j) - b) * m_s.col(j);
         }
 
