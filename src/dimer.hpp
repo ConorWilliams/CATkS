@@ -38,7 +38,6 @@ template <typename F> bool dimerSearch(Vector &R_0, Vector &N) {
     Vector Np{dims};
     Vector g_1{dims};
     Vector gp_1{dims};
-    Vector delta_g{dims};
 
     for (int i = 0; i < IT_MAX; ++i) {
         std::cout << "iteration: " << i << std::endl;
@@ -58,14 +57,12 @@ template <typename F> bool dimerSearch(Vector &R_0, Vector &N) {
         grad(R_0 + DELTA_R * N, g_1);
 
         for (int j = 0; j < IR_MAX; ++j) {
-            delta_g = g_1 - g_0;
-
-            lbfgs_rotate(N, delta_g, theta);
+            lbfgs_rotate(N, g_1 - g_0, theta); // could use perpendicularised
             theta -= dot(theta, N) * N;
             theta.matrix().normalize();
 
-            double b_1 = dot(delta_g, theta) / DELTA_R;
-            double c_x0 = dot(delta_g, N) / DELTA_R;
+            double b_1 = dot(g_1 - g_0, theta) / DELTA_R;
+            double c_x0 = dot(g_1 - g_0, N) / DELTA_R;
             double theta_1 = -0.5 * std::atan(b_1 / abs(c_x0));
 
             if (abs(theta_1) < THETA_TOL) {
@@ -79,6 +76,12 @@ template <typename F> bool dimerSearch(Vector &R_0, Vector &N) {
                 double a_1 = (c_x0 - c_x1 + b_1 * sin(2 * theta_1)) /
                              (1 - std::cos(2 * theta_1));
                 double theta_min = 0.5 * std::atan(b_1 / a_1);
+
+                if (a_1 * std::cos(2 * theta_min) +
+                        b_1 * (std::sin(2 * theta_min) - 1) >
+                    0) {
+                    theta_min += M_PI / 2;
+                }
 
                 N = N * std::cos(theta_min) + theta * std::sin(theta_min);
                 if (abs(theta_min) < THETA_TOL) {

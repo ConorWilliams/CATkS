@@ -19,7 +19,7 @@ int main() {
     pos(0) = 10;
     pos(1) = 10;
 
-    axis(0) = 1;
+    axis(0) = 0;
     axis(1) = 1;
 
     axis.matrix().normalize();
