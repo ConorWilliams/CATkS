@@ -14,8 +14,11 @@ inline constexpr int IT_MAX = 2000;
 inline constexpr int IR_MAX = 10;
 inline constexpr double F_TOL = 0.000001;
 inline constexpr double DELTA_R = 0.001;
-inline constexpr double S_MAX = 1;
+inline constexpr double S_MAX = 100;
 inline constexpr double THETA_TOL = 0.0035; // 2deg
+
+inline constexpr double C_1 = 1e-4;
+inline constexpr double C_2 = 0.9;
 
 void pp(Vector const &v) { std::cout << v.transpose() << std::endl; }
 
@@ -25,8 +28,8 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
 
     long dims = R_0.size();
 
-    CoreLBFGS lbfgs_rotate(dims);
-    CoreLBFGS lbfgs_trnslt(dims);
+    CoreLBFGS<5> lbfgs_rotate(dims);
+    CoreLBFGS<6> lbfgs_trnslt(dims);
 
     Vector p{dims};
 
@@ -37,15 +40,12 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
     Vector g_1{dims};
     Vector gp_1{dims};
 
+    Vector buf{dims}; // scratch space
+
     for (int i = 0; i < IT_MAX; ++i) {
         grad(R_0, g_0);
 
         N.matrix().normalize();
-
-        std::cout << "R: " << R_0.transpose() << " N: " << N.transpose()
-                  << " g_0: " << g_0.transpose()
-                  << " g*: " << (g_0 - 2 * dot(g_0, N) * N).transpose()
-                  << std::endl;
 
         // reversing perpendicular component does not change magnitude
         if (g_0.matrix().squaredNorm() < F_TOL * F_TOL) {
@@ -59,6 +59,7 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
 
         for (int j = 0; j < IR_MAX; ++j) {
             lbfgs_rotate(N, g_1 - g_0, theta); // could use perpendicularised
+            // maybe need theta = -theta here.
             theta -= dot(theta, N) * N;
             theta.matrix().normalize();
 
@@ -85,34 +86,80 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
 
                 N = N * std::cos(theta_min) + theta * std::sin(theta_min);
 
-                if (abs(theta_min) < THETA_TOL || j == IR_MAX - 1) {
+                g_1 = std::sin(theta_1 - theta_min) / std::sin(theta_1) * g_1 +
+                      std::sin(theta_min) / std::sin(theta_1) * gp_1 +
+                      (1 - std::cos(theta_min) -
+                       std::sin(theta_min) * std::tan(0.5 * theta_1)) *
+                          g_0;
+
+                if (abs(theta_min) < THETA_TOL /*|| j == IR_MAX - 1*/) {
                     break;
-                } else {
-                    g_1 = std::sin(theta_1 - theta_min) / std::sin(theta_1) *
-                              g_1 +
-                          std::sin(theta_min) / std::sin(theta_1) * gp_1 +
-                          (1 - std::cos(theta_min) -
-                           std::sin(theta_min) * std::tan(0.5 * theta_1)) *
-                              g_0;
                 }
             }
 
             // pp(N);
         }
 
-        //////////////////////////// Translate Dimer ///////////////////////////
+        std::cout << "R: " << R_0.transpose() << " N: " << N.transpose()
+                  << " g_0: " << g_0.transpose()
+                  << " g*: " << (g_0 - 2 * dot(g_0, N) * N).transpose()
+                  << std::endl;
+
+        ////////////////////////// Translate Dimer ///////////////////////////
 
         lbfgs_trnslt(R_0, g_0 - 2 * dot(g_0, N) * N, p); // grad is neg of f
 
-        pp(p);
+        p = -p;
 
-        if (double s = dot(p, p); s < S_MAX * S_MAX) {
-            R_0 -= p;
-        } else {
-            R_0 -= p * S_MAX / std::sqrt(s);
+        auto phi_p = [&](double alpha) {
+            grad(R_0 + alpha * p, buf);
+            buf -= 2 * dot(buf, N) * N;
+            return dot(buf, p);
+        };
+
+        double lo = 0;
+        double hi = 1;
+
+        double phi_0 = dot(g_0, p);
+
+        // std::cout << "p is: " << p.transpose() << std::endl;
+
+        for (int count = 0;;) {
+            if (++count > 10) {
+                hi = 1;
+                std::terminate();
+                break;
+            }
+
+            // Wolfie 2 to garantee y^T s in bfgs is >0
+            if (abs(phi_p(hi)) <= -C_2 * phi_p(0)) {
+                break;
+            }
+
+            std::cout << phi_0 << ' ' << lo << ' ' << hi << ' ' << phi_p(hi)
+                      << std::endl;
+
+            if (phi_p(hi) >= 0) {
+                // gone too far
+                double r = phi_p(lo) / phi_p(hi);
+
+                hi = (hi * r - lo) / (r - 1);
+
+            } else {
+                lo = hi;
+                hi *= 2;
+            }
         }
 
-        // R_0 -= g_0 - 2 * dot(g_0, N) * N;
+        std::cout << "ALPHA: " << hi << std::endl;
+
+        // if (double s = dot(p, p); s < S_MAX * S_MAX) {
+        //     R_0 += p;
+        // } else {
+        //     R_0 += p * S_MAX / std::sqrt(s);
+        // }
+
+        R_0 += hi * p;
     }
 
     return false;

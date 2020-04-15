@@ -32,6 +32,11 @@ template <long M = M_DEFAULT> class CoreLBFGS {
 
     inline void clear() { m_k = 0; }
 
+    void dump() {
+        std::cout << m_s << std::endl;
+        std::cout << m_y << std::endl;
+    }
+
     /**
      * Computes the H_k g_k product using the L-BFGS two-loop recursion
      *
@@ -49,7 +54,14 @@ template <long M = M_DEFAULT> class CoreLBFGS {
             m_s.col(idx) = pos - m_prev_pos;
             m_y.col(idx) = grad - m_prev_grad;
             m_rho(idx) = 1 / dot(m_s.col(idx), m_y.col(idx));
+
+            // if (m_rho(idx) >= 0) {
+            //     std::cout << m_rho(idx) << " at " << m_k << std::endl;
+            //     assert(false);
+            // }
         }
+
+        // std::cout << "pos " << pos.transpose() << std::endl;
 
         m_prev_pos = pos;
         m_prev_grad = grad;
@@ -68,7 +80,7 @@ template <long M = M_DEFAULT> class CoreLBFGS {
             // std::cout << "one: " << j << std::endl;
 
             m_a(j) = m_rho(j) * dot(m_s.col(j), q);
-            q += m_a(j) * m_y.col(j);
+            q -= m_a(j) * m_y.col(j);
         }
 
         // scaling
@@ -87,10 +99,10 @@ template <long M = M_DEFAULT> class CoreLBFGS {
 
         ++m_k;
 
+        // dump();
+
         return;
     }
-
-    void dump() { std::cout << m_s << std::endl; }
 
     CoreLBFGS(const CoreLBFGS &other) = default;
     CoreLBFGS(CoreLBFGS &&other) = default;
