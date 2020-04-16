@@ -12,10 +12,10 @@
 
 inline constexpr int IT_MAX = 2000;
 inline constexpr int IR_MAX = 10;
-inline constexpr double F_TOL = 0.000001;
+inline constexpr double F_TOL = 1e-5;
 inline constexpr double DELTA_R = 0.001;
 inline constexpr double S_MAX = 100;
-inline constexpr double THETA_TOL = 0.0035; // 2deg
+inline constexpr double THETA_TOL = 1 * (2 * M_PI / 360); // 1deg
 
 inline constexpr double C_1 = 1e-4;
 inline constexpr double C_2 = 0.9;
@@ -28,7 +28,7 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
 
     long dims = R_0.size();
 
-    CoreLBFGS<5> lbfgs_rotate(dims);
+    CoreLBFGS<3> lbfgs_rotate(dims);
     CoreLBFGS<6> lbfgs_trnslt(dims);
 
     Vector p{dims};
@@ -39,8 +39,6 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
     Vector g_0{dims};
     Vector g_1{dims};
     Vector gp_1{dims};
-
-    Vector buf{dims}; // scratch space
 
     grad(R_0, g_0);
 
@@ -60,9 +58,10 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
 
         for (int j = 0; j < IR_MAX; ++j) {
             lbfgs_rotate(N, g_1 - g_0, theta); // could use perpendicularised
-            // theta = -theta; // maybe need theta = -theta here.
             theta -= dot(theta, N) * N;
             theta.matrix().normalize();
+
+            // std::cout << j << std::endl;
 
             double b_1 = dot(g_1 - g_0, theta) / DELTA_R;
             double c_x0 = dot(g_1 - g_0, N) / DELTA_R;
@@ -98,8 +97,6 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
                               g_0;
                 }
             }
-
-            // pp(N);
         }
 
         std::cout << "R: " << R_0.transpose() << " N: " << N.transpose()
@@ -111,36 +108,32 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
 
         lbfgs_trnslt(R_0, g_0 - 2 * dot(g_0, N) * N, p); // grad is neg of f
 
-        p = -p;
-
         double lo = 0;
         double hi = 1;
 
         double phi_0 = dot(g_0 - 2 * dot(g_0, N) * N, p);
         double phi_lo = phi_0;
 
-        // std::cout << "p is: " << p.transpose() << std::endl;
+        int count = 0;
 
-        for (int count = 0;;) {
+        for (;;) {
             grad(R_0 + hi * p, g_0); // computes & stores grad at new point
 
             double phi_hi = dot(g_0 - 2 * dot(g_0, N) * N, p);
 
             if (++count > 10) {
-                hi = 1;
                 std::cout << "P " << p.transpose() << std::endl;
                 std::terminate();
-                break;
             }
 
-            // Wolfie 2 (strong) to garantee y^T s in bfgs is >0
+            // Wolfie 2 (strong) to garantee (y^T s > 0) in bfgs [1980]
             if (abs(phi_hi) <= -C_2 * phi_0) {
                 R_0 += hi * p;
                 break;
             }
 
-            // std::cout << phi_0 << ' ' << lo << ' ' << hi << ' ' << phi_hi
-            //           << std::endl;
+            std::cout << phi_0 << ' ' << lo << ' ' << hi << ' ' << phi_hi
+                      << std::endl;
 
             if (phi_hi >= 0) {
                 // gone too far
@@ -156,12 +149,6 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
         }
 
         std::cout << "ALPHA: " << hi << std::endl;
-
-        // if (double s = dot(p, p); s < S_MAX * S_MAX) {
-        //     R_0 += p;
-        // } else {
-        //     R_0 += p * S_MAX / std::sqrt(s);
-        // }
     }
 
     return false;
