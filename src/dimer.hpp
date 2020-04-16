@@ -10,12 +10,15 @@
 #include "L_BFGS.hpp"
 #include "utils.hpp"
 
+inline constexpr double DELTA_R = 0.001;
+
 inline constexpr int IT_MAX = 2000;
 inline constexpr int IR_MAX = 10;
-inline constexpr double F_TOL = 1e-5;
-inline constexpr double DELTA_R = 0.001;
-inline constexpr double S_MAX = 100;
+
+inline constexpr double F_TOL = 1e-10;
 inline constexpr double THETA_TOL = 1 * (2 * M_PI / 360); // 1deg
+
+inline constexpr double S_MAX = 0.5;
 
 inline constexpr double C_1 = 1e-4;
 inline constexpr double C_2 = 0.9;
@@ -99,12 +102,15 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
             }
         }
 
-        std::cout << "R: " << R_0.transpose() << " N: " << N.transpose()
-                  << " g_0: " << g_0.transpose()
-                  << " g*: " << (g_0 - 2 * dot(g_0, N) * N).transpose()
+        // std::cout << "R: " << R_0.transpose() << " N: " << N.transpose()
+        //           << " g_0: " << g_0.transpose()
+        //           << " g*: " << (g_0 - 2 * dot(g_0, N) * N).transpose()
+        //           << std::endl;
+
+        std::cout << R_0(0) << ' ' << R_0(1) << ' ' << N(0) << ' ' << N(1)
                   << std::endl;
 
-        ////////////////////////// Translate Dimer ///////////////////////////
+        ////////////////////////// Translate Dimer /////////////////////////////
 
         lbfgs_trnslt(R_0, g_0 - 2 * dot(g_0, N) * N, p); // grad is neg of f
 
@@ -122,8 +128,13 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
             double phi_hi = dot(g_0 - 2 * dot(g_0, N) * N, p);
 
             if (++count > 10) {
-                std::cout << "P " << p.transpose() << std::endl;
-                std::terminate();
+                // return false;
+                // std::cout << "P " << p.transpose() << std::endl;
+                // std::terminate();
+                hi = 0.1;
+                grad(R_0 + hi * p, g_0);
+                R_0 += hi * p;
+                break;
             }
 
             // Wolfie 2 (strong) to garantee (y^T s > 0) in bfgs [1980]
@@ -132,8 +143,8 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
                 break;
             }
 
-            std::cout << phi_0 << ' ' << lo << ' ' << hi << ' ' << phi_hi
-                      << std::endl;
+            // std::cout << phi_0 << ' ' << lo << ' ' << hi << ' ' << phi_hi
+            //           << std::endl;
 
             if (phi_hi >= 0) {
                 // gone too far
@@ -148,7 +159,7 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
             }
         }
 
-        std::cout << "ALPHA: " << hi << std::endl;
+        // std::cout << "ALPHA: " << hi << std::endl;
     }
 
     return false;
