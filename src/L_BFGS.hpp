@@ -88,7 +88,7 @@ template <long M = M_DEFAULT> class CoreLBFGS {
             q *= 1 / (m_rho(idx) * dot(m_y.col(idx), m_y.col(idx)));
         } else {
             q.matrix().normalize();
-            // q *= 0.1;
+            q *= 0.1;
         }
 
         // loop 2

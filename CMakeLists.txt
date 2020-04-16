@@ -50,3 +50,6 @@ target_compile_options(bfgs PRIVATE -Wall -Wextra -pedantic -Werror -O2 -march=n
 
 add_executable(dimer src/dimer.test.cpp)
 target_compile_options(dimer PRIVATE -Wall -Wextra -pedantic -Werror -O2 -march=native)
+
+add_executable(2d src/2d.test.cpp)
+target_compile_options(2d PRIVATE -Wall -Wextra -pedantic -Werror -O2 -march=native)

@@ -2,6 +2,8 @@
 
 #include <cmath>
 
+namespace potentials {
+
 inline constexpr double a = 0.05;
 inline constexpr double b = 0.3;
 inline constexpr double c = 0.05;
@@ -42,10 +44,22 @@ double gaus(double A, double x, double y, double x0, double y0, double xi,
 
 double V(double rAB, double rBD) {
     return E(rAB, rAC - rAB, rAC) +
-            2 * kc * std::pow(rAB - (rAC / 2 - rBD / 1.154), 2);
+           2 * kc * std::pow(rAB - (rAC / 2 - rBD / 1.154), 2);
 }
 
-double foo(double x, double y) {
+double f(double x, double y) {
     return V(x, y) + gaus(1.5, x, y, 2.02083, -0.172881, 0.1, 0.35) +
            gaus(6, x, y, 0.8, 2.0, 0.25, 0.7);
 }
+
+inline constexpr double delta = 5e-5;
+
+double fpx(double x, double y) {
+    return (f(x + delta, y) - f(x - delta, y)) / (2 * delta);
+}
+
+double fpy(double x, double y) {
+    return (f(x, y + delta) - f(x, y - delta)) / (2 * delta);
+}
+
+} // namespace potentials

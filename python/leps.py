@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 
 plt.rc("text", usetex=True)
 plt.rc("font", family="serif")
+plt.rc("text.latex", preamble=r"\usepackage{amsmath} \usepackage{siunitx}")
+
 
 a = 0.05
 b = 0.3
@@ -62,6 +64,8 @@ def foo(x, y):
     )
 
 
+print("Python on")
+
 range = 2
 
 xrange = [0.45, 3.3]
@@ -75,17 +79,21 @@ X, Y = np.meshgrid(x, y)
 
 Z = foo(X, Y)
 
-x = np.asarray([0, 1])
-y = np.asarray([0, 1])
+path = np.loadtxt("/home/cdt1902/dis/CATkS/build/search.dat", dtype=np.float64)
+
+print(path)
 
 # levels = np.arange(-20, 20, 1)
 
 # plt.contourf(X, Y, Z, 30, cmap="cividis")
 plt.contour(X, Y, Z, 30, cmap="gnuplot2")
-plt.plot(x, y, "k+")
+plt.plot(path[::, 0], path[::, 1], "k")
 
 plt.xlim(xrange)
 plt.ylim(yrange)
+
+plt.xlabel(r"$x$/\si{\angstrom}")
+plt.ylabel(r"$y$/\si{\angstrom}")
 
 plt.title("$2$D test function")
 
