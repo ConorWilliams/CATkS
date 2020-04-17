@@ -3,7 +3,7 @@
 #include "Eigen/Core"
 
 #include "2d_pot.hpp"
-#include "dimer.hpp"
+#include "dimer_cg.hpp"
 #include "utils.hpp"
 
 // f= 7xy e ^ (-x2+-y2)
@@ -47,7 +47,7 @@ int main() {
     std::random_device rd{};
     std::mt19937 gen{rd()};
 
-    std::normal_distribution<double> d{0, 0.2};
+    std::normal_distribution<double> d{0, 0.1};
     std::uniform_real_distribution<double> u(-M_PI, M_PI);
 
     pos(0) = 0.77 + d(gen);

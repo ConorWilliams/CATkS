@@ -82,6 +82,7 @@ Z = foo(X, Y)
 path = np.loadtxt("/home/cdt1902/dis/CATkS/build/search.dat", dtype=np.float64)
 
 print(path)
+print("iterations:", path.shape)
 
 # levels = np.arange(-20, 20, 1)
 

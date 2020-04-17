@@ -2,7 +2,7 @@
 
 #include "Eigen/Core"
 
-#include "dimer.hpp"
+#include "dimer_cg.hpp"
 #include "utils.hpp"
 
 struct Grad {
