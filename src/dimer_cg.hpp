@@ -40,7 +40,7 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
     Vector gf_p{dims};
     Vector gf_n = g_0 - 2 * dot(g_0, N) * N;
 
-    Vector p_n = -gf_n;
+    Vector p = -gf_n;
 
     double f0 = dot(g_0, g_0);
 
@@ -56,17 +56,17 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
         }
 
         f0 = dot(g_0, g_0);
-        grad(R_0 + smol * p_n / std::sqrt(dot(p_n, p_n)), g_0);
+        grad(R_0 + smol * p / std::sqrt(dot(p, p)), g_0);
         double fn = dot(g_0, g_0);
 
         if (curv > 0) {
-            R_0 += 0.1 * p_n / std::sqrt(dot(p_n, p_n));
+            R_0 += 0.1 * p / std::sqrt(dot(p, p));
         } else {
             double m = (fn - f0) / smol;
             double alpha = -f0 / m;
-            double norm = std::sqrt(dot(p_n, p_n));
+            double norm = std::sqrt(dot(p, p));
             alpha = abs(alpha * norm) <= S_MAX ? alpha : S_MAX / norm;
-            R_0 += p_n * alpha;
+            R_0 += p * alpha;
         }
 
         grad(R_0, g_0);
@@ -80,11 +80,7 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
 
         double beta = dot(gf_n, gf_n - gf_p) / dot(gf_p, gf_p);
 
-        if (curv < 0 && abs(dot(gf_n, gf_p)) >= 0.1 * dot(gf_n, gf_n)) {
-            p_n = -gf_n;
-        } else {
-            p_n = -gf_n + beta * p_n;
-        }
+        p = -gf_n + beta * p;
 
         // if (curv < 0) {
         //     return true;
