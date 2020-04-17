@@ -22,14 +22,12 @@ template <long M = M_DEFAULT> class CoreLBFGS {
 
     Vector m_a;
 
-    std::size_t m_dims;
-    double m_norm;
     long m_k;
 
   public:
-    explicit CoreLBFGS(std::size_t dims, double norm = 1)
+    explicit CoreLBFGS(std::size_t dims)
         : m_s{dims, M}, m_y{dims, M}, m_rho{dims, M}, m_prev_pos{dims},
-          m_prev_grad{dims}, m_a{M}, m_dims{dims}, m_norm{norm}, m_k{0} {}
+          m_prev_grad{dims}, m_a{M}, m_k{0} {}
 
     inline void clear() { m_k = 0; }
 
@@ -94,10 +92,6 @@ template <long M = M_DEFAULT> class CoreLBFGS {
         }
 
         q = -q; // switch to descent direction
-
-        // if (m_k == 0) {
-        //     q *= m_norm / std::sqrt(dot(q, q));
-        // }
 
         ++m_k;
 
