@@ -42,12 +42,14 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
 
     Vector p = -gf_n;
 
+    p *= 1 / std::sqrt(dot(p, p));
+
     double f0 = dot(g_0, g_0);
 
     constexpr double smol = 0.001;
 
-    std::cout << R_0(0) << ' ' << R_0(1) << ' ' << N(0) << ' ' << N(1)
-              << std::endl;
+    std::cout << R_0(0) << ' ' << R_0(1) << ' ' << N(0) << ' ' << N(1) << ' '
+              << R_0(2) << ' ' << R_0(3) << std::endl;
 
     for (int i = 0; i < IT_MAX; ++i) {
 
@@ -56,16 +58,15 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
         }
 
         f0 = dot(g_0, g_0);
-        grad(R_0 + smol * p / std::sqrt(dot(p, p)), g_0);
+        grad(R_0 + smol * p, g_0);
         double fn = dot(g_0, g_0);
 
         if (curv > 0) {
-            R_0 += 0.1 * p / std::sqrt(dot(p, p));
+            R_0 += 0.1 * p;
         } else {
             double m = (fn - f0) / smol;
             double alpha = -f0 / m;
-            double norm = std::sqrt(dot(p, p));
-            alpha = abs(alpha * norm) <= S_MAX ? alpha : S_MAX / norm;
+            alpha = abs(alpha) <= S_MAX ? alpha : S_MAX;
             R_0 += p * alpha;
         }
 
@@ -82,12 +83,14 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
 
         p = -gf_n + beta * p;
 
+        p *= 1 / std::sqrt(dot(p, p));
+
         // if (curv < 0) {
         //     return true;
         // }
 
         std::cout << R_0(0) << ' ' << R_0(1) << ' ' << N(0) << ' ' << N(1)
-                  << std::endl;
+                  << ' ' << R_0(2) << ' ' << R_0(3) << std::endl;
     }
 
     return false;
