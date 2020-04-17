@@ -41,6 +41,8 @@ struct Grad3 {
     }
 };
 
+void pp(Vector &v) { std::cout << v.transpose() << std::endl; }
+
 int main() {
     Vector pos{2};
     Vector axis{2};

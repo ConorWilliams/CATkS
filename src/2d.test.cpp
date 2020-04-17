@@ -29,20 +29,20 @@ struct Grad4 {
 
         result(1) = potentials::fpy(x1, y1);
 
-        auto x2 = pos(2);
-        auto y2 = pos(3);
-
-        result(2) = potentials::fpx(x2, y2);
-
-        result(3) = potentials::fpy(x2, y2);
+        // auto x2 = pos(2);
+        // auto y2 = pos(3);
+        //
+        // result(2) = potentials::fpx(x2, y2);
+        //
+        // result(3) = potentials::fpy(x2, y2);
     }
 };
 
 #include <random>
 
 int main() {
-    Vector pos{4};
-    Vector axis{4};
+    Vector pos{2};
+    Vector axis{2};
 
     std::random_device rd{};
     std::mt19937 gen{rd()};
@@ -53,23 +53,26 @@ int main() {
     pos(0) = 0.77 + d(gen);
     pos(1) = -0.07 + d(gen);
 
-    pos(2) = 0.77 + d(gen);
-    pos(3) = -0.07 + d(gen);
+    // pos(2) = 0.77 + d(gen);
+    // pos(3) = -0.07 + d(gen);
 
     double theta = u(gen);
 
     axis(0) = std::cos(theta);
     axis(1) = std::sin(theta);
 
-    axis(2) = std::sin(theta);
-    axis(3) = std::cos(theta);
+    // axis(2) = std::sin(theta);
+    // axis(3) = std::cos(theta);
 
     axis.matrix().normalize();
 
     dimerSearch(Grad4{}, pos, axis);
 
     std::cout << pos(0) << ' ' << pos(1) << ' ' << axis(0) << ' ' << axis(1)
-              << ' ' << pos(2) << ' ' << pos(3) << std::endl;
+              << std::endl;
+
+    // std::cout << pos(0) << ' ' << pos(1) << ' ' << axis(0) << ' ' << axis(1)
+    //           << ' ' << pos(2) << ' ' << pos(3) << std::endl;
 
     return 0;
 }

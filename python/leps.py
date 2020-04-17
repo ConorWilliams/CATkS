@@ -87,9 +87,9 @@ print(path)
 
 # plt.contourf(X, Y, Z, 30, cmap="cividis")
 plt.contour(X, Y, Z, 30, cmap="gnuplot2")
-plt.plot(path[::, 0], path[::, 1], "r")
-plt.plot(path[::, 4], path[::, 5], "k")
-# plt.quiver(path[::, 0], path[::, 1], path[::, 2], path[::, 3])
+plt.plot(path[::, 0], path[::, 1], "k")
+# plt.plot(path[::, 4], path[::, 5], "r")
+plt.quiver(path[::, 0], path[::, 1], path[::, 2], path[::, 3])
 
 plt.xlim(xrange)
 plt.ylim(yrange)

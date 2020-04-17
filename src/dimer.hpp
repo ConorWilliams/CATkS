@@ -21,7 +21,56 @@ inline constexpr double THETA_TOL = 1 * (2 * M_PI / 360); // 1deg
 
 inline constexpr double S_MAX = 0.5;
 
-void pp(Vector const &v) { std::cout << v.transpose() << std::endl; }
+template <typename T, typename F>
+void dimerRotate(F &grad, T &lbfgs, Vector const &R_0, Vector const &g_0,
+                 Vector &g_1, Vector &N, Vector &Np, Vector &gp_1,
+                 Vector &theta) {
+    lbfgs.clear();
+    grad(R_0 + DELTA_R * N, g_1); // test unevaluated R in grad slow-down
+
+    for (int j = 0; j < IR_MAX; ++j) {
+        lbfgs(N, g_1 - g_0, theta); // could use perpendicularised
+
+        theta -= dot(theta, N) * N;
+        theta.matrix().normalize();
+
+        // std::cout << j << std::endl;
+
+        double b_1 = dot(g_1 - g_0, theta) / DELTA_R;
+        double c_x0 = dot(g_1 - g_0, N) / DELTA_R;
+        double theta_1 = -0.5 * std::atan(b_1 / abs(c_x0));
+
+        if (abs(theta_1) < THETA_TOL) {
+            break;
+        } else {
+            Np = N * std::cos(theta_1) + theta * std::sin(theta_1);
+            grad(R_0 + DELTA_R * Np, gp_1);
+
+            double c_x1 = dot(gp_1 - g_0, Np) / DELTA_R;
+            double a_1 = (c_x0 - c_x1 + b_1 * sin(2 * theta_1)) /
+                         (1 - std::cos(2 * theta_1));
+            double theta_min = 0.5 * std::atan(b_1 / a_1);
+
+            if (a_1 * std::cos(2 * theta_min) - a_1 +
+                    b_1 * std::sin(2 * theta_min) >
+                0) {
+                theta_min += M_PI / 2;
+            }
+
+            N = N * std::cos(theta_min) + theta * std::sin(theta_min);
+
+            if (abs(theta_min) < THETA_TOL || j == IR_MAX - 1) {
+                break;
+            } else {
+                g_1 = std::sin(theta_1 - theta_min) / std::sin(theta_1) * g_1 +
+                      std::sin(theta_min) / std::sin(theta_1) * gp_1 +
+                      (1 - std::cos(theta_min) -
+                       std::sin(theta_min) * std::tan(0.5 * theta_1)) *
+                          g_0;
+            }
+        }
+    }
+}
 
 // F(R, g) -> g = gradient_at R
 template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
@@ -30,7 +79,7 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
     long dims = R_0.size();
 
     CoreLBFGS<6> lbfgs_rotate(dims);
-    CoreLBFGS<10> lbfgs_trnslt(dims, S_MAX);
+    CoreLBFGS<6> lbfgs_trnslt(dims, S_MAX);
 
     Vector p{dims};
 
@@ -54,60 +103,18 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
 
         ///////////////////////////// Rotate Dimer /////////////////////////////
 
-        lbfgs_rotate.clear();
-        grad(R_0 + DELTA_R * N, g_1); // test unevaluated R in grad slow-down
-
-        for (int j = 0; j < IR_MAX; ++j) {
-            lbfgs_rotate(N, g_1 - g_0, theta); // could use perpendicularised
-
-            theta -= dot(theta, N) * N;
-            theta.matrix().normalize();
-
-            // std::cout << j << std::endl;
-
-            double b_1 = dot(g_1 - g_0, theta) / DELTA_R;
-            double c_x0 = dot(g_1 - g_0, N) / DELTA_R;
-            double theta_1 = -0.5 * std::atan(b_1 / abs(c_x0));
-
-            if (abs(theta_1) < THETA_TOL) {
-                break;
-            } else {
-                Np = N * std::cos(theta_1) + theta * std::sin(theta_1);
-                grad(R_0 + DELTA_R * Np, gp_1);
-
-                double c_x1 = dot(gp_1 - g_0, Np) / DELTA_R;
-                double a_1 = (c_x0 - c_x1 + b_1 * sin(2 * theta_1)) /
-                             (1 - std::cos(2 * theta_1));
-                double theta_min = 0.5 * std::atan(b_1 / a_1);
-
-                if (a_1 * std::cos(2 * theta_min) - a_1 +
-                        b_1 * std::sin(2 * theta_min) >
-                    0) {
-                    theta_min += M_PI / 2;
-                }
-
-                N = N * std::cos(theta_min) + theta * std::sin(theta_min);
-
-                if (abs(theta_min) < THETA_TOL || j == IR_MAX - 1) {
-                    break;
-                } else {
-                    g_1 = std::sin(theta_1 - theta_min) / std::sin(theta_1) *
-                              g_1 +
-                          std::sin(theta_min) / std::sin(theta_1) * gp_1 +
-                          (1 - std::cos(theta_min) -
-                           std::sin(theta_min) * std::tan(0.5 * theta_1)) *
-                              g_0;
-                }
-            }
-        }
+        dimerRotate(grad, lbfgs_rotate, R_0, g_0, g_1, N, Np, gp_1, theta);
 
         // std::cout << "R: " << R_0.transpose() << " N: " << N.transpose()
         //           << " g_0: " << g_0.transpose()
         //           << " g*: " << (g_0 - 2 * dot(g_0, N) * N).transpose()
         //           << std::endl;
 
+        // std::cout << R_0(0) << ' ' << R_0(1) << ' ' << N(0) << ' ' << N(1)
+        //           << ' ' << R_0(2) << ' ' << R_0(3) << std::endl;
+
         std::cout << R_0(0) << ' ' << R_0(1) << ' ' << N(0) << ' ' << N(1)
-                  << ' ' << R_0(2) << ' ' << R_0(3) << std::endl;
+                  << std::endl;
 
         ////////////////////////// Translate Dimer /////////////////////////////
 
@@ -136,6 +143,7 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
             if (phi_a > phi_0) {
                 break;
             } else {
+                return false;
                 // return false;
                 // std::cout << "p" << std::endl;
                 alpha *= mult;
