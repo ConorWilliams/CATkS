@@ -68,7 +68,7 @@ print("Python on")
 
 range = 2
 
-xrange = [0.45, 3.3]
+xrange = [0.4, 3.3]
 yrange = [-3, 3.7]
 
 delta = 0.025
@@ -87,7 +87,9 @@ print(path)
 
 # plt.contourf(X, Y, Z, 30, cmap="cividis")
 plt.contour(X, Y, Z, 30, cmap="gnuplot2")
-plt.plot(path[::, 0], path[::, 1], "k")
+plt.plot(path[::, 0], path[::, 1], "r")
+plt.plot(path[::, 4], path[::, 5], "k")
+# plt.quiver(path[::, 0], path[::, 1], path[::, 2], path[::, 3])
 
 plt.xlim(xrange)
 plt.ylim(yrange)

@@ -23,12 +23,13 @@ template <long M = M_DEFAULT> class CoreLBFGS {
     Vector m_a;
 
     std::size_t m_dims;
+    double m_norm;
     long m_k;
 
   public:
-    CoreLBFGS(std::size_t dims)
+    explicit CoreLBFGS(std::size_t dims, double norm = 1)
         : m_s{dims, M}, m_y{dims, M}, m_rho{dims, M}, m_prev_pos{dims},
-          m_prev_grad{dims}, m_a{M}, m_dims{dims}, m_k{0} {}
+          m_prev_grad{dims}, m_a{M}, m_dims{dims}, m_norm{norm}, m_k{0} {}
 
     inline void clear() { m_k = 0; }
 
@@ -54,11 +55,6 @@ template <long M = M_DEFAULT> class CoreLBFGS {
             m_s.col(idx) = pos - m_prev_pos;
             m_y.col(idx) = grad - m_prev_grad;
             m_rho(idx) = 1 / dot(m_s.col(idx), m_y.col(idx));
-
-            // if (m_rho(idx) >= 0) {
-            //     std::cout << m_rho(idx) << " at " << m_k << std::endl;
-            //     assert(false);
-            // }
         }
 
         // std::cout << "pos " << pos.transpose() << std::endl;
@@ -86,9 +82,6 @@ template <long M = M_DEFAULT> class CoreLBFGS {
         // scaling
         if (m_k > 0) {
             q *= 1 / (m_rho(idx) * dot(m_y.col(idx), m_y.col(idx)));
-        } else {
-            q.matrix().normalize();
-            q *= 0.1;
         }
 
         // loop 2
@@ -100,9 +93,13 @@ template <long M = M_DEFAULT> class CoreLBFGS {
             q += (m_a(j) - b) * m_s.col(j);
         }
 
-        ++m_k;
-
         q = -q; // switch to descent direction
+
+        // if (m_k == 0) {
+        //     q *= m_norm / std::sqrt(dot(q, q));
+        // }
+
+        ++m_k;
 
         return;
     }

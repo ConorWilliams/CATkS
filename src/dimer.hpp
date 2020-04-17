@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm> //min max
 #include <cassert>
 #include <cmath>
 #include <cstddef> // std::size_t
@@ -15,13 +16,10 @@ inline constexpr double DELTA_R = 0.001;
 inline constexpr int IT_MAX = 2000;
 inline constexpr int IR_MAX = 10;
 
-inline constexpr double F_TOL = 1e-10;
+inline constexpr double F_TOL = 1e-8;
 inline constexpr double THETA_TOL = 1 * (2 * M_PI / 360); // 1deg
 
 inline constexpr double S_MAX = 0.5;
-
-inline constexpr double C_1 = 1e-4;
-inline constexpr double C_2 = 0.9;
 
 void pp(Vector const &v) { std::cout << v.transpose() << std::endl; }
 
@@ -31,8 +29,8 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
 
     long dims = R_0.size();
 
-    CoreLBFGS<3> lbfgs_rotate(dims);
-    CoreLBFGS<6> lbfgs_trnslt(dims);
+    CoreLBFGS<6> lbfgs_rotate(dims);
+    CoreLBFGS<10> lbfgs_trnslt(dims, S_MAX);
 
     Vector p{dims};
 
@@ -61,6 +59,7 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
 
         for (int j = 0; j < IR_MAX; ++j) {
             lbfgs_rotate(N, g_1 - g_0, theta); // could use perpendicularised
+
             theta -= dot(theta, N) * N;
             theta.matrix().normalize();
 
@@ -108,58 +107,43 @@ template <typename F> bool dimerSearch(F grad, Vector &R_0, Vector &N) {
         //           << std::endl;
 
         std::cout << R_0(0) << ' ' << R_0(1) << ' ' << N(0) << ' ' << N(1)
-                  << std::endl;
+                  << ' ' << R_0(2) << ' ' << R_0(3) << std::endl;
 
         ////////////////////////// Translate Dimer /////////////////////////////
 
-        lbfgs_trnslt(R_0, g_0 - 2 * dot(g_0, N) * N, p); // grad is neg of f
+        auto g_t = [&]() { return g_0 - 2 * dot(g_0, N) * N; };
 
-        double lo = 0;
-        double hi = 1;
+        lbfgs_trnslt(R_0, g_t(), p); // grad is neg of f
 
-        double phi_0 = dot(g_0 - 2 * dot(g_0, N) * N, p);
-        double phi_lo = phi_0;
+        double norm = std::sqrt(dot(p, p));
 
-        int count = 0;
+        double alpha = norm > S_MAX ? S_MAX / norm : 1.0;
 
-        for (;;) {
-            grad(R_0 + hi * p, g_0); // computes & stores grad at new point
+        double phi_0 = dot(g_t(), p);
 
-            double phi_hi = dot(g_0 - 2 * dot(g_0, N) * N, p);
+        // double mag_0 = dot(g_0, g_0);
 
-            if (++count > 10) {
-                // return false;
-                // std::cout << "P " << p.transpose() << std::endl;
-                // std::terminate();
-                hi = 0.1;
-                grad(R_0 + hi * p, g_0);
-                R_0 += hi * p;
+        constexpr double mult = 1.5;
+
+        grad(R_0 + alpha * p, g_0);
+
+        while (alpha < S_MAX / norm / mult) {
+
+            // double mag_a = dot(g_0, g_0);
+
+            double phi_a = dot(g_t(), p);
+
+            if (phi_a > phi_0) {
                 break;
-            }
-
-            // Wolfie 2 (strong) to garantee (y^T s > 0) in bfgs [1980]
-            if (abs(phi_hi) <= -C_2 * phi_0) {
-                R_0 += hi * p;
-                break;
-            }
-
-            // std::cout << phi_0 << ' ' << lo << ' ' << hi << ' ' << phi_hi
-            //           << std::endl;
-
-            if (phi_hi >= 0) {
-                // gone too far
-                double r = phi_lo / phi_hi;
-                hi = (hi * r - lo) / (r - 1);
-
             } else {
-                lo = hi;
-                phi_lo = phi_hi;
-
-                hi *= 2;
+                // return false;
+                // std::cout << "p" << std::endl;
+                alpha *= mult;
+                grad(R_0 + alpha * p, g_0);
             }
         }
 
-        // std::cout << "ALPHA: " << hi << std::endl;
+        R_0 += alpha * p;
     }
 
     return false;

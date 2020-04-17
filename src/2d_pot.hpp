@@ -13,6 +13,8 @@ inline constexpr double d3 = 3.445;
 inline constexpr double al = 1.942;
 inline constexpr double r0 = 0.742;
 
+inline constexpr double delta = 1e-6;
+
 double Q(double r, double d) {
     return d / 2 *
            (1.5 * std::exp(-2 * al * (r - r0)) - std::exp(-al * (r - r0)));
@@ -51,8 +53,6 @@ double f(double x, double y) {
     return V(x, y) + gaus(1.5, x, y, 2.02083, -0.172881, 0.1, 0.35) +
            gaus(6, x, y, 0.8, 2.0, 0.25, 0.7);
 }
-
-inline constexpr double delta = 5e-5;
 
 double fpx(double x, double y) {
     return (f(x + delta, y) - f(x - delta, y)) / (2 * delta);
