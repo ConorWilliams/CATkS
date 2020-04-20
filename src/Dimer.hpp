@@ -9,19 +9,19 @@
 #include "L_BFGS.hpp"
 #include "utils.hpp"
 
-inline constexpr int IR_MAX = 10;
-inline constexpr int IE_MAX = 50;
-inline constexpr int IT_MAX = 1950;
-
-inline constexpr double DELTA_R = 0.001;
-
-inline constexpr double F_TOL = 1e-8;
-inline constexpr double THETA_TOL = 5 * (2 * M_PI / 360); // 1deg
-
-inline constexpr double S_MIN = 0.1;
-inline constexpr double S_MAX = 0.5;
-
 template <typename F> class Dimer {
+    static constexpr int IR_MAX = 10;
+    static constexpr int IE_MAX = 50;
+    static constexpr int IT_MAX = 1950;
+
+    static constexpr double DELTA_R = 0.001;
+
+    static constexpr double F_TOL = 1e-8;
+    static constexpr double THETA_TOL = 1 * (2 * M_PI / 360); // 1deg
+
+    static constexpr double S_MIN = 0.1;
+    static constexpr double S_MAX = 0.5;
+
     F const &grad;
     long dims;
 
@@ -55,24 +55,21 @@ template <typename F> class Dimer {
         updateGrad();
     }
 
-  public:
     inline auto effGrad() const { return g_0 - 2 * dot(g_0, N) * N; }
 
+  public:
     void print() const {
         std::cout << R_0(0) << ' ' << R_0(1) << ' ' << N(0) << ' ' << N(1)
                   << ' ' << R_0(2) << ' ' << R_0(3) << std::endl;
     }
 
-    Dimer(F const &grad, Vector &R_0, Vector &N)
-        : grad{grad}, dims{N.size()}, lbfgs_rot(dims),
-          lbfgs_trn(dims), R_0{R_0}, N{N}, g_0{dims}, s1{dims}, s2{dims},
-          s3{dims}, g_1{dims}, gp_1{dims}, Np{dims}, theta{dims} {
-        assert(R_0.size() == N.size());
-        updateGrad();
-    }
+    Dimer(F const &grad, Vector &R_in, Vector &N_in)
+        : grad{grad}, dims{R_in.size()}, lbfgs_rot(dims),
+          lbfgs_trn(dims), R_0{R_in}, N{N_in}, g_0{dims}, s1{dims}, s2{dims},
+          s3{dims}, g_1{dims}, gp_1{dims}, Np{dims}, theta{dims} {}
 
+  private:
     inline double alignAxis() {
-
         lbfgs_rot.clear();
         grad(R_0 + DELTA_R * N, g_1); // test unevaluated R in grad slow-down
 
@@ -164,7 +161,12 @@ template <typename F> class Dimer {
         return false;
     }
 
+  public:
     bool findSaddle() {
+        lbfgs_trn.clear();
+
+        updateGrad();
+
         if (!escapeConvex()) {
             return false;
         }

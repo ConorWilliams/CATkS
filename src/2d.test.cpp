@@ -50,11 +50,10 @@ int main() {
     std::normal_distribution<double> d{0, 0.1};
     std::uniform_real_distribution<double> u(-M_PI, M_PI);
 
-    pos(0) = 0.77 + d(gen);
-    pos(1) = -0.07 + d(gen);
-
-    pos(2) = 0.692 + d(gen);
-    pos(3) = 3.801 + d(gen);
+    pos(0) = 0.77;
+    pos(1) = -0.07;
+    pos(2) = 0.692;
+    pos(3) = 3.801;
 
     double theta = u(gen);
 
@@ -66,11 +65,17 @@ int main() {
 
     axis.matrix().normalize();
 
+    auto rand = Eigen::ArrayXXd::NullaryExpr(4, 1, [&]() { return d(gen); });
+
+    pos += rand;
+
     Dimer dimer{Grad4{}, pos, axis};
+
     dimer.findSaddle();
     dimer.print();
 
-    // std::cout << pos(0) << ' ' << pos(1) << ' ' << axis(0) << ' ' << axis(1)
+    // std::cout << pos(0) << ' ' << pos(1) << ' ' << axis(0) << ' ' <<
+    // axis(1)
     //           << ' ' << pos(2) << ' ' << pos(3) << std::endl;
 
     return 0;
