@@ -68,7 +68,7 @@ print("Python on")
 
 range = 2
 
-xrange = [0.4, 3.3]
+xrange = [0.35, 3.3]
 yrange = [-3, 3.7]
 
 delta = 0.025
