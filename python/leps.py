@@ -69,7 +69,7 @@ print("Python on")
 range = 2
 
 xrange = [0.35, 3.3]
-yrange = [-3, 3.7]
+yrange = [-3, 7]
 
 delta = 0.025
 x = np.arange(*xrange, delta)
@@ -88,9 +88,9 @@ print("iterations:", path.shape)
 
 # plt.contourf(X, Y, Z, 30, cmap="cividis")
 plt.contour(X, Y, Z, 30, cmap="gnuplot2")
-plt.plot(path[::, 0], path[::, 1], "k")
-# plt.plot(path[::, 4], path[::, 5], "r")
-plt.quiver(path[::, 0], path[::, 1], path[::, 2], path[::, 3])
+plt.plot(path[::, 0], path[::, 1], color="b", marker="+", linestyle="-")
+plt.plot(path[::, 4], path[::, 5], color="r", marker="+", linestyle="-")
+# plt.quiver(path[::, 0], path[::, 1], path[::, 2], path[::, 3])
 
 plt.xlim(xrange)
 plt.ylim(yrange)

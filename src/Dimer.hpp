@@ -10,7 +10,7 @@
 #include "utils.hpp"
 
 inline constexpr int IR_MAX = 10;
-inline constexpr int IE_MAX = 100;
+inline constexpr int IE_MAX = 50;
 inline constexpr int IT_MAX = 1950;
 
 inline constexpr double DELTA_R = 0.001;
@@ -37,6 +37,7 @@ template <typename F> class Dimer {
     Vector s1;
     Vector s2;
     Vector s3;
+    Vector s4;
 
     // rotation storage
     Vector g_1;
@@ -45,7 +46,23 @@ template <typename F> class Dimer {
     Vector Np;
     Vector theta;
 
+  private:
+    inline void updateGrad() { grad(R_0, g_0); }
+
+    template <typename T> inline void translate(T const &x) {
+        print();
+        R_0 += x;
+        updateGrad();
+    }
+
   public:
+    inline auto effGrad() const { return g_0 - 2 * dot(g_0, N) * N; }
+
+    void print() const {
+        std::cout << R_0(0) << ' ' << R_0(1) << ' ' << N(0) << ' ' << N(1)
+                  << ' ' << R_0(2) << ' ' << R_0(3) << std::endl;
+    }
+
     Dimer(F const &grad, Vector &R_0, Vector &N)
         : grad{grad}, dims{N.size()}, lbfgs_rot(dims),
           lbfgs_trn(dims), R_0{R_0}, N{N}, g_0{dims}, s1{dims}, s2{dims},
@@ -102,25 +119,11 @@ template <typename F> class Dimer {
         }
     }
 
-    inline void updateGrad() { grad(R_0, g_0); }
-
-    template <typename T> inline void translate(T const &x) {
-        print();
-        R_0 += x;
-        updateGrad();
-    }
-
-    inline auto effGrad() const { return g_0 - 2 * dot(g_0, N) * N; }
-
-    void print() const {
-        std::cout << R_0(0) << ' ' << R_0(1) << ' ' << N(0) << ' ' << N(1)
-                  << std::endl;
-    }
-
     bool escapeConvex() {
         Vector &gf_p = s1;
         Vector &gf_n = s2;
         Vector &p = s3;
+        Vector &o = s4;
 
         double curv = alignAxis();
 
@@ -130,35 +133,32 @@ template <typename F> class Dimer {
         gf_n = eff_grad();
         p = -gf_n;
 
-        double m = S_MIN;
+        double m = S_MIN / std::sqrt(dot(p, p));
 
         for (int i = 0; i < IE_MAX; ++i) {
             if (curv < 0 || dot(g_0, g_0) < F_TOL * F_TOL) {
                 return true;
             }
 
-            translate(m * p / std::sqrt(dot(p, p)));
-
+            translate(m * p);
             curv = alignAxis();
 
             using std::swap;
             swap(gf_n, gf_p);
 
             gf_n = eff_grad();
-
+            // Polak-Ribiere CG methd
             double b = dot(gf_n, gf_n - gf_p) / dot(gf_p, gf_p);
 
-            Vector prev = p;
-
+            o = p; // old
             p = b * p - gf_n;
 
-            double ps = dot(prev, p);
+            double op = dot(o, p);
+            double pp = dot(p, p);
 
-            if (ps > 0 * dot(p, p)) {
-                m = std::min(S_MAX, 1.5 * m);
-            } else {
-                m = S_MIN;
-            }
+            m = S_MAX * 0.5 * (op / pp + 1);
+            m = std::min(std::max(S_MIN, m), S_MAX);
+            m = m / std::sqrt(pp);
         }
 
         return false;
@@ -174,6 +174,11 @@ template <typename F> class Dimer {
 
         alignAxis();
 
+        // initial small step -- scales Hessian
+        lbfgs_trn(R_0, effGrad(), p);
+        translate(S_MIN * p / std::sqrt(dot(p, p)));
+        alignAxis();
+
         for (int i = 0; i < IT_MAX; ++i) {
             // reversing perpendicular component does not change magnitude
             if (dot(g_0, g_0) < F_TOL * F_TOL) {
@@ -182,22 +187,24 @@ template <typename F> class Dimer {
 
             g_eff = effGrad();
 
-            lbfgs_trn(R_0, g_eff, p); // grad is neg of f
+            lbfgs_trn(R_0, g_eff, p);
 
             double norm = std::sqrt(dot(p, p));
             double alpha = norm > S_MAX ? S_MAX / norm : 1.0;
+
             double phi_0 = dot(g_eff, p);
 
             translate(alpha * p);
 
-            alignAxis();
-
+            double curv = alignAxis();
             double phi_a = dot(effGrad(), p);
 
             // optional
-            if (phi_a <= phi_0) {
-                std::terminate();
+            if (phi_a <= phi_0 && curv > 0) {
                 return false;
+                // std::terminate();
+                // return false;
+                // return findSaddle();
             }
         }
 
