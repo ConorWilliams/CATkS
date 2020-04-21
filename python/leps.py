@@ -68,8 +68,9 @@ print("Python on")
 
 range = 2
 
-xrange = [0.2, 3.3]
+xrange = [0.5, 3.2]
 yrange = [-3, 4]
+
 
 delta = 0.025
 x = np.arange(*xrange, delta)
@@ -81,13 +82,11 @@ Z = foo(X, Y)
 
 path = np.loadtxt("/home/cdt1902/dis/CATkS/build/search.dat", dtype=np.float64)
 
-print(path)
-print("iterations:", path.shape)
 
 # levels = np.arange(-20, 20, 1)
 
 # plt.contourf(X, Y, Z, 30, cmap="cividis")
-plt.contour(X, Y, Z, 30, cmap="gnuplot2")
+plt.contour(X, Y, Z, 50, cmap="gnuplot2")
 plt.plot(path[::, 0], path[::, 1], color="b", marker="+", linestyle="-")
 # plt.plot(path[::, 4], path[::, 5], color="r", marker="+", linestyle="-")
 # plt.quiver(path[::, 0], path[::, 1], path[::, 2], path[::, 3])

@@ -171,6 +171,7 @@ template <typename F> class Dimer {
         updateGrad();
 
         if (!escapeConvex()) {
+            std::cerr << "failed to escape convex" << std::endl;
             return false;
         }
 
@@ -197,21 +198,23 @@ template <typename F> class Dimer {
             double norm = std::sqrt(dot(p, p));
             double alpha = norm > S_MAX ? S_MAX / norm : 1.0;
 
-            double phi_0 = dot(g_eff, p);
+            double g0 = dot(g_eff, p);
 
             translate(alpha * p);
 
             double curv = alignAxis();
-            double phi_a = dot(effGrad(), p);
+            double ga = dot(effGrad(), p);
 
             // optional
-            if (phi_a <= phi_0 && curv > 0) {
-                return false;
+            if (ga <= g0 && curv > 0) {
+                std::cerr << "failed to uphold y^T s in dimer" << std::endl;
+                // return false;
                 // std::terminate();
-                // return findSaddle();
+                return findSaddle();
             }
         }
 
+        std::cerr << "failed converge dimer" << std::endl;
         return false;
     }
 };

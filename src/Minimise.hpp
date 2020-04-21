@@ -16,7 +16,7 @@ template <typename F1, typename F2> class Minimise {
     static constexpr int I_MAX = 1000;
     static constexpr double F_TOL = 1e-6;
 
-    static constexpr double S_MAX = 0.5;
+    static constexpr double S_MAX = 1;
 
     F1 const &f;
     F2 const &grad;
@@ -47,15 +47,14 @@ template <typename F1, typename F2> class Minimise {
 
             lbfgs(x, g, p);
 
-            double norm = std::sqrt(dot(p, p));
-            double a = norm > S_MAX ? S_MAX / norm : 1.0;
+            double a = 1;
 
             x0 = x;
 
             double const f0 = f(x);
             double const g0 = dot(g, p);
 
-            // get descent direction
+            // force descent direction
             if (g0 > 0) {
                 p = -p;
             }
@@ -66,16 +65,28 @@ template <typename F1, typename F2> class Minimise {
 
                 double fa = f(x);
 
-                if (fa <= f0 + C1 * a * g0 || i > 10) {
+                if (fa <= f0 + C1 * a * g0) {
                     break;
                 } else {
-                    a = -a * a * g0 * 0.5 / (fa - a * g0 - f0);
+                    double quad = -a * a * g0 * 0.5 / (fa - a * g0 - f0);
+                    if (quad <= 0 || quad >= a) {
+                        a = a / 2;
+                    } else {
+                        a = quad;
+                    }
+                }
+
+                if (i > 20) {
+                    std::cerr << "fail in minimiser line search" << std::endl;
+                    std::terminate();
                 }
             }
 
-            std::cout << x(0) << ' ' << x(1) << ' ' << 0 << ' ' << 0
+            std::cout << x(0) << ' ' << x(1) << ' ' << 1 << ' ' << 0
                       << std::endl;
         }
+
+        std::cerr << "line search failed to converge" << std::endl;
         return false;
     }
 };

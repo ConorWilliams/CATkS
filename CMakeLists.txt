@@ -46,7 +46,7 @@ include_directories(src)
 
 # add the executables
 add_executable(bfgs src/L_BFGS.test.cpp)
-target_compile_options(bfgs PRIVATE -Wall -Wextra -pedantic -Werror -O2 -march=native)
+target_compile_options(bfgs PRIVATE -Wall -Wextra -pedantic -Werror -O3)
 
 add_executable(2d src/2d.test.cpp)
-target_compile_options(2d PRIVATE -Wall -Wextra -pedantic -Werror -O2 -march=native)
+target_compile_options(2d PRIVATE -Wall -Wextra -pedantic -Werror -O3)

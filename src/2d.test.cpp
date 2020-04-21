@@ -46,7 +46,7 @@ int main() {
     std::random_device rd{};
     std::mt19937 gen{rd()};
 
-    std::normal_distribution<double> d{0, 0.1};
+    std::normal_distribution<double> d{0, 0.3};
     std::uniform_real_distribution<double> u(-M_PI, M_PI);
 
     pos(0) = 0.77;
