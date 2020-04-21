@@ -60,14 +60,19 @@ template <long M = M_DEFAULT> class CoreLBFGS {
         m_prev_pos = pos;
         m_prev_grad = grad;
 
-        long upper = std::min(M, m_k);
+        long incr = m_k - M;
+        long bound = M;
 
-        long j = (m_k) % M;
+        if (m_k <= M) {
+            incr = 0;
+            bound = m_k;
+        }
 
         // loop 1
-        for (long i = 0; i < upper; ++i) {
-            j = (j + M - 1) % M;
+        for (long i = bound - 1; i >= 0; --i) {
+            long j = (i + incr) % M;
             // std::cout << "one: " << j << std::endl;
+
             m_a(j) = m_rho(j) * dot(m_s.col(j), q);
             q -= m_a(j) * m_y.col(j);
         }
@@ -78,11 +83,12 @@ template <long M = M_DEFAULT> class CoreLBFGS {
         }
 
         // loop 2
-        for (long i = 0; i < upper; ++i) {
+        for (long i = 0; i <= bound - 1; ++i) {
+            long j = (i + incr) % M;
             // std::cout << "two: " << j << std::endl;
+
             double b = m_rho(j) * dot(m_y.col(j), q);
             q += (m_a(j) - b) * m_s.col(j);
-            j = (j + 1) % M;
         }
 
         q = -q; // switch to descent direction
