@@ -68,8 +68,8 @@ print("Python on")
 
 range = 2
 
-xrange = [0.35, 3.3]
-yrange = [-3, 7]
+xrange = [0.2, 3.3]
+yrange = [-3, 4]
 
 delta = 0.025
 x = np.arange(*xrange, delta)
@@ -92,8 +92,8 @@ plt.plot(path[::, 0], path[::, 1], color="b", marker="+", linestyle="-")
 # plt.plot(path[::, 4], path[::, 5], color="r", marker="+", linestyle="-")
 # plt.quiver(path[::, 0], path[::, 1], path[::, 2], path[::, 3])
 
-# plt.xlim(xrange)
-# plt.ylim(yrange)
+plt.xlim(xrange)
+plt.ylim(yrange)
 
 plt.xlabel(r"$x$/\si{\angstrom}")
 plt.ylabel(r"$y$/\si{\angstrom}")
