@@ -26,7 +26,7 @@ template <typename F> class Dimer {
     long dims;
 
     CoreLBFGS<4> lbfgs_rot;
-    CoreLBFGS<6> lbfgs_trn;
+    CoreLBFGS<8> lbfgs_trn;
 
     Vector &R_0;
     Vector &N;
@@ -59,8 +59,10 @@ template <typename F> class Dimer {
 
   public:
     void print() const {
+        // std::cout << R_0(0) << ' ' << R_0(1) << ' ' << N(0) << ' ' << N(1)
+        //           << ' ' << R_0(2) << ' ' << R_0(3) << std::endl;
         std::cout << R_0(0) << ' ' << R_0(1) << ' ' << N(0) << ' ' << N(1)
-                  << ' ' << R_0(2) << ' ' << R_0(3) << std::endl;
+                  << std::endl;
     }
 
     Dimer(F const &grad, Vector &R_in, Vector &N_in)
@@ -124,7 +126,7 @@ template <typename F> class Dimer {
 
         double curv = alignAxis();
 
-        //    auto eff_grad = [&]() { return -dot(g_0, N) * N; };
+        // auto eff_grad = [&]() { return -dot(g_0, N) * N; };
         auto eff_grad = [&]() { return effGrad(); };
 
         gf_n = eff_grad();
@@ -146,6 +148,7 @@ template <typename F> class Dimer {
             gf_n = eff_grad();
             // Polak-Ribiere CG methd
             double b = dot(gf_n, gf_n - gf_p) / dot(gf_p, gf_p);
+            // b = std::max(0.0, b);
 
             o = p; // old
             p = b * p - gf_n;
@@ -205,7 +208,6 @@ template <typename F> class Dimer {
             if (phi_a <= phi_0 && curv > 0) {
                 return false;
                 // std::terminate();
-                // return false;
                 // return findSaddle();
             }
         }
