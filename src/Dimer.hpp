@@ -16,8 +16,9 @@ template <typename F> class Dimer {
 
     static constexpr double DELTA_R = 0.001;
 
-    static constexpr double F_TOL = 1e-8;
-    static constexpr double THETA_TOL = 1 * (2 * M_PI / 360); // 1deg
+    static constexpr double /*    */ F_TOL = 1e-8;
+    static constexpr double /**/ THETA_TOL = 1 * (2 * M_PI / 360); // 1deg
+    static constexpr double /*    */ G_TOL = 0.01;
 
     static constexpr double S_MIN = 0.1;
     static constexpr double S_MAX = 0.5;
@@ -126,7 +127,7 @@ template <typename F> class Dimer {
 
         double curv = alignAxis();
 
-        // auto eff_grad = [&]() { return -dot(g_0, N) * N; };
+        //    auto eff_grad = [&]() { return -dot(g_0, N) * N; };
         auto eff_grad = [&]() { return effGrad(); };
 
         gf_n = eff_grad();
@@ -146,9 +147,9 @@ template <typename F> class Dimer {
             swap(gf_n, gf_p);
 
             gf_n = eff_grad();
-            // Polak-Ribiere CG methd
+            // CG methd is Polak-Ribiere(+) variant
             double b = dot(gf_n, gf_n - gf_p) / dot(gf_p, gf_p);
-            // b = std::max(0.0, b);
+            b = std::max(0.0, b);
 
             o = p; // old
             p = b * p - gf_n;
@@ -178,40 +179,44 @@ template <typename F> class Dimer {
         Vector &p = s1;
         Vector &g_eff = s2;
 
-        alignAxis();
+        g_eff = effGrad();
 
-        // initial small step -- scales Hessian
-        lbfgs_trn(R_0, effGrad(), p);
-        translate(S_MIN * p / std::sqrt(dot(p, p)));
-        alignAxis();
+        double trust = S_MIN; // S_MIN <~ trust <~ S_MAX
+        double g0 = HUGE_VAL; // +infinity
 
         for (int i = 0; i < IT_MAX; ++i) {
-            // reversing perpendicular component does not change magnitude
-            if (dot(g_0, g_0) < F_TOL * F_TOL) {
+
+            if (dot(g_eff, g_eff) < F_TOL * F_TOL) {
                 return true;
             }
 
-            g_eff = effGrad();
-
             lbfgs_trn(R_0, g_eff, p);
 
-            double norm = std::sqrt(dot(p, p));
-            double alpha = norm > S_MAX ? S_MAX / norm : 1.0;
+            std::cerr << trust << std::endl;
 
-            double g0 = dot(g_eff, p);
+            double norm = std::sqrt(dot(p, p));
+            double alpha = norm > trust ? trust / norm : 1.0;
 
             translate(alpha * p);
+            g_eff = effGrad();
 
-            double curv = alignAxis();
-            double ga = dot(effGrad(), p);
+            [[maybe_unused]] double curv = alignAxis();
+            double ga = dot(g_eff, p); // -p0
 
-            // optional
+            if (ga >= G_TOL && trust >= S_MIN) {
+                trust /= 2;
+            } else if (ga <= -G_TOL && trust <= S_MAX) {
+                trust *= 2;
+            }
+
+            // // optional // //
             if (ga <= g0 && curv > 0) {
                 std::cerr << "failed to uphold y^T s in dimer" << std::endl;
-                // return false;
-                // std::terminate();
-                return findSaddle();
+                return false;
             }
+
+            using std::swap;
+            swap(g0, ga);
         }
 
         std::cerr << "failed converge dimer" << std::endl;

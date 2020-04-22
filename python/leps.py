@@ -82,6 +82,7 @@ Z = foo(X, Y)
 
 path = np.loadtxt("/home/cdt1902/dis/CATkS/build/search.dat", dtype=np.float64)
 
+print("iterations", path.shape)
 
 # levels = np.arange(-20, 20, 1)
 
@@ -91,8 +92,8 @@ plt.plot(path[::, 0], path[::, 1], color="b", marker="+", linestyle="-")
 # plt.plot(path[::, 4], path[::, 5], color="r", marker="+", linestyle="-")
 # plt.quiver(path[::, 0], path[::, 1], path[::, 2], path[::, 3])
 
-plt.xlim(xrange)
-plt.ylim(yrange)
+# plt.xlim(xrange)
+# plt.ylim(yrange)
 
 plt.xlabel(r"$x$/\si{\angstrom}")
 plt.ylabel(r"$y$/\si{\angstrom}")
