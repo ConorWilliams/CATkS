@@ -56,6 +56,7 @@ template <typename F> class Dimer {
         updateGrad();
     }
 
+    // Effective gradient is negative of translational force acting on dimer
     inline auto effGrad() const { return g_0 - 2 * dot(g_0, N) * N; }
 
   public:
@@ -66,12 +67,20 @@ template <typename F> class Dimer {
                   << std::endl;
     }
 
+    // grad is a function-like object such that grad(x, g) writes the gradient
+    // at x into g: Vector, Vector -> void
+    // R_in is the center of the dimer.
+    // N_in is the dimer axis unit vector.
     Dimer(F const &grad, Vector &R_in, Vector &N_in)
         : grad{grad}, dims{R_in.size()}, lbfgs_rot(dims),
           lbfgs_trn(dims), R_0{R_in}, N{N_in}, g_0{dims}, s1{dims}, s2{dims},
-          s3{dims}, g_1{dims}, gp_1{dims}, Np{dims}, theta{dims} {}
+          s3{dims}, g_1{dims}, gp_1{dims}, Np{dims}, theta{dims} {
+        N /= std::sqrt(dot(N, N));
+    }
 
   private:
+    // Aligns the dimer with the minimum curvature mode, returns the curvature
+    // along the minimum mode.
     inline double alignAxis() {
         lbfgs_rot.clear();
         grad(R_0 + DELTA_R * N, g_1); // test unevaluated R in grad slow-down
@@ -81,7 +90,7 @@ template <typename F> class Dimer {
             lbfgs_rot(N, g_delta, theta); // could use perpendicularised
 
             theta -= dot(theta, N) * N;
-            theta.matrix().normalize();
+            theta /= std::sqrt(dot(theta, theta));
 
             double b_1 = dot(g_delta, theta) / DELTA_R;
             double c_x0 = dot(g_delta, N) / DELTA_R;
@@ -119,11 +128,15 @@ template <typename F> class Dimer {
         }
     }
 
+    // Move the dimer out of the convex region into a region were the minimum
+    // curvature mode has negative curvature.
     bool escapeConvex() {
         Vector &gf_p = s1;
         Vector &gf_n = s2;
         Vector &p = s3;
         Vector &o = s4;
+
+        updateGrad();
 
         double curv = alignAxis();
 
@@ -135,8 +148,8 @@ template <typename F> class Dimer {
 
         double m = S_MIN / std::sqrt(dot(p, p));
 
-        for (int i = 0; i < IE_MAX; ++i) {
-            if (curv < 0 || dot(g_0, g_0) < F_TOL * F_TOL) {
+        for (int iter = 0; iter < IE_MAX; ++iter) {
+            if (curv < 0 || dot(gf_n, gf_n) < F_TOL * F_TOL) {
                 return true;
             }
 
@@ -145,13 +158,13 @@ template <typename F> class Dimer {
 
             using std::swap;
             swap(gf_n, gf_p);
-
             gf_n = eff_grad();
+
             // CG methd is Polak-Ribiere(+) variant
             double b = dot(gf_n, gf_n - gf_p) / dot(gf_p, gf_p);
-            b = std::max(0.0, b);
+            b = std::max(0.0, b); // (+) ensure descent direction
 
-            o = p; // old
+            o = p; // o for old
             p = b * p - gf_n;
 
             double op = dot(o, p);
@@ -166,10 +179,10 @@ template <typename F> class Dimer {
     }
 
   public:
+    // Moves the dimer to a saddle point and aligns the dimer axis with the
+    // saddle points minimum mode.
     bool findSaddle() {
         lbfgs_trn.clear();
-
-        updateGrad();
 
         if (!escapeConvex()) {
             std::cerr << "failed to escape convex" << std::endl;
@@ -184,15 +197,12 @@ template <typename F> class Dimer {
         double trust = S_MIN; // S_MIN <~ trust <~ S_MAX
         double g0 = HUGE_VAL; // +infinity
 
-        for (int i = 0; i < IT_MAX; ++i) {
-
+        for (int iter = 0; iter < IT_MAX; ++iter) {
             if (dot(g_eff, g_eff) < F_TOL * F_TOL) {
                 return true;
             }
 
             lbfgs_trn(R_0, g_eff, p);
-
-            std::cerr << trust << std::endl;
 
             double norm = std::sqrt(dot(p, p));
             double alpha = norm > trust ? trust / norm : 1.0;

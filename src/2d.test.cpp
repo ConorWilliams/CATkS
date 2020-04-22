@@ -76,12 +76,12 @@ int main() {
         return 0;
     }
 
-    // Minimise min{Pot{}, Grad{}, pos.size()};
-    //
-    // pos += 0.1 * axis;
-    // // dimer.print();
-    //
-    // min.findMin(pos);
+    Minimise min{Pot{}, Grad{}, pos.size()};
+
+    pos += 0.1 * axis;
+    // dimer.print();
+
+    min.findMin(pos);
 
     // std::cout << pos(0) << ' ' << pos(1) << ' ' << axis(0) << ' ' <<
     // axis(1)
