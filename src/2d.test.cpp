@@ -49,8 +49,8 @@ int main() {
     std::normal_distribution<double> d{0, 0.1};
     std::uniform_real_distribution<double> u(-M_PI, M_PI);
 
-    pos(0) = 0.77;
-    pos(1) = -0.07;
+    pos(0) = 0.77 - 0.05;
+    pos(1) = -0.07 - 0.4;
     // pos(2) = 0.692;
     // pos(3) = 3.801;
 
@@ -69,19 +69,18 @@ int main() {
     pos += rand;
 
     Dimer dimer{Grad{}, pos, axis};
-    dimer.print();
 
     if (!dimer.findSaddle()) {
-        // std::cout << "saddle fail" << std::endl;
+        std::cerr << "saddle fail" << std::endl;
         return 0;
     }
-
-    Minimise min{Pot{}, Grad{}, pos.size()};
-
-    pos += 0.1 * axis;
-    // dimer.print();
-
-    min.findMin(pos);
+    //
+    // Minimise min{Pot{}, Grad{}, pos.size()};
+    //
+    // pos += 0.1 * axis;
+    // // dimer.print();
+    //
+    // min.findMin(pos);
 
     // std::cout << pos(0) << ' ' << pos(1) << ' ' << axis(0) << ' ' <<
     // axis(1)

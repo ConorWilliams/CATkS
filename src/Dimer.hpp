@@ -204,13 +204,10 @@ template <typename F> class Dimer {
 
             lbfgs_trn(R_0, g_eff, p);
 
-            double norm = std::sqrt(dot(p, p));
-            double alpha = norm > trust ? trust / norm : 1.0;
+            translate(std::min(1.0, trust / std::sqrt(dot(p, p))) * p);
 
-            translate(alpha * p);
+            double curv = alignAxis();
             g_eff = effGrad();
-
-            [[maybe_unused]] double curv = alignAxis();
             double ga = dot(g_eff, p); // -p0
 
             if (ga >= G_TOL && trust >= S_MIN) {

@@ -68,8 +68,8 @@ print("Python on")
 
 range = 2
 
-xrange = [0.5, 3.2]
-yrange = [-3, 4]
+xrange = [0.5, 3]
+yrange = [-3, 3.1]
 
 
 delta = 0.025
@@ -82,22 +82,37 @@ Z = foo(X, Y)
 
 path = np.loadtxt("/home/cdt1902/dis/CATkS/build/search.dat", dtype=np.float64)
 
+print(path)
 print("iterations", path.shape)
 
 # levels = np.arange(-20, 20, 1)
 
-# plt.contourf(X, Y, Z, 30, cmap="cividis")
-plt.contour(X, Y, Z, 50, cmap="gnuplot2")
-plt.plot(path[::, 0], path[::, 1], color="b", marker="+", linestyle="-")
-# plt.plot(path[::, 4], path[::, 5], color="r", marker="+", linestyle="-")
-# plt.quiver(path[::, 0], path[::, 1], path[::, 2], path[::, 3])
 
-# plt.xlim(xrange)
-# plt.ylim(yrange)
+# plt.contourf(X, Y, Z, 30, cmap="cividis")
+plt.contour(X, Y, Z, 20, cmap="gnuplot2")
+plt.plot(
+    path[::, 0], path[::, 1], color="k", linestyle="--", label="Dimer path"
+)
+# plt.plot(path[::, 4], path[::, 5], color="r", marker="+", linestyle="-")
+plt.quiver(
+    path[::, 0],
+    path[::, 1],
+    path[::, 2],
+    path[::, 3],
+    width=0.0035,
+    headwidth=1,
+    headlength=0,
+    pivot="mid",
+    label=r"Dimer axis, $\mathbf{\hat{N}}$",
+)
+
+plt.legend()
+
+
+plt.xlim(xrange)
+plt.ylim(yrange)
 
 plt.xlabel(r"$x$/\si{\angstrom}")
 plt.ylabel(r"$y$/\si{\angstrom}")
-
-plt.title("$2$D test function")
 
 plt.show()
