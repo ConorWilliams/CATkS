@@ -113,6 +113,8 @@ plt.quiver(
     antialiased=True,
 )
 
+print("1 is", len(nn))
+
 plt.plot(se[::, 0], se[::, 1], color="orange", linestyle="--", label="Dimer 2")
 plt.quiver(
     se[::, 0],
@@ -125,6 +127,8 @@ plt.quiver(
     pivot="mid",
     antialiased=True,
 )
+
+print("2 is", len(se))
 
 
 plt.plot(ne[::, 0], ne[::, 1], color="b", linestyle="--", label="Dimer 3")
@@ -139,6 +143,7 @@ plt.quiver(
     pivot="mid",
     antialiased=True,
 )
+print("3 is", len(ne))
 
 plt.plot(w[::, 0], w[::, 1], color="green", linestyle="--", label="Dimer 4")
 plt.quiver(

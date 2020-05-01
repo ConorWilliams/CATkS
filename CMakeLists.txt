@@ -50,3 +50,6 @@ target_compile_options(bfgs PRIVATE -Wall -Wextra -pedantic -Werror -O3)
 
 add_executable(2d src/2d.test.cpp)
 target_compile_options(2d PRIVATE -Wall -Wextra -pedantic -Werror -O3)
+
+add_executable(quiver plt/quiver/quiver.cpp)
+target_compile_options(quiver PRIVATE -Wall -Wextra -pedantic -Werror -O3)

@@ -68,8 +68,8 @@ print("Python on")
 
 range = 2
 
-xrange = [0.5, 3]
-yrange = [-3, 3.1]
+xrange = [0.62, 3]
+yrange = [-3, 3.3]
 
 
 delta = 0.025
@@ -80,31 +80,21 @@ X, Y = np.meshgrid(x, y)
 
 Z = foo(X, Y)
 
-path = np.loadtxt("/home/cdt1902/dis/CATkS/build/search.dat", dtype=np.float64)
+path = np.loadtxt("/home/cdt1902/dis/CATkS/build/quiver.dat", dtype=np.float64)
 
 print(path)
 print("iterations", path.shape)
 
 # levels = np.arange(-20, 20, 1)
+#
+
+f = plt.figure(figsize=(10, 7))
 
 
-# plt.contourf(X, Y, Z, 30, cmap="cividis")
-plt.contour(X, Y, Z, 20, cmap="gnuplot2")
-plt.plot(
-    path[::, 0], path[::, 1], color="k", linestyle="--", label="Dimer path"
-)
-# plt.plot(path[::, 4], path[::, 5], color="r", marker="+", linestyle="-")
-plt.quiver(
-    path[::, 0],
-    path[::, 1],
-    path[::, 2],
-    path[::, 3],
-    width=0.0035,
-    headwidth=1,
-    headlength=0,
-    pivot="mid",
-    label=r"Dimer axis, $\mathbf{\hat{N}}$",
-)
+plt.contourf(X, Y, Z, 10, cmap="coolwarm")
+# plt.contour(X, Y, Z, 10, cmap="gray")
+
+plt.quiver(path[::, 0], path[::, 1], path[::, 2], path[::, 3], pivot="mid")
 
 plt.legend()
 
@@ -114,5 +104,8 @@ plt.ylim(yrange)
 
 plt.xlabel(r"$x$/\si{\angstrom}")
 plt.ylabel(r"$y$/\si{\angstrom}")
+
+plt.tight_layout()
+f.savefig(r"/home/cdt1902/dis/thesis/validation/Figs/ft.pdf")
 
 plt.show()

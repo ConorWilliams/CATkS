@@ -1,30 +1,27 @@
-#pragma once
 
 #include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <utility>
 
+#include "2d_pot.hpp"
 #include "Eigen/Core"
 #include "L_BFGS.hpp"
 #include "utils.hpp"
 
 template <typename F> class Dimer {
-    static constexpr int IR_MAX = 10;
+    static constexpr int IR_MAX = 50;
     static constexpr int IE_MAX = 50;
     static constexpr int IT_MAX = 1950;
 
     static constexpr double DELTA_R = 0.001;
 
     static constexpr double /*    */ F_TOL = 1e-8;
-    static constexpr double /**/ THETA_TOL = 1 * (2 * M_PI / 360); // 1deg
+    static constexpr double /**/ THETA_TOL = 0.005 * (2 * M_PI / 360); // 1deg
     static constexpr double /*    */ G_TOL = 0.01;
 
     static constexpr double S_MIN = 0.1;
     static constexpr double S_MAX = 0.5;
-
-    // increase for more component parallel to dimer, default = 1
-    static constexpr double BOOST = 1;
 
     F const &grad;
     long dims;
@@ -50,7 +47,7 @@ template <typename F> class Dimer {
     Vector Np;
     Vector theta;
 
-  private:
+  public:
     inline void updateGrad() { grad(R_0, g_0); }
 
     template <typename T> inline void translate(T const &x) {
@@ -60,9 +57,11 @@ template <typename F> class Dimer {
     }
 
     // Effective gradient is negative of translational force acting on dimer
-    inline auto effGrad() const { return g_0 - (1 + BOOST) * dot(g_0, N) * N; }
+    inline auto effGrad() const { return g_0 - 2 * dot(g_0, N) * N; }
 
-  public:
+    inline auto effGradPar() const { return dot(g_0, N) * N; }
+    inline auto effGradPerp() const { return g_0 - dot(g_0, N) * N; }
+
     void print() const {
         // std::cout << R_0(0) << ' ' << R_0(1) << ' ' << N(0) << ' ' << N(1)
         //           << ' ' << R_0(2) << ' ' << R_0(3) << std::endl;
@@ -81,7 +80,6 @@ template <typename F> class Dimer {
         N /= std::sqrt(dot(N, N));
     }
 
-  private:
     // Aligns the dimer with the minimum curvature mode, returns the curvature
     // along the minimum mode.
     inline double alignAxis() {
@@ -130,106 +128,66 @@ template <typename F> class Dimer {
             }
         }
     }
+};
 
-    // Move the dimer out of the convex region into a region were the minimum
-    // curvature mode has negative curvature.
-    bool escapeConvex() {
-        Vector &gf_p = s1;
-        Vector &gf_n = s2;
-        Vector &p = s3;
-        Vector &o = s4;
+struct Grad {
+    inline void operator()(Vector const &pos, Vector &result) const {
+        auto x1 = pos(0);
+        auto y1 = pos(1);
 
-        updateGrad();
+        result(0) = potentials::fpx(x1, y1);
 
-        double curv = alignAxis();
-
-        //    auto eff_grad = [&]() { return -dot(g_0, N) * N; };
-        auto eff_grad = [&]() { return effGrad(); };
-
-        gf_n = eff_grad();
-        p = -gf_n;
-
-        double m = S_MIN / std::sqrt(dot(p, p));
-
-        for (int iter = 0; iter < IE_MAX; ++iter) {
-            if (curv < 0 || dot(gf_n, gf_n) < F_TOL * F_TOL) {
-                return true;
-            }
-
-            translate(m * p);
-            curv = alignAxis();
-
-            using std::swap;
-            swap(gf_n, gf_p);
-            gf_n = eff_grad();
-
-            // CG methd is Polak-Ribiere(+) variant
-            double b = dot(gf_n, gf_n - gf_p) / dot(gf_p, gf_p);
-            b = std::max(0.0, b); // (+) ensure descent direction
-
-            o = p; // o for old
-            p = b * p - gf_n;
-
-            double op = dot(o, p);
-            double pp = dot(p, p);
-
-            m = S_MAX * 0.5 * (op / pp + 1);
-            m = std::min(std::max(S_MIN, m), S_MAX);
-            m = m / std::sqrt(pp);
-        }
-
-        return false;
-    }
-
-  public:
-    // Moves the dimer to a saddle point and aligns the dimer axis with the
-    // saddle points minimum mode.
-    bool findSaddle() {
-        lbfgs_trn.clear();
-
-        if (!escapeConvex()) {
-            std::cerr << "failed to escape convex" << std::endl;
-            return false;
-        }
-
-        Vector &p = s1;
-        Vector &g_eff = s2;
-
-        g_eff = effGrad();
-
-        double trust = S_MIN; // S_MIN <~ trust <~ S_MAX
-        double g0 = HUGE_VAL; // +infinity
-
-        for (int iter = 0; iter < IT_MAX; ++iter) {
-            if (dot(g_eff, g_eff) < F_TOL * F_TOL) {
-                return true;
-            }
-
-            lbfgs_trn(R_0, g_eff, p);
-
-            translate(std::min(1.0, trust / std::sqrt(dot(p, p))) * p);
-
-            double curv = alignAxis();
-            g_eff = effGrad();
-            double ga = dot(g_eff, p); // -p0
-
-            if (ga >= G_TOL && trust >= S_MIN) {
-                trust /= 2;
-            } else if (ga <= -G_TOL && trust <= S_MAX) {
-                trust *= 2;
-            }
-
-            // // optional // //
-            if (ga <= g0 && curv > 0) {
-                std::cerr << "failed to uphold y^T s in dimer" << std::endl;
-                return false;
-            }
-
-            using std::swap;
-            swap(g0, ga);
-        }
-
-        std::cerr << "failed converge dimer" << std::endl;
-        return false;
+        result(1) = potentials::fpy(x1, y1);
     }
 };
+
+struct Pot {
+    inline double operator()(Vector const &pos) const {
+        auto x = pos(0);
+        auto y = pos(1);
+
+        return potentials::f(x, y);
+    }
+};
+
+int main() {
+    constexpr int N = 2;
+    Vector pos{N};
+    Vector axis{N};
+
+    pos(0) = 0.77;
+    pos(1) = -0.07;
+
+    axis(0) = 1;
+    axis(1) = 1;
+
+    axis.matrix().normalize();
+
+    Dimer dimer{Grad{}, pos, axis};
+
+    // xrange = [0.5, 3]
+    // yrange = [-3, 3.3]
+    double delta_x = (3 - 0.67) / 35;
+    double delta_y = (3.3 - -3) / 35;
+
+    for (double x = 0.67; x <= 3; x = x + delta_x) {
+        for (double y = -3; y <= 3.3; y = y + delta_y) {
+            pos(0) = x;
+            pos(1) = y;
+
+            axis(0) = 1;
+            axis(1) = 1;
+
+            dimer.updateGrad();
+            dimer.alignAxis();
+
+            axis.matrix().normalize();
+
+            Vector force = -0.5 * dimer.effGradPerp() + dimer.effGradPar();
+            std::cout << pos(0) << ' ' << pos(1) << ' ' << force(0) << ' '
+                      << force(1) << std::endl;
+        }
+    }
+
+    std::cerr << "working" << std::endl;
+}

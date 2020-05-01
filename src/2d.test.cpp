@@ -49,8 +49,8 @@ int main() {
     std::normal_distribution<double> d{0, 0.1};
     std::uniform_real_distribution<double> u(-M_PI, M_PI);
 
-    pos(0) = 0.77 - 0.05;
-    pos(1) = -0.07 - 0.4;
+    pos(0) = 0.77;
+    pos(1) = -0.07;
     // pos(2) = 0.692;
     // pos(3) = 3.801;
 
