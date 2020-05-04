@@ -4,3 +4,6 @@
 [submodule "external/doctest"]
 	path = external/doctest
 	url = https://github.com/onqtam/doctest
+[submodule "external/hilbert"]
+	path = external/hilbert
+	url = https://github.com/adishavit/hilbert

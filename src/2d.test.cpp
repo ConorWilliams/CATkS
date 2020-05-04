@@ -38,10 +38,33 @@ struct Pot {
 
 #include <random>
 
+#include "hilbert.c"
+
+/*
+ * hilbert_c2i
+ *
+ * Convert coordinates of a point on a Hilbert curve to its index.
+ * Inputs:
+ *  nDims:      Number of coordinates.
+ *  nBits:      Number of bits/coordinate.
+ *  coord:      Array of n nBits-bit coordinates.
+ * Outputs:
+ *  index:      Output index value.  nDims*nBits bits.
+ * Assumptions:
+ *      nDims*nBits <= (sizeof bitmask_t) * (bits_per_byte)
+ */
+
 int main() {
     constexpr int N = 2;
     Vector pos{N};
     Vector axis{N};
+
+    const long long unsigned coord[3] = {1, 1, 1};
+    int out = hilbert_c2i(3, 4, coord);
+
+    std::cout << out << std::endl;
+
+    return 0;
 
     std::random_device rd{};
     std::mt19937 gen{rd()};

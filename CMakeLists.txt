@@ -39,7 +39,7 @@ set(CMAKE_CXX_COMPILER /home/cdt1902/usr/bin/g++9)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # add external depandacies (header only libs)
-include_directories(SYSTEM external/eigen external/doctest)
+include_directories(SYSTEM external/eigen external/doctest external/hilbert)
 
 # all code is in src
 include_directories(src)
@@ -53,3 +53,6 @@ target_compile_options(2d PRIVATE -Wall -Wextra -pedantic -Werror -O3)
 
 add_executable(quiver plt/quiver/quiver.cpp)
 target_compile_options(quiver PRIVATE -Wall -Wextra -pedantic -Werror -O3)
+
+add_executable(sort src/sort.test.cpp)
+target_compile_options(sort PRIVATE -Wall -Wextra -pedantic -O3 -pg)
