@@ -14,7 +14,8 @@ inline void tick() { START = clk::now(); }
 
 inline double tock() {
     auto stop = clk::now();
-    return std::chrono::duration<double, std::ratio<1, 1000>>(stop - START)
+    return std::chrono::duration<double, std::ratio<1, 1000000000>>(stop -
+                                                                    START)
         .count();
 }
 
@@ -32,18 +33,18 @@ int main() {
 
     std::random_device rd{};
     std::mt19937 gen{rd()};
-    // 2-24
-    for (int i = 2; i <= 30; ++i) {
+    // 2-28
+    for (int i = 2; i <= 28; ++i) {
         std::vector<double> averages(6, 0);
 
         int length = std::pow(10.0, (double)i / 4);
 
-        int max = std::max(length / 25, 10);
+        int max = std::max(length / 30, 2);
 
         std::uniform_real_distribution<double> u(min, max);
-        std::uniform_int_distribution<int> u2(min, max - 1);
+        std::uniform_int_distribution<int> u2(0, length - 1);
 
-        int repeat = 31 - i;
+        int repeat = 33 - i;
 
         for (int j = 0; j < repeat; ++j) {
 
@@ -57,8 +58,9 @@ int main() {
             std::vector<vec3> ints2 = ints1;
             std::vector<vec3> ints3 = ints1;
 
-            const auto lam = [](vec3 const &x) {
-                return ((int)x.a + (int)x.b + (int)x.c) / 3;
+            const auto lam = [](vec3 const &x) -> int {
+                return ((int)(x.a * 5) + (int)(x.b * 2) + (int)(x.c * 3)) /
+                       (5 + 2 + 3);
             };
 
             ////////////////////////std////////////////////////////
@@ -80,7 +82,7 @@ int main() {
             ////////////////////////swap_count////////////////////////
 
             tick();
-            cj::sort(ints2.begin(), ints2.end(), min, max, lam);
+            ints2 = cj::sort2(ints2, min, max, lam);
             averages[2] += tock();
 
             for (std::size_t i = 0; i < ints2.size() / 100; ++i) {
@@ -88,7 +90,7 @@ int main() {
             }
 
             tick();
-            cj::sort(ints2.begin(), ints2.end(), min, max, lam);
+            ints2 = cj::sort2(ints2, min, max, lam);
             averages[3] += tock();
 
             ////////////////////////////////////////////////
@@ -99,13 +101,17 @@ int main() {
             // std::cout << std::endl;
 
             tick();
+
             cj::sort_clever(ints3.begin(), ints3.end(), min, max, lam);
+
             averages[4] += tock();
 
             // for (auto &&elem : ints3) {
             //     std::cout << lam(elem) << ' ';
             // }
             // std::cout << std::endl;
+
+            // check
 
             for (std::size_t i = 0; i < ints3.size() / 100; ++i) {
                 ints3[u2(gen)].a = u(gen);
@@ -114,6 +120,10 @@ int main() {
             tick();
             cj::sort_clever(ints3.begin(), ints3.end(), min, max, lam);
             averages[5] += tock();
+
+            for (auto it = ints3.begin() + 1; it != ints3.end(); ++it) {
+                assert(lam(*(it - 1)) <= lam(*it));
+            }
 
             ////////////////////////////////////////////////
         }

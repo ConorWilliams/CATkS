@@ -56,3 +56,6 @@ target_compile_options(quiver PRIVATE -Wall -Wextra -pedantic -Werror -O3)
 
 add_executable(sort src/sort.test.cpp)
 target_compile_options(sort PRIVATE -Wall -Wextra -pedantic -O3 -pg)
+
+add_executable(force src/force.test.cpp)
+target_compile_options(force PRIVATE -Wall -Wextra -pedantic -Werror -O3)
