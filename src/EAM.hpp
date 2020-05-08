@@ -10,9 +10,10 @@
 #include <utility>
 
 #include "Eigen/Core"
+#include "utils.hpp"
 
 // struct holds setfl formatted file data;
-struct ForceData {
+struct TabEAM {
     std::size_t numSpecies;
     std::size_t numPntsP; // P -> density coord
     std::size_t numPntsR; // R -> distance coord
@@ -35,8 +36,18 @@ struct ForceData {
     Eigen::Array<Eigen::ArrayXd, Eigen::Dynamic, Eigen::Dynamic> difPhi;
     Eigen::Array<Eigen::ArrayXd, Eigen::Dynamic, Eigen::Dynamic> difV;
 
-    ForceData(std::size_t numS, std::size_t numP, std::size_t numR, double delP,
-              double delR, double cut)
+    std::size_t rToIndex(double r) {
+        check(r > 0 && r <= numPntsP * deltaR, "r outside boundary");
+        return r / deltaR;
+    }
+
+    std::size_t pToIndex(double p) {
+        check(p > 0 && p <= numPntsP * deltaP, "p outside boundary");
+        return p / deltaP;
+    }
+
+    TabEAM(std::size_t numS, std::size_t numP, std::size_t numR, double delP,
+           double delR, double cut)
         : numSpecies(numS), numPntsP(numP), numPntsR(numR), deltaR(delR),
           deltaP(delP), rCut(cut) {
 
@@ -74,7 +85,7 @@ void ensureGetline(std::ifstream &file, std::string &line) {
 }
 
 // read raw tabulated data in SETFL file fmt to stuct^
-ForceData parseTabEAM(std::string const &fileName) {
+TabEAM parseTabEAM(std::string const &fileName) {
     std::ifstream file(fileName);
     std::string line;
 
@@ -90,7 +101,7 @@ ForceData parseTabEAM(std::string const &fileName) {
     ensureGetline(file, line);
     toStream(line) >> numP >> delP >> numR >> delR >> cut;
 
-    ForceData data{numS, numP, numR, delP, delR, cut};
+    TabEAM data{numS, numP, numR, delP, delR, cut};
 
     for (std::size_t i = 0; i < data.numSpecies; ++i) {
         // read species info
@@ -142,7 +153,7 @@ ForceData parseTabEAM(std::string const &fileName) {
 }
 
 // removes factor of r from tabulated potentials
-void processTab(ForceData &data) {
+void processTab(TabEAM &data) {
     for (std::size_t i = 0; i < data.numSpecies; ++i) {
         for (std::size_t j = 0; j < data.numSpecies; ++j) {
             for (std::size_t k = 0; k < data.numPntsR; ++k) {
@@ -164,7 +175,7 @@ void differenciate(T const &in, U &&out, double del) {
     }
 }
 
-void numericalDiff(ForceData &data) {
+void numericalDiff(TabEAM &data) {
     for (std::size_t i = 0; i < data.numSpecies; ++i) {
         differenciate(data.tabF.col(i), data.difF.col(i), data.deltaP);
         for (std::size_t j = 0; j < data.numSpecies; ++j) {
