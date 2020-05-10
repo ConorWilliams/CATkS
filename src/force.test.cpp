@@ -1,9 +1,10 @@
 #include <iostream>
 
 #include "EAM.hpp"
-#include "Force.hpp"
+#include "Force2.hpp"
 
 int main() {
+    enum : uint8_t { Fe = 0, H = 1 };
 
     // auto eamData = parseTabEAM("/home/cdt1902/dis/CATkS/data/PotentialA.fs");
     //
@@ -11,9 +12,24 @@ int main() {
     //
     // numericalDiff(eamData);
     //
-    Vector x = {{1, 1, 1, 1.5, 1.5, 1.5, 2, 2, 2}};
-    //
-    std::vector<int> kinds(x.size() / 3, 0);
+
+    constexpr double LAT = 2.855700;
+
+    Vector x = {{0, 0, 0, 2.87, 0, 0}};
+
+    Vector grad(x.size());
+
+    cell = 0;
+
+    for (int i = 0; i < 7; ++i) {
+        for (int j = 0; j < 7; ++j) {
+            for (int k = 0; k < 7; ++k) {
+                /* code */
+            }
+        }
+    }
+
+    std::vector<int> kinds(x.size() / 3, Fe);
     //
     // // std::cout << lam.numCells() << " " << lam(-1, -1, -1) << std::endl;
     //
@@ -27,9 +43,18 @@ int main() {
 
     CompEAM f{"/home/cdt1902/dis/CATkS/data/PotentialA.fs",
               kinds,
-              {1, 0, 3, 0, 3, 0, 3}};
+              0,
+              7 * LAT,
+              0,
+              7 * LAT,
+              0,
+              7 * LAT};
 
-    f(x);
+    f(x, grad);
+
+    std::cout << grad.transpose() << std::endl;
+
+    // f(x, grad);
 
     // std::cout << box.numCells() << std::endl;
 

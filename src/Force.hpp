@@ -64,13 +64,20 @@ class Box {
         check(xmax > xmin, "cannot have x min <= max");
         check(ymax > ymin, "cannot have y min <= max");
         check(zmax > zmin, "cannot have z min <= max");
+
         check(rcut > 0, "rcut is negative");
+
+        check(xmax - xmin >= rcut, "box too small");
+        check(ymax - ymin >= rcut, "box too small");
+        check(zmax - zmin >= rcut, "box too small");
 
         // round down (toward zero) truncation, therefore boxes always biger
         // than rcut, plus two (+ 2) for gost cell layer
         mx = static_cast<std::size_t>((xmax - xmin) / rcut) + 2;
         my = static_cast<std::size_t>((ymax - ymin) / rcut) + 2;
         mz = static_cast<std::size_t>((zmax - zmin) / rcut) + 2;
+
+        std::cout << "shape " << mx << ' ' << my << ' ' << mz << std::endl;
 
         // dimensions of cells
         double lcx = (xmax - xmin) / (mx - 2);
@@ -161,6 +168,9 @@ template <typename C, typename B> class LinkedCellList {
     inline auto begin() const { return list.begin(); }
     inline auto end() const { return list.begin() + numAtoms; }
 
+    inline Atom<kind_t> const &getAtom(std::size_t i) const { return list[i]; }
+    inline std::size_t getNumAtoms() const { return numAtoms; }
+
     template <typename T> void makeCellList(T const &x3n) {
         check(static_cast<std::size_t>(x3n.size()) == 3 * numAtoms,
               "wrong number of atoms");
@@ -217,13 +227,15 @@ template <typename C, typename B> class LinkedCellList {
     void makeGhosts() {
         // TODO: could accelerate by only looking for ghosts at edge boxes
         for (std::size_t i = 0; i < 3; ++i) {
+            // fixed end stops double copies
             for (std::size_t j = 0, end = list.size(); j < end; ++j) {
                 Atom<kind_t> const &atom = list[j];
 
                 if (atom[i] < box.rcut()) {
                     list.emplace_back(atom);
                     list.back()[i] += box.limits(i).len;
-                } else if (atom[i] > box.limits(i).len - box.rcut()) {
+                }
+                if (atom[i] > box.limits(i).len - box.rcut()) {
                     list.emplace_back(atom);
                     list.back()[i] -= box.limits(i).len;
                 }
@@ -266,15 +278,15 @@ LinkedCellList(C &&, B &&)->LinkedCellList<C, B>;
 
 template <typename C> class CompEAM {
   private:
-    double rcut;
-
     TabEAM data;
     LinkedCellList<C, Box> lcl;
 
   public:
-    CompEAM(std::string const &file, C &&kinds, Box box)
-        : rcut{box.rcut()}, data{parseTabEAM(file)}, lcl{std::forward<C>(kinds),
-                                                         std::move(box)} {
+    CompEAM(std::string const &file, C &&kinds, double xmin, double xmax,
+            double ymin, double ymax, double zmin, double zmax)
+        : data{parseTabEAM(file)}, lcl{std::forward<C>(kinds),
+                                       {data.rCut, xmin, xmax, ymin, ymax, zmin,
+                                        zmax}} {
         using kind_t = typename std::remove_reference_t<C>::value_type;
 
         static_assert(std::is_integral_v<kind_t>, "kinds must be integers");
@@ -288,29 +300,77 @@ template <typename C> class CompEAM {
               "found kinds that are negative?");
     }
 
+    // assumes makeCellList has already been called
+    template <typename K> double calcRho(Atom<K> const &beta) {
+        double rho = 0;
+        lcl.findAdjAtoms(beta, [&, rcut = data.rCut](auto const &alpha) {
+            double dx = beta[0] - alpha[0];
+            double dy = beta[1] - alpha[1];
+            double dz = beta[2] - alpha[2];
+            double r = dx * dx + dy * dy + dz * dz;
+
+            if (r <= rcut * rcut) {
+                rho += data.tabPhi(alpha.kind(),
+                                   beta.kind())(data.rToIndex(std::sqrt(r)));
+            }
+        });
+        return rho;
+    }
+
     // compute energy
     template <typename T> double operator()(T const &x) {
-
+        // TODO: could only sum over half atoms of by symetry, how?
         lcl.makeCellList(x);
 
         double sum = 0;
 
         for (auto const &alpha : lcl) {
-            lcl.findAdjAtoms(alpha, [&, rcut = rcut](auto beta) {
+            lcl.findAdjAtoms(alpha, [&, rcut = data.rCut](auto const &beta) {
                 double dx = beta[0] - alpha[0];
                 double dy = beta[1] - alpha[1];
                 double dz = beta[2] - alpha[2];
                 double r = dx * dx + dy * dy + dz * dz;
-
                 if (r <= rcut * rcut) {
-                    sum += data.tabV(alpha.kind(), ) std::sqrt(r);
+                    sum += data.tabV(alpha.kind(),
+                                     beta.kind())(data.rToIndex(std::sqrt(r)));
                 }
             });
         }
 
-        std::cout << "" << sum << std::endl;
+        sum /= 2;
 
-        return 3;
+        return sum;
     }
+
+    // template <typename T> double operator()(T const &x, Vector &out) {
+    //     // TODO: could only sum over half atoms of by symetry, how?
+    //     lcl.makeCellList(x);
+    //
+    //     for (std::size_t i = 0; i < lcl.getNumAtoms(); ++i) {
+    //         auto const &alpha = lcl.getAtom(i);
+    //
+    //         out[3 * i + 0] = 0;
+    //         out[3 * i + 1] = 0;
+    //         out[3 * i + 2] = 0;
+    //
+    //         // lcl.findAdjAtoms(alpha, [&, rcut = data.rCut](auto beta) {
+    //         //     double dx = beta[0] - alpha[0];
+    //         //     double dy = beta[1] - alpha[1];
+    //         //     double dz = beta[2] - alpha[2];
+    //         //     double r = dx * dx + dy * dy + dz * dz;
+    //         //
+    //         //     if (r <= rcut * rcut) {
+    //         //         sum += 1;
+    //         //         // sum += data.tabV(alpha.kind(),
+    //         //         // beta.kind())(data.rToIndex(std::sqrt(r)));
+    //         //     }
+    //         // });
+    //     }
+    //
+    //     return 2;
+    // }
 };
-template <typename C> CompEAM(std::string const &, C &&, Box)->CompEAM<C>;
+template <typename C>
+CompEAM(std::string const &, C &&, double, double, double, double, double,
+        double)
+    ->CompEAM<C>;
