@@ -36,15 +36,34 @@ struct TabEAM {
     Eigen::Array<Eigen::ArrayXd, Eigen::Dynamic, Eigen::Dynamic> difPhi;
     Eigen::Array<Eigen::ArrayXd, Eigen::Dynamic, Eigen::Dynamic> difV;
 
-    std::size_t rToIndex(double r) {
+    std::size_t rToIndex(double r) const {
         check(r >= 0 && r <= numPntsP * deltaR,
               "r outside boundary " << numPntsP * deltaR);
         return r / deltaR;
     }
 
-    std::size_t pToIndex(double p) {
-        check(p >= 0 && p <= numPntsP * deltaP, "p outside boundary");
+    std::size_t pToIndex(double p) const {
+        check(p >= 0 && p <= numPntsP * deltaP,
+              "p outside boundary " << p << " bound " << numPntsP * deltaP);
         return p / deltaP;
+    }
+
+    template <typename T> double ineterpR(T const &v, double r) {
+        std::size_t idx = r / deltaR;
+
+        double hi = v[idx + 1];
+        double lo = v[idx];
+
+        return lo + (r - idx * deltaR) * (hi - lo) / deltaR;
+    }
+
+    template <typename T> double ineterpP(T const &v, double p) {
+        std::size_t idx = p / deltaP;
+
+        double hi = v[idx + 1];
+        double lo = v[idx];
+
+        return lo + (p - idx * deltaP) * (hi - lo) / deltaP;
     }
 
     TabEAM(std::size_t numS, std::size_t numP, std::size_t numR, double delP,

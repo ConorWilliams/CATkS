@@ -1,7 +1,7 @@
 #include <iostream>
 
 #include "EAM.hpp"
-#include "Force2.hpp"
+#include "FuncEAM.hpp"
 
 int main() {
     enum : uint8_t { Fe = 0, H = 1 };
@@ -15,16 +15,24 @@ int main() {
 
     constexpr double LAT = 2.855700;
 
-    Vector x = {{0, 0, 0, 2.87, 0, 0}};
+    Vector x(7 * 7 * 7 * 3 * 2);
 
     Vector grad(x.size());
 
-    cell = 0;
+    double cell = 0;
 
     for (int i = 0; i < 7; ++i) {
         for (int j = 0; j < 7; ++j) {
             for (int k = 0; k < 7; ++k) {
-                /* code */
+                x[3 * cell + 0] = i * LAT;
+                x[3 * cell + 1] = j * LAT;
+                x[3 * cell + 2] = k * LAT;
+
+                x[3 * cell + 3] = (i + 0.5) * LAT;
+                x[3 * cell + 4] = (j + 0.5) * LAT;
+                x[3 * cell + 5] = (k + 0.5) * LAT;
+
+                cell += 2;
             }
         }
     }
@@ -41,7 +49,7 @@ int main() {
     //
     // lcl.makeCellList(x);
 
-    CompEAM f{"/home/cdt1902/dis/CATkS/data/PotentialA.fs",
+    FuncEAM f{"/home/cdt1902/dis/CATkS/data/PotentialA.fs",
               kinds,
               0,
               7 * LAT,
@@ -50,9 +58,13 @@ int main() {
               0,
               7 * LAT};
 
+    x[0] += 0.1;
+
     f(x, grad);
 
-    std::cout << grad.transpose() << std::endl;
+    std::cout << x.size() << ' ' << x[1] << ' ' << x[2] << std::endl;
+
+    std::cout << grad[0] << ' ' << grad[1] << ' ' << grad[2] << std::endl;
 
     // f(x, grad);
 

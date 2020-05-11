@@ -7,3 +7,6 @@
 [submodule "external/hilbert"]
 	path = external/hilbert
 	url = https://github.com/adishavit/hilbert
+[submodule "external/vmdstream"]
+	path = external/vmdstream
+	url = https://github.com/askeys/vmdstream

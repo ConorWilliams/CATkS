@@ -3,6 +3,7 @@
 #include <array>
 #include <cassert>
 #include <cmath>
+#include <iomanip>
 #include <iostream>
 #include <string>
 #include <type_traits>
@@ -79,7 +80,7 @@ class Box {
         for (std::size_t K = 0; K < mz; ++K) {
             for (std::size_t J = 0; J < my; ++J) {
                 for (std::size_t I = 0; I < mx; ++I) {
-                    // compute neighbour offsets
+                    // pre compute adjecent cells
                     long idx = 0;
                     for (auto k : {-1, 0, 1}) {
                         for (auto j : {-1, 0, 1}) {
@@ -113,9 +114,9 @@ class Box {
     }
 
     inline std::size_t lambda(double x, double y, double z) const {
-        check(x >= 0 && x < m_limits[0].len, "x out of +cell");
-        check(y >= 0 && y < m_limits[1].len, "y out of +cell");
-        check(z >= 0 && z < m_limits[2].len, "z out of +cell");
+        check(x >= 0 && x < m_limits[0].len, "x out of cell");
+        check(y >= 0 && y < m_limits[1].len, "y out of cell");
+        check(z >= 0 && z < m_limits[2].len, "z out of cell");
 
         std::size_t i = x * m_limits[0].inv * mx;
         std::size_t j = y * m_limits[1].inv * my;
@@ -200,14 +201,28 @@ template <typename C, typename B> class LinkedCellList {
                        box.limits(2).len *
                            std::floor(x3n[3 * i + 2] * box.limits(2).inv);
 
-            std::cout << x << ' ' << y << ' ' << z << ' ' << std::endl;
+            x -= box.limits(0).len * std::floor(x * box.limits(0).inv);
+            y -= box.limits(1).len * std::floor(y * box.limits(1).inv);
+            z -= box.limits(2).len * std::floor(z * box.limits(2).inv);
+
+            // if (y >= box.limits(1).len) {
+            //     std::cout << std::setprecision(16) << y << std::endl;
+            //     std::cout << y * box.limits(1).inv << std::endl;
+            //     std::cout << x3n[3 * i + 1] << std::endl;
+            // }
+
+            check(x >= 0 && x < box.limits(0).len, "x out of cell " << x);
+            check(y >= 0 && y < box.limits(1).len, "y out of cell " << y);
+            check(z >= 0 && z < box.limits(2).len, "z out of cell " << x);
+
+            // std::cout << x << ' ' << y << ' ' << z << ' ' << std::endl;
 
             list.emplace_back(kinds[i], x, y, z);
         }
 
         updateHead();
 
-        std::cout << head.transpose() << std::endl;
+        // std::cout << head.transpose() << std::endl;
     }
 
   private:
@@ -253,7 +268,7 @@ template <typename C, typename B> class LinkedCellList {
         for (std::size_t cell : box.getAdjOff().col(lambda)) {
             index = head[cell];
             while (index != end) {
-                std::cout << "cell_t " << cell << std::endl;
+                // std::cout << "cell_t " << cell << std::endl;
                 Atom<kind_t> const &neigh = list[index];
                 double dx, dy, dz;
                 double r = box.norm(neigh, atom, dx, dy, dz);
@@ -268,13 +283,15 @@ template <typename C, typename B> class LinkedCellList {
 template <typename C, typename B>
 LinkedCellList(C &&, B &&)->LinkedCellList<C, B>;
 
-template <typename C> class CompEAM {
+/////////////////////////////////////////////////////////////////////////////////
+
+template <typename C> class FuncEAM {
   private:
     TabEAM data;
-    LinkedCellList<C, Box> lcl;
+    mutable LinkedCellList<C, Box> lcl;
 
   public:
-    CompEAM(std::string const &file, C &&kinds, double xmin, double xmax,
+    FuncEAM(std::string const &file, C &&kinds, double xmin, double xmax,
             double ymin, double ymax, double zmin, double zmax)
         : data{parseTabEAM(file)}, lcl{std::forward<C>(kinds),
                                        {data.rCut, xmin, xmax, ymin, ymax, zmin,
@@ -293,7 +310,7 @@ template <typename C> class CompEAM {
     }
 
     // compute energy
-    template <typename T> double operator()(T const &x) {
+    template <typename T> double operator()(T const &x) const {
         lcl.makeCellList(x);
 
         double sum = 0;
@@ -314,7 +331,7 @@ template <typename C> class CompEAM {
     }
 
     // assumes makeCellList has already been called
-    template <typename K> double calcRho(Atom<K> const &beta) {
+    template <typename K> double calcRho(Atom<K> const &beta) const {
         double rho = 0;
         lcl.findNeigh(
             beta, [&](auto const &alpha, double r, double, double, double) {
@@ -324,7 +341,7 @@ template <typename C> class CompEAM {
     }
 
     // computes grad
-    template <typename T> void operator()(T const &x, Vector &out) {
+    template <typename T> void operator()(T const &x, Vector &out) const {
         lcl.makeCellList(x);
 
         for (std::size_t i = 0; i < lcl.getNumAtoms(); ++i) {
@@ -340,7 +357,7 @@ template <typename C> class CompEAM {
             // finds R^{\alpha\gamma}
             lcl.findNeigh(gamma, [&](auto const &alpha, double r, double dx,
                                      double dy, double dz) {
-                std::cout << "r is: " << r << ' ' << gamma[0] << std::endl;
+                // std::cout << "r is: " << r << ' ' << gamma[0] << std::endl;
 
                 double mag =
                     data.difV(alpha.kind(), gamma.kind())[data.rToIndex(r)] +
@@ -362,6 +379,6 @@ template <typename C> class CompEAM {
 };
 
 template <typename C>
-CompEAM(std::string const &, C &&, double, double, double, double, double,
+FuncEAM(std::string const &, C &&, double, double, double, double, double,
         double)
-    ->CompEAM<C>;
+    ->FuncEAM<C>;

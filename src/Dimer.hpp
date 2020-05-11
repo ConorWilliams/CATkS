@@ -14,10 +14,10 @@ template <typename F> class Dimer {
     static constexpr int IE_MAX = 50;
     static constexpr int IT_MAX = 1950;
 
-    static constexpr double DELTA_R = 0.001;
+    static constexpr double DELTA_R = 0.01;
 
-    static constexpr double /*    */ F_TOL = 1e-8;
-    static constexpr double /**/ THETA_TOL = 1 * (2 * M_PI / 360); // 1deg
+    static constexpr double /*    */ F_TOL = 1e-2;
+    static constexpr double /**/ THETA_TOL = 1 * (2 * M_PI / 360); // deg
     static constexpr double /*    */ G_TOL = 0.01;
 
     static constexpr double S_MIN = 0.1;
@@ -192,6 +192,9 @@ template <typename F> class Dimer {
             return false;
         }
 
+        std::cerr << "escaped convex" << std::endl;
+        // return false;
+
         Vector &p = s1;
         Vector &g_eff = s2;
 
@@ -212,6 +215,9 @@ template <typename F> class Dimer {
             double curv = alignAxis();
             g_eff = effGrad();
             double ga = dot(g_eff, p); // -p0
+
+            std::cout << "ga: " << ga << " G_eff^2: " << dot(g_eff, g_eff)
+                      << std::endl;
 
             if (ga >= G_TOL && trust >= S_MIN) {
                 trust /= 2;

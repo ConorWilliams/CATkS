@@ -39,7 +39,7 @@ set(CMAKE_CXX_COMPILER /home/cdt1902/usr/bin/g++9)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # add external depandacies (header only libs)
-include_directories(SYSTEM external/eigen external/doctest external/hilbert)
+include_directories(SYSTEM external/eigen external/doctest external/hilbert external/vmdstream/include)
 
 # all code is in src
 include_directories(src)
@@ -59,3 +59,6 @@ target_compile_options(sort PRIVATE -Wall -Wextra -pedantic -O3 -pg)
 
 add_executable(force src/force.test.cpp)
 target_compile_options(force PRIVATE -Wall -Wextra -pedantic -Werror -O3)
+
+add_executable(xmd src/vmd.test.cpp)
+target_compile_options(xmd PRIVATE -Wall -Wextra -pedantic -Werror -O3)
