@@ -5,7 +5,7 @@
 
 #include <utils.hpp>
 
-static std::string symbol[2] = {"Fe", "H"};
+static std::string symbol[4] = {"Fe", "H", "C", "O"};
 
 template <typename K>
 void dumpXYX(std::string const &file, Vector const &coords, K kinds) {

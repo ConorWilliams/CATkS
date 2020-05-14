@@ -34,7 +34,7 @@ if(NOT EXISTS "${PROJECT_SOURCE_DIR}/external/doctest/CMakeLists.txt")
 endif()
 
 # bad practice
-set(CMAKE_CXX_COMPILER /home/cdt1902/usr/bin/g++9)
+set(CMAKE_CXX_COMPILER /home/cdt1902/usr/bin/g++9.3)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -61,4 +61,4 @@ add_executable(force src/force.test.cpp)
 target_compile_options(force PRIVATE -Wall -Wextra -pedantic -Werror -O3)
 
 add_executable(xmd src/vmd.test.cpp)
-target_compile_options(xmd PRIVATE -Wall -Wextra -pedantic -Werror -O3)
+target_compile_options(xmd PRIVATE -Wall -Wextra -pedantic -Werror -O3 -march=native -ffast-math)

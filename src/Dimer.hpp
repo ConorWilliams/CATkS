@@ -3,20 +3,22 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <random>
 #include <utility>
 
 #include "Eigen/Core"
 #include "L_BFGS.hpp"
 #include "utils.hpp"
+#include <DumpXYX.hpp>
 
-template <typename F> class Dimer {
+template <typename F, typename P> class Dimer {
     static constexpr int IR_MAX = 10;
     static constexpr int IE_MAX = 50;
-    static constexpr int IT_MAX = 1950;
+    static constexpr int IT_MAX = 200;
 
     static constexpr double DELTA_R = 0.01;
 
-    static constexpr double /*    */ F_TOL = 1e-2;
+    static constexpr double /*    */ F_TOL = 1e-5;
     static constexpr double /**/ THETA_TOL = 1 * (2 * M_PI / 360); // deg
     static constexpr double /*    */ G_TOL = 0.01;
 
@@ -24,9 +26,11 @@ template <typename F> class Dimer {
     static constexpr double S_MAX = 0.5;
 
     // increase for more component parallel to dimer, default = 1
+    // higher = less relaxation
     static constexpr double BOOST = 1;
 
     F const &grad;
+    P printer;
     long dims;
 
     CoreLBFGS<4> lbfgs_rot;
@@ -54,7 +58,7 @@ template <typename F> class Dimer {
     inline void updateGrad() { grad(R_0, g_0); }
 
     template <typename T> inline void translate(T const &x) {
-        print();
+        printer();
         R_0 += x;
         updateGrad();
     }
@@ -63,19 +67,12 @@ template <typename F> class Dimer {
     inline auto effGrad() const { return g_0 - (1 + BOOST) * dot(g_0, N) * N; }
 
   public:
-    void print() const {
-        // std::cout << R_0(0) << ' ' << R_0(1) << ' ' << N(0) << ' ' << N(1)
-        //           << ' ' << R_0(2) << ' ' << R_0(3) << std::endl;
-        std::cout << R_0(0) << ' ' << R_0(1) << ' ' << N(0) << ' ' << N(1)
-                  << std::endl;
-    }
-
     // grad is a function-like object such that grad(x, g) writes the gradient
     // at x into g: Vector, Vector -> void
     // R_in is the center of the dimer.
     // N_in is the dimer axis unit vector.
-    Dimer(F const &grad, Vector &R_in, Vector &N_in)
-        : grad{grad}, dims{R_in.size()}, lbfgs_rot(dims),
+    Dimer(F const &grad, Vector &R_in, Vector &N_in, P const &printer)
+        : grad{grad}, printer{printer}, dims{R_in.size()}, lbfgs_rot(dims),
           lbfgs_trn(dims), R_0{R_in}, N{N_in}, g_0{dims}, s1{dims}, s2{dims},
           s3{dims}, g_1{dims}, gp_1{dims}, Np{dims}, theta{dims} {
         N /= std::sqrt(dot(N, N));
@@ -140,11 +137,24 @@ template <typename F> class Dimer {
         Vector &o = s4;
 
         updateGrad();
-
         double curv = alignAxis();
 
-        //    auto eff_grad = [&]() { return -dot(g_0, N) * N; };
+        // auto eff_grad = [&]() { return -dot(g_0, N) * N; };
         auto eff_grad = [&]() { return effGrad(); };
+
+        // crazy
+        // Vector tmp = -dot(g_0, N) * N;
+
+        // auto eff_grad = [&]() -> Vector {
+        //     auto tmp = dot(g_0, N) * N;
+        //     auto sd = (tmp - tmp.mean()).square().sum();
+        //     std::cout << sd << std::endl;
+        //     if (sd > 0.1) {
+        //         return g_0 - dot(g_0, N) * N;
+        //     } else {
+        //         return -g_0;
+        //     }
+        // };
 
         gf_n = eff_grad();
         p = -gf_n;
@@ -152,11 +162,13 @@ template <typename F> class Dimer {
         double m = S_MIN / std::sqrt(dot(p, p));
 
         for (int iter = 0; iter < IE_MAX; ++iter) {
-            if (curv < 0 || dot(gf_n, gf_n) < F_TOL * F_TOL) {
+            std::cerr << "convex mode " << iter << ' ' << curv << std::endl;
+
+            if (curv < 0 /*|| dot(gf_n, gf_n) < F_TOL * F_TOL */) {
                 return true;
             }
 
-            translate(m * p);
+            translate(m * p); // updates grad after translate
             curv = alignAxis();
 
             using std::swap;
@@ -176,6 +188,9 @@ template <typename F> class Dimer {
             m = S_MAX * 0.5 * (op / pp + 1);
             m = std::min(std::max(S_MIN, m), S_MAX);
             m = m / std::sqrt(pp);
+            // m /= (p * p).maxCoeff();
+
+            // std::cout << m << std::endl;
         }
 
         return false;
@@ -187,9 +202,13 @@ template <typename F> class Dimer {
     bool findSaddle() {
         lbfgs_trn.clear();
 
-        if (!escapeConvex()) {
-            std::cerr << "failed to escape convex" << std::endl;
-            return false;
+        // if (!escapeConvex()) {
+        //     std::cerr << "failed to escape convex" << std::endl;
+        //     return false;
+        // }
+        { // else
+            updateGrad();
+            alignAxis();
         }
 
         std::cerr << "escaped convex" << std::endl;
@@ -203,7 +222,13 @@ template <typename F> class Dimer {
         double trust = S_MIN; // S_MIN <~ trust <~ S_MAX
         double g0 = HUGE_VAL; // +infinity
 
+        double curv = 0;
+        int strikes = 0;
+
         for (int iter = 0; iter < IT_MAX; ++iter) {
+            std::cout << "G_eff^2: " << dot(g_eff, g_eff) << ' ' << curv
+                      << std::endl;
+
             if (dot(g_eff, g_eff) < F_TOL * F_TOL) {
                 return true;
             }
@@ -212,12 +237,9 @@ template <typename F> class Dimer {
 
             translate(std::min(1.0, trust / std::sqrt(dot(p, p))) * p);
 
-            double curv = alignAxis();
+            curv = alignAxis();
             g_eff = effGrad();
             double ga = dot(g_eff, p); // -p0
-
-            std::cout << "ga: " << ga << " G_eff^2: " << dot(g_eff, g_eff)
-                      << std::endl;
 
             if (ga >= G_TOL && trust >= S_MIN) {
                 trust /= 2;
@@ -227,8 +249,13 @@ template <typename F> class Dimer {
 
             // // optional // //
             if (ga <= g0 && curv > 0) {
-                std::cerr << "failed to uphold y^T s in dimer" << std::endl;
-                return false;
+                std::cerr << "STRIKE: " << strikes + 1 << std::endl;
+                if (++strikes == 5) {
+                    return false;
+                }
+                // return findSaddle();
+                // lbfgs_trn.clear();
+                // return false;
             }
 
             using std::swap;

@@ -1,10 +1,8 @@
 #pragma once
 
-#include <algorithm>
 #include <array>
 #include <cassert>
 #include <cmath>
-#include <iomanip>
 #include <iostream>
 #include <string>
 #include <type_traits>
@@ -34,24 +32,29 @@ template <typename T> class Atom {
 // Contains info about simulation box and performs Lambda mapping
 class Box {
   private:
+    double m_rcut;
+
     struct Lim {
         double min, max, len, inv;
         Lim(double min, double max)
             : min{min}, max{max}, len{max - min}, inv{1.0 / len} {}
     };
 
-    double m_rcut;
-
     std::array<Lim, 3> m_limits;
 
-    std::size_t mx, my, mz; // number of cells
+    double ox; // offsets
+    double oy;
+    double oz;
 
-    Eigen::Array<std::size_t, 26, Eigen::Dynamic> adjOff; // 3^3 - 1
+    std::size_t mx; // number of cells
+    std::size_t my;
+    std::size_t mz;
 
-    inline __attribute__((noinline)) std::size_t
-    map3To1(std::size_t i, std::size_t j, std::size_t k) const {
-        return i + j * mx + k * mx * my;
-    }
+    double lx; // lengths
+    double ly;
+    double lz;
+
+    std::array<long, 26> adjOff; // 3^3 - 1
 
   public:
     Box(double rcut, double xmin, double xmax, double ymin, double ymax,
@@ -64,42 +67,51 @@ class Box {
 
         check(rcut > 0, "rcut is negative");
 
-        check(xmax - xmin >= 3 * rcut, "box too small");
-        check(ymax - ymin >= 3 * rcut, "box too small");
-        check(zmax - zmin >= 3 * rcut, "box too small");
+        check(xmax - xmin >= rcut, "box too small");
+        check(ymax - ymin >= rcut, "box too small");
+        check(zmax - zmin >= rcut, "box too small");
 
         // round down (toward zero) truncation, therefore boxes always biger
-        // than rcut
-        mx = static_cast<std::size_t>((xmax - xmin) / rcut);
-        my = static_cast<std::size_t>((ymax - ymin) / rcut);
-        mz = static_cast<std::size_t>((zmax - zmin) / rcut);
-
-        adjOff.resize(26, mx * my * mz);
+        // than rcut, plus two (+ 4) for gost cell layer
+        mx = static_cast<std::size_t>((xmax - xmin) / rcut) + 4;
+        my = static_cast<std::size_t>((ymax - ymin) / rcut) + 4;
+        mz = static_cast<std::size_t>((zmax - zmin) / rcut) + 4;
 
         std::cout << "shape " << mx << ' ' << my << ' ' << mz << std::endl;
 
-        for (std::size_t K = 0; K < mz; ++K) {
-            for (std::size_t J = 0; J < my; ++J) {
-                for (std::size_t I = 0; I < mx; ++I) {
-                    // pre compute adjecent cells
-                    long idx = 0;
-                    for (auto k : {-1, 0, 1}) {
-                        for (auto j : {-1, 0, 1}) {
-                            for (auto i : {-1, 0, 1}) {
-                                if (i != 0 || j != 0 || k != 0) {
-                                    adjOff(idx++, map3To1(I, J, K)) =
-                                        ((I + i + mx) % mx) +
-                                        ((J + j + my) % my) * mx +
-                                        ((K + k + mz) % mz) * mx * my;
-                                }
-                            }
-                        }
+        // dimensions of cells
+        double lcx = (xmax - xmin) / (mx - 4);
+        double lcy = (ymax - ymin) / (my - 4);
+        double lcz = (ymax - ymin) / (mz - 4);
+
+        check(lcx >= rcut, "cells made too small");
+        check(lcy >= rcut, "cells made too small");
+        check(lcz >= rcut, "cells made too small");
+
+        ox = -2 * lcx; // o for offset
+        oy = -2 * lcy;
+        oz = -2 * lcz;
+
+        lx = lcx * mx;
+        ly = lcy * my;
+        lz = lcz * mz;
+
+        // compute neighbour offsets
+        long idx = 0;
+        for (auto k : {-1, 0, 1}) {
+            for (auto j : {-1, 0, 1}) {
+                for (auto i : {-1, 0, 1}) {
+                    if (i != 0 || j != 0 || k != 0) {
+                        adjOff[idx++] = i + j * mx + k * mx * my;
                     }
                 }
             }
         }
 
-        // std::cout << adjOff.transpose() << std::endl;
+        for (auto n : adjOff) {
+            std::cout << n << ' ';
+        }
+        std::cout << std::endl;
     }
 
     std::size_t numCells() const { return mx * my * mz; }
@@ -110,29 +122,9 @@ class Box {
 
     Lim const &limits(std::size_t i) const { return m_limits[i]; }
 
-    template <typename T> inline std::size_t lambda(Atom<T> const &atom) const {
-        return lambda(atom[0], atom[1], atom[2]);
-    }
-
-    inline __attribute__((noinline)) std::size_t lambda(double x, double y,
-                                                        double z) const {
-        check(x >= 0 && x < m_limits[0].len, "x out of cell");
-        check(y >= 0 && y < m_limits[1].len, "y out of cell");
-        check(z >= 0 && z < m_limits[2].len, "z out of cell");
-
-        std::size_t i = x * m_limits[0].inv * mx;
-        std::size_t j = y * m_limits[1].inv * my;
-        std::size_t k = z * m_limits[2].inv * mz;
-
-        check(map3To1(i, j, k) < numCells(), "lambda out of range");
-
-        return map3To1(i, j, k);
-    }
-
     template <typename K>
-    inline __attribute__((noinline)) double norm(Atom<K> const &a,
-                                                 Atom<K> const &b, double &dx,
-                                                 double &dy, double &dz) {
+    inline double norm(Atom<K> const &a, Atom<K> const &b, double &dx,
+                       double &dy, double &dz) {
         dx = b[0] - a[0];
         dy = b[1] - a[1];
         dz = b[2] - a[2];
@@ -142,11 +134,37 @@ class Box {
         check(!(b[0] == a[0] && b[1] == a[1] && b[2] == a[2]),
               "two atoms in same position");
 
-        dx -= m_limits[0].len * std::floor(m_limits[0].inv * dx + 0.5);
-        dy -= m_limits[1].len * std::floor(m_limits[1].inv * dy + 0.5);
-        dz -= m_limits[2].len * std::floor(m_limits[2].inv * dz + 0.5);
-
         return dx * dx + dy * dy + dz * dz;
+    }
+
+    template <typename T> inline std::size_t lambda(Atom<T> const &atom) const {
+        check(atom[0] >= ox && atom[0] - ox < lx, "x out of +cell");
+        check(atom[1] >= oy && atom[1] - oy < ly, "y out of +cell");
+        check(atom[2] >= oz && atom[2] - oz < lz, "z out of +cell");
+
+        std::size_t i = (atom[0] - ox) * mx / lx;
+        std::size_t j = (atom[1] - oy) * my / ly;
+        std::size_t k = (atom[2] - oz) * mz / lz;
+
+        check(i + j * mx + k * mx * my < numCells(), "lambda out of range");
+
+        return i + j * mx + k * mx * my;
+    }
+
+    // maps point any were into range 0->(max-min)
+    inline std::array<double, 3> mapIntoCell(double x, double y, double z) {
+
+        std::array<double, 3> ret;
+
+        ret[0] = x - limits(0).len * std::floor(x * limits(0).inv);
+        ret[1] = y - limits(1).len * std::floor(y * limits(1).inv);
+        ret[2] = z - limits(2).len * std::floor(z * limits(2).inv);
+
+        // ret[0] -= limits(0).len * std::floor(x * limits(0).inv);
+        // ret[1] -= limits(1).len * std::floor(y * limits(1).inv);
+        // ret[2] -= limits(2).len * std::floor(z * limits(2).inv);
+
+        return ret;
     }
 };
 
@@ -180,71 +198,36 @@ template <typename C, typename B> class LinkedCellList {
     inline Atom<kind_t> const &getAtom(std::size_t i) const { return list[i]; }
     inline std::size_t getNumAtoms() const { return numAtoms; }
 
-    void sort(Eigen::ArrayXd &x) {
-
-        makeCellList(x);
-
-        std::sort(list.begin(), list.end(),
-                  [&](Atom<kind_t> a, Atom<kind_t> b) -> bool {
-                      return box.lambda(a) < box.lambda(b);
-                  });
-
-        for (std::size_t i = 0; i < list.size(); ++i) {
-            x[3 * i + 0] = list[i][0];
-            x[3 * i + 1] = list[i][1];
-            x[3 * i + 2] = list[i][2];
-
-            kinds[i] = list[i].kind();
-        }
-    }
-
     template <typename T>
-    void __attribute__((noinline)) makeCellList(T const &x3n) {
+    __attribute__((noinline)) void fillCellList(T const &x3n) {
         check(static_cast<std::size_t>(x3n.size()) == 3 * numAtoms,
               "wrong number of atoms");
 
         static_assert(std::is_trivially_destructible_v<Atom<kind_t>>,
-                      "can't clear in constant time");
+                      "can't clear atoms in constant time");
 
         list.clear(); // should be order 1 by ^
 
         // add all atoms to cell list
         for (std::size_t i = 0; i < numAtoms; ++i) {
             // map atoms into cell (0->xlen, 0->ylen, 0->zlen)
-            double x = x3n[3 * i + 0] -
-                       box.limits(0).len *
-                           std::floor(x3n[3 * i + 0] * box.limits(0).inv);
+            auto [x, y, z] =
+                box.mapIntoCell(x3n[3 * i + 0], x3n[3 * i + 1], x3n[3 * i + 2]);
 
-            double y = x3n[3 * i + 1] -
-                       box.limits(1).len *
-                           std::floor(x3n[3 * i + 1] * box.limits(1).inv);
-
-            double z = x3n[3 * i + 2] -
-                       box.limits(2).len *
-                           std::floor(x3n[3 * i + 2] * box.limits(2).inv);
-
-            x -= box.limits(0).len * std::floor(x * box.limits(0).inv);
-            y -= box.limits(1).len * std::floor(y * box.limits(1).inv);
-            z -= box.limits(2).len * std::floor(z * box.limits(2).inv);
-
-            // if (y >= box.limits(1).len) {
-            //     std::cout << std::setprecision(16) << y << std::endl;
-            //     std::cout << y * box.limits(1).inv << std::endl;
-            //     std::cout << x3n[3 * i + 1] << std::endl;
-            // }
-
-            check(x >= 0 && x < box.limits(0).len, "x out of cell " << x);
-            check(y >= 0 && y < box.limits(1).len, "y out of cell " << y);
-            check(z >= 0 && z < box.limits(2).len, "z out of cell " << x);
-
-            // std::cout << x << ' ' << y << ' ' << z << ' ' << std::endl;
+            // check in cell
+            check(x >= 0 && x < box.limits(0).len, "x out of box");
+            check(y >= 0 && y < box.limits(1).len, "y out of box");
+            check(z >= 0 && z < box.limits(2).len,
+                  "z out of box" << z << ' ' << x3n[3 * i + 2]);
 
             list.emplace_back(kinds[i], x, y, z);
         }
+    }
 
+    template <typename T> void makeCellList(T const &x) {
+        fillCellList(x);
+        makeGhosts();
         updateHead();
-
-        // std::cout << head.transpose() << std::endl;
     }
 
   private:
@@ -260,6 +243,31 @@ template <typename C, typename B> class LinkedCellList {
             std::size_t lambda = box.lambda(atom);
             atom.next() = head[lambda];
             head[lambda] = i;
+        }
+    }
+
+    // Rapaport p.18
+    void makeGhosts() {
+        // TODO: could accelerate by only looking for ghosts at edge boxes
+        for (std::size_t i = 0; i < 3; ++i) {
+            // fixed end stops double copies
+            std::size_t end = list.size();
+
+            for (std::size_t j = 0; j < end; ++j) {
+                Atom<kind_t> atom = list[j];
+
+                if (atom[i] < 2 * box.rcut()) {
+
+                    list.push_back(atom);
+                    list.back()[i] += box.limits(i).len;
+                }
+
+                if (atom[i] > box.limits(i).len - 2 * box.rcut()) {
+
+                    list.push_back(atom);
+                    list.back()[i] -= box.limits(i).len;
+                }
+            }
         }
     }
 
@@ -288,8 +296,8 @@ template <typename C, typename B> class LinkedCellList {
         } while (index != end);
 
         // in adjecent cells -- don't need check against self
-        for (std::size_t cell : box.getAdjOff().col(lambda)) {
-            index = head[cell];
+        for (std::size_t off : box.getAdjOff()) {
+            index = head[lambda + off];
             while (index != end) {
                 // std::cout << "cell_t " << cell << std::endl;
                 Atom<kind_t> const &neigh = list[index];
@@ -300,6 +308,24 @@ template <typename C, typename B> class LinkedCellList {
                 }
                 index = neigh.next();
             }
+        }
+    }
+
+    void sort(Eigen::ArrayXd &x) {
+        fillCellList(x);
+        updateHead();
+
+        std::sort(list.begin(), list.end(),
+                  [&](Atom<kind_t> const &a, Atom<kind_t> const &b) -> bool {
+                      return box.lambda(a) < box.lambda(b);
+                  });
+
+        for (std::size_t i = 0; i < list.size(); ++i) {
+            x[3 * i + 0] = list[i][0];
+            x[3 * i + 1] = list[i][1];
+            x[3 * i + 2] = list[i][2];
+
+            kinds[i] = list[i].kind();
         }
     }
 };
@@ -336,6 +362,7 @@ template <typename C> class FuncEAM {
 
     // compute energy
     template <typename T> double operator()(T const &x) const {
+
         lcl.makeCellList(x);
 
         double sum = 0;
@@ -367,6 +394,7 @@ template <typename C> class FuncEAM {
 
     // computes grad
     template <typename T> void operator()(T const &x, Vector &out) const {
+
         lcl.makeCellList(x);
 
         for (std::size_t i = 0; i < lcl.getNumAtoms(); ++i) {

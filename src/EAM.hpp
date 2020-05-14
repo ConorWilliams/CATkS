@@ -48,7 +48,7 @@ struct TabEAM {
         return p / deltaP;
     }
 
-    template <typename T> double ineterpR(T const &v, double r) {
+    template <typename T> double ineterpR(T const &v, double r) const {
         std::size_t idx = r / deltaR;
 
         double hi = v[idx + 1];
@@ -57,7 +57,7 @@ struct TabEAM {
         return lo + (r - idx * deltaR) * (hi - lo) / deltaR;
     }
 
-    template <typename T> double ineterpP(T const &v, double p) {
+    template <typename T> double ineterpP(T const &v, double p) const {
         std::size_t idx = p / deltaP;
 
         double hi = v[idx + 1];

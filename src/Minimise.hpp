@@ -9,14 +9,16 @@
 #include "L_BFGS.hpp"
 #include "utils.hpp"
 
+#include <iomanip>
+
 template <typename F1, typename F2> class Minimise {
     static constexpr double C1 = 1e-4;
     static constexpr double C2 = 0.9;
 
     static constexpr int I_MAX = 1000;
-    static constexpr int L_MAX = 10;
+    static constexpr int L_MAX = 3;
 
-    static constexpr double F_TOL = 5e-2;
+    static constexpr double F_TOL = 1e-4;
 
     static constexpr double S_MAX = 1;
 
@@ -48,7 +50,8 @@ template <typename F1, typename F2> class Minimise {
         grad(x, g);
 
         for (int iter = 0; iter < I_MAX; ++iter) {
-            std::cout << "Min iter: " << iter << ' ' << dot(g, g) << std::endl;
+            std::cout << "Min iter: " << iter << ' ' << std::setprecision(16)
+                      << f(x) << std::endl;
 
             if (dot(g, g) < F_TOL * F_TOL) {
                 return true;
@@ -60,7 +63,7 @@ template <typename F1, typename F2> class Minimise {
 
             double a = 1;
 
-            // double const f0 = f(x);
+            //    double const f0 = f(x);
             double const g0 = dot(g, p);
 
             // force descent direction
@@ -79,14 +82,12 @@ template <typename F1, typename F2> class Minimise {
             x = x0 + a * p;
             grad(x, g);
 
-            // // backtracking line search
+            // backtracking line search
             // for (int i = 1;; ++i) {
             //     x = x0 + a * p;
             //     grad(x, g);
             //
             //     double fa = f(x);
-            //
-            //     std::cout << "x is: " << fa << std::endl;
             //
             //     // Wolfie sufficiant decrese condition
             //     if (fa <= f0 + C1 * a * g0) {
@@ -102,9 +103,11 @@ template <typename F1, typename F2> class Minimise {
             //
             //     if (i > L_MAX) {
             //         std::cerr << "fail in minimiser line search" <<
-            //         std::endl; break; return false;
+            //         std::endl;
+            //         // break;
+            //         return false;
             //     }
-            //}
+            // }
 
             // std::cout << x(0) << ' ' << x(1) << ' ' << 1 << ' ' << 0
             //           << std::endl;
