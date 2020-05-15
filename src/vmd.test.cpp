@@ -1,4 +1,5 @@
-
+#define NDEBUG
+#define EIGEN_NO_DEBUG
 
 #include <iostream>
 #include <random>
@@ -12,8 +13,10 @@
 enum : uint8_t { Fe = 0, H = 1 };
 constexpr double LAT = 2.855700;
 
+inline constexpr int len = 7;
+
 int main() {
-    Vector init(7 * 7 * 7 * 3 * 2 - 3);
+    Vector init(len * len * len * 3 * 2 - 3);
     Vector grad(init.size());
     Vector ax(init.size());
 
@@ -21,9 +24,9 @@ int main() {
 
     // make BCC lattice
     double cell = 0;
-    for (int i = 0; i < 7; ++i) {
-        for (int j = 0; j < 7; ++j) {
-            for (int k = 0; k < 7; ++k) {
+    for (int i = 0; i < len; ++i) {
+        for (int j = 0; j < len; ++j) {
+            for (int k = 0; k < len; ++k) {
 
                 if (i == 1 && j == 1 && k == 1) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
@@ -62,11 +65,11 @@ int main() {
     FuncEAM f{"/home/cdt1902/dis/CATkS/data/PotentialA.fs",
               kinds,
               0,
-              7 * LAT,
+              len * LAT,
               0,
-              7 * LAT,
+              len * LAT,
               0,
-              7 * LAT};
+              len * LAT};
 
     f.sort(init);
 
@@ -104,7 +107,7 @@ int main() {
 
     std::ofstream file{"/home/cdt1902/dis/CATkS/raw.txt"};
 
-    for (int i = 0; i < 1; ++i) {
+    for (int i = 0; i < 10; ++i) {
         std::cout << "this is cycle " << i << std::endl;
 
         x = init;
@@ -114,7 +117,7 @@ int main() {
         }
 
         // was 35, vac 34
-        for (std::size_t i = 0; i < 34 + 33; ++i) {
+        for (std::size_t i = 0; i < 34; ++i) {
             x[3 * i + 0] += d(gen);
             x[3 * i + 1] += d(gen);
             x[3 * i + 2] += d(gen);
@@ -166,10 +169,11 @@ int main() {
             std::cout << "out   " << f(plus) - f(x) << std::endl;
             std::cout << "total " << f(plus) - f(minus) << std::endl;
 
-            file << frame << ' ' << f(x) - f(minus) << ' ' << f(plus) - f(x)
-                 << ' ' << f(plus) - f(minus) << std::endl;
-
             if (d1 < 0.1) {
+
+                file << frame << ' ' << f(x) - f(minus) << ' ' << f(plus) - f(x)
+                     << ' ' << f(plus) - f(minus) << std::endl;
+
                 std::string head{"/home/cdt1902/dis/CATkS/plt/dump/vac_vid_"};
                 std::string tail{".xyz"};
                 to_print.push_back(plus);

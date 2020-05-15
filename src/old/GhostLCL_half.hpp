@@ -14,26 +14,16 @@
 // Helper class holds atom in LIST array of LCL with index of neighbours
 template <typename T> class Atom {
   private:
-    std::array<double, 3> r;
-    double m_rho;
     T k;
+    std::array<double, 3> r;
     std::size_t n;
 
   public:
-    Atom(T k, double x, double y, double z) : r{x, y, z}, k{k} {}
-    Atom(Atom const &) = default;
-    Atom(Atom &&) = default;
-    Atom() = default;
-    Atom &operator=(Atom const &) = default;
-    Atom &operator=(Atom &&) = default;
+    Atom(T k, double x, double y, double z) : k{k}, r{x, y, z} {}
 
     inline T const &kind() const { return k; }
-
     inline std::size_t &next() { return n; }
     inline std::size_t next() const { return n; }
-
-    inline double &rho() { return m_rho; }
-    inline double rho() const { return m_rho; }
 
     inline double &operator[](std::size_t i) { return r[i]; }
     inline double const &operator[](std::size_t i) const { return r[i]; }
@@ -64,7 +54,7 @@ class Box {
     double ly;
     double lz;
 
-    std::array<long, 26> adjOff; // 3^3 - 1
+    std::array<long, 124> adjOff; // 3^3 - 1
 
   public:
     Box(double rcut, double xmin, double xmax, double ymin, double ymax,
@@ -82,25 +72,21 @@ class Box {
         check(zmax - zmin >= rcut, "box too small");
 
         // round down (toward zero) truncation, therefore boxes always biger
-        // than rcut, plus two (+ 2) for gost cell layer
-        mx = static_cast<std::size_t>((xmax - xmin) / rcut) + 2;
-        my = static_cast<std::size_t>((ymax - ymin) / rcut) + 2;
-        mz = static_cast<std::size_t>((zmax - zmin) / rcut) + 2;
+        // than rcut, plus two (+ 4) for gost cell layer
+        mx = static_cast<std::size_t>((xmax - xmin) / (rcut * 0.5)) + 8;
+        my = static_cast<std::size_t>((ymax - ymin) / (rcut * 0.5)) + 8;
+        mz = static_cast<std::size_t>((zmax - zmin) / (rcut * 0.5)) + 8;
 
         std::cout << "shape " << mx << ' ' << my << ' ' << mz << std::endl;
 
         // dimensions of cells
-        double lcx = (xmax - xmin) / (mx - 2);
-        double lcy = (ymax - ymin) / (my - 2);
-        double lcz = (ymax - ymin) / (mz - 2);
+        double lcx = (xmax - xmin) / (mx - 8);
+        double lcy = (ymax - ymin) / (my - 8);
+        double lcz = (ymax - ymin) / (mz - 8);
 
-        check(lcx >= rcut, "cells made too small");
-        check(lcy >= rcut, "cells made too small");
-        check(lcz >= rcut, "cells made too small");
-
-        ox = -lcx; // o for offset
-        oy = -lcy;
-        oz = -lcz;
+        ox = -4 * lcx; // o for offset
+        oy = -4 * lcy;
+        oz = -4 * lcz;
 
         lx = lcx * mx;
         ly = lcy * my;
@@ -108,9 +94,9 @@ class Box {
 
         // compute neighbour offsets
         long idx = 0;
-        for (auto k : {-1, 0, 1}) {
-            for (auto j : {-1, 0, 1}) {
-                for (auto i : {-1, 0, 1}) {
+        for (auto k : {-2, -1, 0, 1, 2}) {
+            for (auto j : {-2, -1, 0, 1, 2}) {
+                for (auto i : {-2, -1, 0, 1, 2}) {
                     if (i != 0 || j != 0 || k != 0) {
                         adjOff[idx++] = i + j * mx + k * mx * my;
                     }
@@ -162,8 +148,7 @@ class Box {
     }
 
     // maps point any were into range 0->(max-min)
-    __attribute__((noinline)) inline std::array<double, 3>
-    mapIntoCell(double x, double y, double z) {
+    inline std::array<double, 3> mapIntoCell(double x, double y, double z) {
 
         std::array<double, 3> ret;
 
@@ -171,13 +156,9 @@ class Box {
         ret[1] = y - limits(1).len * std::floor(y * limits(1).inv);
         ret[2] = z - limits(2).len * std::floor(z * limits(2).inv);
 
-        // ret[0] -= limits(0).len * std::floor(ret[0] * limits(0).inv);
-        // ret[1] -= limits(1).len * std::floor(ret[1] * limits(1).inv);
-        // ret[2] -= limits(2).len * std::floor(ret[2] * limits(2).inv);
-        // else
-        ret[0] = ret[0] == limits(0).len ? 0.0 : ret[0];
-        ret[1] = ret[1] == limits(1).len ? 0.0 : ret[1];
-        ret[2] = ret[2] == limits(2).len ? 0.0 : ret[2];
+        // ret[0] -= limits(0).len * std::floor(x * limits(0).inv);
+        // ret[1] -= limits(1).len * std::floor(y * limits(1).inv);
+        // ret[2] -= limits(2).len * std::floor(z * limits(2).inv);
 
         return ret;
     }
@@ -207,13 +188,13 @@ template <typename C, typename B> class LinkedCellList {
 
     inline auto const &getKinds() const { return kinds; }
 
-    inline auto begin() { return list.begin(); }
-    inline auto end() { return list.begin() + numAtoms; }
+    inline auto begin() const { return list.begin(); }
+    inline auto end() const { return list.begin() + numAtoms; }
 
     inline Atom<kind_t> const &getAtom(std::size_t i) const { return list[i]; }
     inline std::size_t getNumAtoms() const { return numAtoms; }
 
-    template <typename T> inline void fillCellList(T const &x3n) {
+    template <typename T> void fillCellList(T const &x3n) {
         check(static_cast<std::size_t>(x3n.size()) == 3 * numAtoms,
               "wrong number of atoms");
 
@@ -229,9 +210,9 @@ template <typename C, typename B> class LinkedCellList {
                 box.mapIntoCell(x3n[3 * i + 0], x3n[3 * i + 1], x3n[3 * i + 2]);
 
             // check in cell
-            check(x >= 0 && x < box.limits(0).len, "x out of box " << x);
-            check(y >= 0 && y < box.limits(1).len, "y out of box " << y);
-            check(z >= 0 && z < box.limits(2).len, "z out of box " << z);
+            check(x >= 0 && x < box.limits(0).len, "x out of box");
+            check(y >= 0 && y < box.limits(1).len, "y out of box");
+            check(z >= 0 && z < box.limits(2).len, "z out of box");
 
             list.emplace_back(kinds[i], x, y, z);
         }
@@ -245,7 +226,7 @@ template <typename C, typename B> class LinkedCellList {
 
   private:
     // Alg 3.1
-    inline void updateHead() {
+    void updateHead() {
         for (auto &&elem : head) {
             elem = list.size();
         }
@@ -260,7 +241,7 @@ template <typename C, typename B> class LinkedCellList {
     }
 
     // Rapaport p.18
-    inline void makeGhosts() {
+    void makeGhosts() {
         // TODO: could accelerate by only looking for ghosts at edge boxes
         for (std::size_t i = 0; i < 3; ++i) {
             // fixed end stops double copies
@@ -269,13 +250,13 @@ template <typename C, typename B> class LinkedCellList {
             for (std::size_t j = 0; j < end; ++j) {
                 Atom<kind_t> atom = list[j];
 
-                if (atom[i] < box.rcut()) {
+                if (atom[i] < 2 * box.rcut()) {
 
                     list.push_back(atom);
                     list.back()[i] += box.limits(i).len;
                 }
 
-                if (atom[i] > box.limits(i).len - box.rcut()) {
+                if (atom[i] > box.limits(i).len - 2 * box.rcut()) {
 
                     list.push_back(atom);
                     list.back()[i] -= box.limits(i).len;
@@ -285,16 +266,9 @@ template <typename C, typename B> class LinkedCellList {
     }
 
   public:
-    void updateGhosts() {
-        list.resize(getNumAtoms()); // should not realloc
-        makeGhosts();
-        updateHead();
-    }
-
     // applies f() for every neighbour (closer than rcut)
     template <typename F>
-    __attribute__((noinline)) inline void findNeigh(Atom<kind_t> const &atom,
-                                                    F const &f) {
+    inline void findNeigh(Atom<kind_t> const &atom, F const &f) {
 
         std::size_t const lambda = box.lambda(atom);
         std::size_t const end = list.size();
@@ -403,23 +377,19 @@ template <typename C> class FuncEAM {
     }
 
     // assumes makeCellList has already been called
-    void __attribute__((noinline)) calcAllRho() const {
-        for (auto &&beta : lcl) {
-            beta.rho() = 0;
-            lcl.findNeigh(beta, [&](auto const &alpha, double r, double, double,
-                                    double) {
-                beta.rho() +=
-                    data.ineterpR(data.tabPhi(alpha.kind(), beta.kind()), r);
+    template <typename K> double calcRho(Atom<K> const &beta) const {
+        double rho = 0;
+        lcl.findNeigh(
+            beta, [&](auto const &alpha, double r, double, double, double) {
+                rho += data.ineterpR(data.tabPhi(alpha.kind(), beta.kind()), r);
             });
-        }
-        lcl.updateGhosts();
+        return rho;
     }
 
     // computes grad
     template <typename T> void operator()(T const &x, Vector &out) const {
 
         lcl.makeCellList(x);
-        calcAllRho();
 
         for (std::size_t i = 0; i < lcl.getNumAtoms(); ++i) {
             auto const &gamma = lcl.getAtom(i);
@@ -429,7 +399,7 @@ template <typename C> class FuncEAM {
             out[3 * i + 2] = 0;
 
             double const fpg =
-                data.ineterpP(data.difF.col(gamma.kind()), gamma.rho());
+                data.ineterpP(data.difF.col(gamma.kind()), calcRho(gamma));
 
             // finds R^{\alpha\gamma}
             lcl.findNeigh(gamma, [&](auto const &alpha, double r, double dx,
@@ -440,7 +410,7 @@ template <typename C> class FuncEAM {
                     data.ineterpR(data.difV(alpha.kind(), gamma.kind()), r) +
                     fpg * data.ineterpR(data.difPhi(alpha.kind(), gamma.kind()),
                                         r) +
-                    data.ineterpP(data.difF.col(alpha.kind()), alpha.rho()) *
+                    data.ineterpP(data.difF.col(alpha.kind()), calcRho(alpha)) *
                         data.ineterpR(data.difPhi(gamma.kind(), alpha.kind()),
                                       r);
 

@@ -61,4 +61,4 @@ add_executable(force src/force.test.cpp)
 target_compile_options(force PRIVATE -Wall -Wextra -pedantic -Werror -O3)
 
 add_executable(xmd src/vmd.test.cpp)
-target_compile_options(xmd PRIVATE -Wall -Wextra -pedantic -Werror -O3 -march=native -ffast-math)
+target_compile_options(xmd PRIVATE -Wall -Wextra -pedantic -Werror -O3 -march=native )

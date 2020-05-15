@@ -48,8 +48,8 @@ class Box {
 
     Eigen::Array<std::size_t, 26, Eigen::Dynamic> adjOff; // 3^3 - 1
 
-    inline __attribute__((noinline)) std::size_t
-    map3To1(std::size_t i, std::size_t j, std::size_t k) const {
+    inline std::size_t map3To1(std::size_t i, std::size_t j,
+                               std::size_t k) const {
         return i + j * mx + k * mx * my;
     }
 
@@ -114,8 +114,7 @@ class Box {
         return lambda(atom[0], atom[1], atom[2]);
     }
 
-    inline __attribute__((noinline)) std::size_t lambda(double x, double y,
-                                                        double z) const {
+    inline std::size_t lambda(double x, double y, double z) const {
         check(x >= 0 && x < m_limits[0].len, "x out of cell");
         check(y >= 0 && y < m_limits[1].len, "y out of cell");
         check(z >= 0 && z < m_limits[2].len, "z out of cell");
