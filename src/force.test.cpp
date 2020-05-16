@@ -1,7 +1,7 @@
 #include <iostream>
 
 #include "EAM.hpp"
-#include "FuncEAM.hpp"
+#include "Forces.hpp"
 
 int main() {
     enum : uint8_t { Fe = 0, H = 1 };

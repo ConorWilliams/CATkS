@@ -12,6 +12,35 @@
 #include "Eigen/Core"
 #include "utils.hpp"
 
+inline double cubicInterpolate(double y0, double y1, double y2, double y3,
+                               double mu) {
+    /*
+     * Interpolation methods
+     * Written by Paul Bourke
+     * December 1999
+     * URL: http://paulbourke.net/miscellaneous/interpolation/
+     */
+    double a0, a1, a2, a3, mu2;
+
+    mu2 = mu * mu;
+    a0 = y3 - y2 - y0 + y1;
+    a1 = y0 - y1 - a0;
+    a2 = y2 - y0;
+    a3 = y1;
+
+    return (a0 * mu * mu2 + a1 * mu2 + a2 * mu + a3);
+}
+
+inline double linearInterpolate(double y1, double y2, double mu) {
+    /*
+     * Interpolation methods
+     * Written by Paul Bourke
+     * December 1999
+     * URL: http://paulbourke.net/miscellaneous/interpolation/
+     */
+    return (y1 * (1 - mu) + y2 * mu);
+}
+
 // struct holds setfl formatted file data;
 struct TabEAM {
     std::size_t numSpecies;
@@ -36,34 +65,22 @@ struct TabEAM {
     Eigen::Array<Eigen::ArrayXd, Eigen::Dynamic, Eigen::Dynamic> difPhi;
     Eigen::Array<Eigen::ArrayXd, Eigen::Dynamic, Eigen::Dynamic> difV;
 
-    std::size_t rToIndex(double r) const {
-        check(r >= 0 && r <= numPntsP * deltaR,
-              "r outside boundary " << numPntsP * deltaR);
-        return r / deltaR;
+    template <typename T> inline double ineterpR(T const &v, double r) const {
+        std::size_t i = r / deltaR;
+        double mu = (r - i * deltaR) / deltaR;
+
+        check(i > 0 && i + 1 < numPntsR, "r out of bounds " << i);
+        return cubicInterpolate(v[i - 1], v[i], v[i + 1],
+                                v[std::min(i + 2, numPntsR - 1)], mu);
     }
 
-    std::size_t pToIndex(double p) const {
-        check(p >= 0 && p <= numPntsP * deltaP,
-              "p outside boundary " << p << " bound " << numPntsP * deltaP);
-        return p / deltaP;
-    }
+    template <typename T> inline double ineterpP(T const &v, double p) const {
+        std::size_t i = p / deltaP;
+        double mu = (p - i * deltaP) / deltaP;
 
-    template <typename T> double ineterpR(T const &v, double r) const {
-        std::size_t idx = r / deltaR;
-
-        double hi = v[idx + 1];
-        double lo = v[idx];
-
-        return lo + (r - idx * deltaR) * (hi - lo) / deltaR;
-    }
-
-    template <typename T> double ineterpP(T const &v, double p) const {
-        std::size_t idx = p / deltaP;
-
-        double hi = v[idx + 1];
-        double lo = v[idx];
-
-        return lo + (p - idx * deltaP) * (hi - lo) / deltaP;
+        check(i > 0 && i + 1 < numPntsP, "p out of bounds " << i);
+        return cubicInterpolate(v[i - 1], v[i], v[i + 1],
+                                v[std::min(i + 2, numPntsP - 1)], mu);
     }
 
     TabEAM(std::size_t numS, std::size_t numP, std::size_t numR, double delP,
@@ -73,6 +90,8 @@ struct TabEAM {
 
         number.resize(numSpecies);
         mass.resize(numSpecies);
+
+        // plus one for cubic interpolation
 
         tabF.resize(numPntsP, numSpecies);
         tabPhi.resize(numSpecies, numSpecies);

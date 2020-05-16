@@ -6,7 +6,7 @@
 
 #include "Dimer.hpp"
 #include "DumpXYX.hpp"
-#include "GhostLCL.hpp"
+#include "Forces.hpp"
 #include "Minimise.hpp"
 #include "utils.hpp"
 
@@ -62,7 +62,7 @@ int main() {
     //
     // kinds[kinds.size() - 2] = H;
 
-    FuncEAM f{"/home/cdt1902/dis/CATkS/data/PotentialA.fs",
+    FuncEAM f{"/home/cdt1902/dis/CATkS/data/PotentialB.fs",
               kinds,
               0,
               len * LAT,
@@ -84,7 +84,7 @@ int main() {
 
     auto unkinds = kinds;
 
-    dumpXYX("/home/cdt1902/dis/CATkS/plt/dump/vac_rand.xyz", init, unkinds);
+    dumpXYX("/home/cdt1902/dis/CATkS/plt/dump/vac_rand.xyz", init, kinds);
 
     Vector x = init;
 
@@ -94,20 +94,20 @@ int main() {
     std::vector<std::string> names;
 
     auto printer = [&]() {
-        std::string head{"/home/cdt1902/dis/CATkS/plt/dump/vac_vid_"};
-        std::string head2{"/home/cdt1902/dis/CATkS/plt/dump/vac_cont_"};
-
-        std::string tail{".xyz"};
-        to_print.push_back(x);
-        dumpXYX(head2 + std::to_string(frame) + tail, x, unkinds);
-        names.push_back(head + std::to_string(frame++) + tail);
+        // std::string head{"/home/cdt1902/dis/CATkS/plt/dump/vac_vid_"};
+        // std::string head2{"/home/cdt1902/dis/CATkS/plt/dump/vac_cont_"};
+        //
+        // std::string tail{".xyz"};
+        // to_print.push_back(x);
+        // // dumpXYX(head2 + std::to_string(frame) + tail, x, kinds);
+        // names.push_back(head + std::to_string(frame++) + tail);
     };
 
     Dimer dimer{f, x, ax, printer};
 
-    std::ofstream file{"/home/cdt1902/dis/CATkS/raw.txt"};
+    std::ofstream file{"/home/cdt1902/dis/CATkS/rawB.txt"};
 
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 5000; ++i) {
         std::cout << "this is cycle " << i << std::endl;
 
         x = init;
@@ -117,7 +117,7 @@ int main() {
         }
 
         // was 35, vac 34
-        for (std::size_t i = 0; i < 34; ++i) {
+        for (std::size_t i = 0; i < 34 + 34; ++i) {
             x[3 * i + 0] += d(gen);
             x[3 * i + 1] += d(gen);
             x[3 * i + 2] += d(gen);
@@ -143,7 +143,7 @@ int main() {
 
         std::string ver[2] = {"_fail", "_pass"};
 
-        dumpXYX(head + std::to_string(i) + ver[ok] + tail, x, unkinds);
+        // dumpXYX(head + std::to_string(i) + ver[ok] + tail, x, unkinds);
 
         if (ok) {
             Vector plus = x + ax * 0.1;
@@ -183,8 +183,10 @@ int main() {
                 init = plus;
 
                 for (std::size_t i = 0; i < to_print.size(); ++i) {
-                    dumpXYX(names[i], to_print[i], unkinds);
+                    dumpXYX(names[i], to_print[i], kinds);
                 }
+
+                f.sort(init);
             }
         }
 

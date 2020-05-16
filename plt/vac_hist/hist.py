@@ -6,25 +6,18 @@ plt.rc("text", usetex=True)
 plt.rc("font", family="serif")
 plt.rc("text.latex", preamble=r"\usepackage{amsmath} \usepackage{siunitx}")
 
-raw = np.loadtxt(
-    "/home/cdt1902/dis/CATkS/plt/vac_hist/raw.txt", dtype=np.float64
+
+rawA = np.loadtxt(
+    "/home/cdt1902/dis/CATkS/plt/vac_hist/rawA2.txt", dtype=np.float64
 )
 
-raw1 = np.loadtxt(
-    "/home/cdt1902/dis/CATkS/plt/vac_hist/raw1.txt", dtype=np.float64
+rawB = np.loadtxt(
+    "/home/cdt1902/dis/CATkS/plt/vac_hist/rawB2.txt", dtype=np.float64
 )
 
-energies = []
 
-for row in raw:
-    energies.append(row[1])
-
-for row in raw1:
-    energies.append(row[1])
-
-print(len(energies))
-
-plt.hist(energies, 90, histtype="bar")
+plt.hist(rawA[::, 1], 50)
+plt.hist(rawB[::, 1], 50)
 
 plt.xlim(0, 6)
 

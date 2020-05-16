@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "EAM.hpp"
-#include "sort.hpp"
 #include "utils.hpp"
 
 // Helper class holds atom in LIST array of LCL with index of neighbours
@@ -197,12 +196,14 @@ template <typename C> class FuncEAM {
     mutable Eigen::Array<std::size_t, Eigen::Dynamic, 1> head;
     mutable std::vector<Atom<kind_t>> list;
 
+    mutable std::vector<std::vector<Atom<kind_t> *>> verlet;
+
   public:
     FuncEAM(std::string const &file, C &&kinds, double xmin, double xmax,
             double ymin, double ymax, double zmin, double zmax)
         : data{parseTabEAM(file)}, kinds{std::forward<C>(kinds)},
           box{data.rCut, xmin, xmax, ymin, ymax, zmin, zmax},
-          numAtoms{kinds.size()}, head(box.numCells()) {
+          numAtoms{kinds.size()}, head(box.numCells()), verlet(numAtoms) {
 
         static_assert(std::is_integral_v<kind_t>, "kinds must be integers");
 
@@ -218,7 +219,7 @@ template <typename C> class FuncEAM {
     }
 
   private:
-    template <typename T> void fillCellList(T const &x3n) const {
+    template <typename T> inline void fillCellList(T const &x3n) const {
         check(static_cast<std::size_t>(x3n.size()) == 3 * numAtoms,
               "wrong number of atoms");
 
@@ -240,7 +241,7 @@ template <typename C> class FuncEAM {
     }
 
     // Alg 3.1
-    void updateHead() const {
+    inline void updateHead() const {
         for (auto &&elem : head) {
             elem = list.size();
         }
@@ -255,7 +256,7 @@ template <typename C> class FuncEAM {
     }
 
     // Rapaport p.18
-    void makeGhosts() const {
+    inline void makeGhosts() const {
         // TODO: could accelerate by only looking for ghosts at edge boxes
         for (std::size_t i = 0; i < 3; ++i) {
             // fixed end stops double copies
@@ -279,7 +280,8 @@ template <typename C> class FuncEAM {
 
     // applies f() for every neighbour (closer than rcut)
     template <typename F>
-    inline void findNeigh(Atom<kind_t> const &atom, F const &f) const {
+    __attribute__((noinline)) inline void findNeigh(Atom<kind_t> const &atom,
+                                                    F const &f) const {
 
         std::size_t const lambda = box.lambda(atom);
         std::size_t const end = list.size();
@@ -316,30 +318,85 @@ template <typename C> class FuncEAM {
         }
     }
 
+    void makeVerlet() {
+        for (std::size_t i = 0; i < numAtoms; ++i) {
+            verlet[i].clear();
+            Atom<kind_t> *atom = &list[i];
+
+            std::size_t const lambda = box.lambda(*atom);
+            std::size_t const end = list.size();
+            double const cut_sq = box.rcut() * box.rcut();
+
+            std::size_t index = head[lambda];
+
+            // in same cell as atom
+            do {
+                Atom<kind_t> *neigh = &list[index];
+                if (atom != neigh) {
+                    double dx, dy, dz;
+                    double r_sq = box.norm(*neigh, *atom, dx, dy, dz);
+                    if (r_sq <= cut_sq) {
+                        verlet[i].push_back(neigh);
+                    }
+                }
+                index = neigh->next();
+            } while (index != end);
+
+            // in adjecent cells -- don't need check against self
+            for (std::size_t off : box.getAdjOff()) {
+                index = head[lambda + off];
+                while (index != end) {
+                    // std::cout << "cell_t " << cell << std::endl;
+                    Atom<kind_t> *neigh = &list[index];
+                    double dx, dy, dz;
+                    double r_sq = box.norm(*neigh, *atom, dx, dy, dz);
+                    if (r_sq <= cut_sq) {
+                        verlet[i].push_back(neigh);
+                    }
+                    index = neigh->next();
+                }
+            }
+        }
+    };
+
   public:
     // compute energy
     template <typename T> double operator()(T const &x) const {
 
-        fillCellList(x); // initilises rho to zeros
+        fillCellList(x);
         makeGhosts();
         updateHead();
 
         double sum = 0;
-        for (auto alpha = list.begin(); alpha != list.begin() + numAtoms;
-             ++alpha) {
+        for (auto it = list.begin(); it != list.begin() + numAtoms; ++it) {
 
-            findNeigh(*alpha, [&](auto const &beta, double r, double, double,
-                                  double) {
-                sum += 0.5 *
-                       data.ineterpR(data.tabV(alpha->kind(), beta.kind()), r);
+            findNeigh(*it, [&](auto const &beta, double r, double, double,
+                               double) {
+                sum +=
+                    0.5 * data.ineterpR(data.tabV(it->kind(), beta.kind()), r);
 
-                alpha->rho() +=
-                    data.ineterpR(data.tabPhi(beta.kind(), alpha->kind()), r);
+                it->rho() +=
+                    data.ineterpR(data.tabPhi(beta.kind(), it->kind()), r);
             });
 
-            sum += data.ineterpP(data.tabF.col(alpha->kind()), alpha->rho());
+            sum += data.ineterpP(data.tabF.col(it->kind()), it->rho());
         }
         return sum;
+    }
+
+    // assumes makeCellList has already been called
+    void __attribute__((noinline)) calcAllRho() const {
+        for (auto it = list.begin(); it != list.begin() + numAtoms; ++it) {
+            findNeigh(
+                *it, [&](auto const &alpha, double r, double, double, double) {
+                    it->rho() +=
+                        data.ineterpR(data.tabPhi(alpha.kind(), it->kind()), r);
+                });
+        }
+
+        list.resize(numAtoms); // should not realloc, verlet still valid
+        makeGhosts();
+        updateHead();
     }
 
     // computes grad
@@ -349,19 +406,7 @@ template <typename C> class FuncEAM {
         makeGhosts();
         updateHead();
 
-        // computes all rho values
-        for (auto beta = list.begin(); beta != list.begin() + numAtoms;
-             ++beta) {
-            findNeigh(*beta, [&](auto const &alpha, double r, double, double,
-                                 double) {
-                beta->rho() +=
-                    data.ineterpR(data.tabPhi(alpha.kind(), beta->kind()), r);
-            });
-        }
-
-        list.resize(numAtoms); // deletes ghosts, should not realloc
-        makeGhosts();
-        updateHead();
+        calcAllRho();
 
         for (std::size_t i = 0; i < numAtoms; ++i) {
             auto const &gamma = list[i];
@@ -376,18 +421,19 @@ template <typename C> class FuncEAM {
             // finds R^{\alpha\gamma}
             findNeigh(gamma, [&](auto const &alpha, double r, double dx,
                                  double dy, double dz) {
-                double mag =
-                    (data.ineterpR(data.difV(alpha.kind(), gamma.kind()), r) +
-                     fpg * data.ineterpR(
-                               data.difPhi(alpha.kind(), gamma.kind()), r) +
-                     data.ineterpP(data.difF.col(alpha.kind()), alpha.rho()) *
-                         data.ineterpR(data.difPhi(gamma.kind(), alpha.kind()),
-                                       r)) /
-                    r;
+                // std::cout << "r is: " << r << ' ' << gamma[0] << std::endl;
 
-                out[3 * i + 0] += dx * mag;
-                out[3 * i + 1] += dy * mag;
-                out[3 * i + 2] += dz * mag;
+                double mag =
+                    data.ineterpR(data.difV(alpha.kind(), gamma.kind()), r) +
+                    fpg * data.ineterpR(data.difPhi(alpha.kind(), gamma.kind()),
+                                        r) +
+                    data.ineterpP(data.difF.col(alpha.kind()), alpha.rho()) *
+                        data.ineterpR(data.difPhi(gamma.kind(), alpha.kind()),
+                                      r);
+
+                out[3 * i + 0] += dx * mag / r;
+                out[3 * i + 1] += dy * mag / r;
+                out[3 * i + 2] += dz * mag / r;
             });
         }
     }
@@ -401,9 +447,6 @@ template <typename C> class FuncEAM {
                   [&](Atom<kind_t> const &a, Atom<kind_t> const &b) -> bool {
                       return box.lambda(a) < box.lambda(b);
                   });
-        // else
-        // cj::sort_clever(list.begin(), list.end(), 0, box.numCells(),
-        //                 [&](auto const &atom) { return box.lambda(atom); });
 
         for (std::size_t i = 0; i < list.size(); ++i) {
             x[3 * i + 0] = list[i][0];
