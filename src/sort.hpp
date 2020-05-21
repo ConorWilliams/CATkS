@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <iostream>
+#include <numeric>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -124,11 +125,9 @@ T sort2(T const &list, int_t min, int_t max, K &&key) {
 // expects random access iterators
 template <typename ItBeg, typename ItEnd, typename K>
 void sort_clever(ItBeg &&begin, ItEnd &&end, long min, long max, K &&key) {
-    using int_t = long;
+    //    using int_t = long;
     // sift_key(list[i]) -> int \in {0...max-min}
-    const auto shift_key = [key = std::forward<K>(key), min](auto x) {
-        return key(x) - min;
-    };
+    const auto shift_key = [&key, min](auto x) { return key(x) - min; };
 
     assert(min <= max);
 
@@ -140,8 +139,7 @@ void sort_clever(ItBeg &&begin, ItEnd &&end, long min, long max, K &&key) {
         ++offsets[shift_key(*it)];
     }
 
-    std::vector<long> next;
-    next.reserve(offsets.size());
+    std::vector<long> next(offsets.size());
 
     // counts -> offsets, via cumsum + rightshift
     long sum = 0;
@@ -152,13 +150,36 @@ void sort_clever(ItBeg &&begin, ItEnd &&end, long min, long max, K &&key) {
         sum += count;
     }
 
-    long swapped = 0;
-    while (swapped != end - begin) {
-        for (int_t goal = max - min - 1; goal >= 0; --goal) {
-            for (long i = offsets[goal + 1] - 1; i >= next[goal]; --i) {
+    ///////////////////////////////////////
+
+    // std::vector<std::size_t> parts(offsets.size() - 1);
+    // std::iota(std::begin(parts), std::end(parts), 0);
+    //
+    // auto first = parts.begin();
+    //
+    // while (first != parts.end()) {
+    //
+    //     for (auto it = first; it != parts.end(); ++it) {
+    //         for (long i = offsets[*it + 1] - 1; i >= next[*it]; --i) {
+    //             std::swap(begin[i], begin[next[shift_key(begin[i])]++]);
+    //         }
+    //     }
+    //
+    //     first = std::partition(first, parts.end(), [&](std::size_t idx) {
+    //         return next[idx] == offsets[idx + 1];
+    //     });
+    // }
+
+    while (true) {
+        bool done = true;
+        for (long goal = max - min - 1; goal > 0; --goal) {
+            for (long i = offsets[goal] - 1; i >= next[goal - 1]; --i) {
                 std::swap(begin[i], begin[next[shift_key(begin[i])]++]);
-                ++swapped;
+                done = false;
             }
+        }
+        if (done) {
+            break;
         }
     }
 }

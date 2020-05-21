@@ -12,7 +12,7 @@
 #include <DumpXYX.hpp>
 
 template <typename F, typename P> class Dimer {
-    static constexpr int IR_MAX = 10;
+    static constexpr int IR_MAX = 15;
     static constexpr int IE_MAX = 50;
     static constexpr int IT_MAX = 200;
 
@@ -27,14 +27,14 @@ template <typename F, typename P> class Dimer {
 
     // increase for more component parallel to dimer, default = 1
     // higher = less relaxation
-    static constexpr double BOOST = 1;
+    static constexpr double BOOST = 0.5;
 
     F const &grad;
     P printer;
     long dims;
 
     CoreLBFGS<4> lbfgs_rot;
-    CoreLBFGS<8> lbfgs_trn;
+    CoreLBFGS<16> lbfgs_trn;
 
     Vector &R_0;
     Vector &N;
@@ -87,14 +87,16 @@ template <typename F, typename P> class Dimer {
 
         for (int iter = 0;; ++iter) {
             g_delta = g_1 - g_0;
-            lbfgs_rot(N, g_delta, theta); // could use perpendicularised
-
+            lbfgs_rot(N, g_delta, theta); // could use perpendicularised:
+                                          // g_delta -= dot(g_delta, N) * N;
             theta -= dot(theta, N) * N;
             theta /= std::sqrt(dot(theta, theta));
 
             double b_1 = dot(g_delta, theta) / DELTA_R;
             double c_x0 = dot(g_delta, N) / DELTA_R;
             double theta_1 = -0.5 * std::atan(b_1 / abs(c_x0));
+
+            // std::cout << iter << " theta " << theta_1 << std::endl;
 
             if (abs(theta_1) < THETA_TOL || iter == IR_MAX) {
                 return c_x0;
@@ -112,6 +114,8 @@ template <typename F, typename P> class Dimer {
                     0) {
                     theta_min += M_PI / 2;
                 }
+
+                // std::cout << iter << " theta " << theta_min << std::endl;
 
                 N = N * std::cos(theta_min) + theta * std::sin(theta_min);
 
@@ -141,20 +145,6 @@ template <typename F, typename P> class Dimer {
 
         // auto eff_grad = [&]() { return -dot(g_0, N) * N; };
         auto eff_grad = [&]() { return effGrad(); };
-
-        // crazy
-        // Vector tmp = -dot(g_0, N) * N;
-
-        // auto eff_grad = [&]() -> Vector {
-        //     auto tmp = dot(g_0, N) * N;
-        //     auto sd = (tmp - tmp.mean()).square().sum();
-        //     std::cout << sd << std::endl;
-        //     if (sd > 0.1) {
-        //         return g_0 - dot(g_0, N) * N;
-        //     } else {
-        //         return -g_0;
-        //     }
-        // };
 
         gf_n = eff_grad();
         p = -gf_n;

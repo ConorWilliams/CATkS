@@ -15,6 +15,9 @@ constexpr double LAT = 2.855700;
 
 inline constexpr int len = 7;
 
+static const std::string OUTFILE = "/home/cdt1902/dis/CATkS/raw.txt";
+constexpr double G_AMP = 0.1;
+
 int main() {
     Vector init(len * len * len * 3 * 2 - 3);
     Vector grad(init.size());
@@ -62,7 +65,7 @@ int main() {
     //
     // kinds[kinds.size() - 2] = H;
 
-    FuncEAM f{"/home/cdt1902/dis/CATkS/data/PotentialB.fs",
+    FuncEAM f{"/home/cdt1902/dis/CATkS/data/PotentialA.fs",
               kinds,
               0,
               len * LAT,
@@ -75,7 +78,7 @@ int main() {
 
     std::random_device rd{};
     std::mt19937 gen{rd()};
-    std::normal_distribution<double> d{0, 0.3};
+    std::normal_distribution<double> d{0, G_AMP};
     std::uniform_real_distribution<double> random(-1, 1);
 
     Minimise min{f, f, init.size()};
@@ -94,20 +97,20 @@ int main() {
     std::vector<std::string> names;
 
     auto printer = [&]() {
-        // std::string head{"/home/cdt1902/dis/CATkS/plt/dump/vac_vid_"};
-        // std::string head2{"/home/cdt1902/dis/CATkS/plt/dump/vac_cont_"};
-        //
-        // std::string tail{".xyz"};
-        // to_print.push_back(x);
-        // // dumpXYX(head2 + std::to_string(frame) + tail, x, kinds);
-        // names.push_back(head + std::to_string(frame++) + tail);
+        std::string head{"/home/cdt1902/dis/CATkS/plt/dump/vac_vid_"};
+        std::string head2{"/home/cdt1902/dis/CATkS/plt/dump/vac_cont_"};
+
+        std::string tail{".xyz"};
+        to_print.push_back(x);
+        // dumpXYX(head2 + std::to_string(frame) + tail, x, kinds);
+        names.push_back(head + std::to_string(frame++) + tail);
     };
 
     Dimer dimer{f, x, ax, printer};
 
-    std::ofstream file{"/home/cdt1902/dis/CATkS/rawB.txt"};
+    std::ofstream file{OUTFILE};
 
-    for (int i = 0; i < 5000; ++i) {
+    for (int i = 0; i < 500; ++i) {
         std::cout << "this is cycle " << i << std::endl;
 
         x = init;

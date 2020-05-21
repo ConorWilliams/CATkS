@@ -18,7 +18,7 @@ template <typename F1, typename F2> class Minimise {
     static constexpr int I_MAX = 1000;
     static constexpr int L_MAX = 3;
 
-    static constexpr double F_TOL = 1e-4;
+    static constexpr double F_TOL = 1e-5;
 
     static constexpr double S_MAX = 1;
 
@@ -50,8 +50,8 @@ template <typename F1, typename F2> class Minimise {
         grad(x, g);
 
         for (int iter = 0; iter < I_MAX; ++iter) {
-            std::cout << "Min iter: " << iter << ' ' << std::setprecision(16)
-                      << f(x) << std::endl;
+            // std::cout << "Min iter: " << iter << ' ' << std::setprecision(16)
+            //           << f(x) << std::endl;
 
             if (dot(g, g) < F_TOL * F_TOL) {
                 return true;

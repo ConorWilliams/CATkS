@@ -34,12 +34,12 @@ int main() {
     std::random_device rd{};
     std::mt19937 gen{rd()};
     // 2-28
-    for (int i = 2; i <= 28; ++i) {
+    for (int i = 4; i <= 26; ++i) {
         std::vector<double> averages(6, 0);
 
         int length = std::pow(10.0, (double)i / 4);
 
-        int max = std::max(length / 30, 2);
+        int max = std::max(length / 30, 10);
 
         std::uniform_real_distribution<double> u(min, max);
         std::uniform_int_distribution<int> u2(0, length - 1);

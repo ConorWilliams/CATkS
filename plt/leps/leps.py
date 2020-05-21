@@ -5,7 +5,21 @@ import matplotlib.pyplot as plt
 
 plt.rc("text", usetex=True)
 plt.rc("font", family="serif")
-plt.rc("text.latex", preamble=r"\usepackage{amsmath} \usepackage{siunitx}")
+plt.rc(
+    "text.latex",
+    preamble=r"""\RequirePackage[utf8]{inputenc}
+                 \RequirePackage[T1]{fontenc}
+                 \RequirePackage[final]{microtype}
+                 \RequirePackage{amsfonts}
+                 \RequirePackage{amsmath}
+                 \RequirePackage{amssymb}
+                 \usepackage{siunitx}
+                 \PassOptionsToPackage{full}{textcomp}
+                 \usepackage{textcomp}
+                 \usepackage{newtxtext}
+                 \usepackage[subscriptcorrection,vvarbb]{newtxmath}
+                 \usepackage{bm}""",
+)
 
 
 a = 0.05
@@ -109,7 +123,7 @@ plt.quiver(
     headwidth=1,
     headlength=0,
     pivot="mid",
-    label=r"Dimer Axes, $\mathbf{\hat{N}}$",
+    label=r"Dimer Axes, $\bm{\hat{N}}$",
     antialiased=True,
 )
 
@@ -182,6 +196,6 @@ plt.xlabel(r"$x$/\si{\angstrom}")
 plt.ylabel(r"$y$/\si{\angstrom}")
 
 plt.tight_layout()
-f.savefig(r"/home/cdt1902/dis/thesis/validation/Figs/2d.pdf")
+f.savefig(r"/home/cdt1902/dis/pres/pot5.pdf")
 
 plt.show()
