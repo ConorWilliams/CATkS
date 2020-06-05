@@ -3,12 +3,14 @@
 #include <array>
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 #include <iostream>
 #include <string>
 #include <type_traits>
 #include <vector>
 
 #include "EAM.hpp"
+#include "colour.hpp"
 #include "sort.hpp"
 #include "utils.hpp"
 
@@ -412,6 +414,28 @@ template <typename C> class FuncEAM {
 
             kinds[i] = list[i].kind();
         }
+    }
+
+    template <typename T> auto colour(T const &x) const {
+        fillCellList(x);
+        makeGhosts();
+        updateHead();
+
+        std::vector<std::size_t> colours;
+        std::hash<Rdf> hasher;
+
+        for (auto atom = list.begin(); atom != list.begin() + numAtoms;
+             ++atom) {
+
+            Rdf rdf{};
+
+            findNeigh(*atom, [&](auto const &, double r, double, double,
+                                 double) { rdf.add(r / box.rcut()); });
+
+            colours.push_back(hasher(rdf));
+        }
+
+        return colours;
     }
 };
 

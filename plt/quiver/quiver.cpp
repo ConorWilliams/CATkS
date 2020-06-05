@@ -61,6 +61,7 @@ template <typename F> class Dimer {
 
     inline auto effGradPar() const { return dot(g_0, N) * N; }
     inline auto effGradPerp() const { return g_0 - dot(g_0, N) * N; }
+    inline auto actualGrad() const { return N; }
 
     void print() const {
         // std::cout << R_0(0) << ' ' << R_0(1) << ' ' << N(0) << ' ' << N(1)
@@ -167,8 +168,8 @@ int main() {
 
     // xrange = [0.5, 3]
     // yrange = [-3, 3.3]
-    double delta_x = (3 - 0.67) / 35;
-    double delta_y = (3.3 - -3) / 35;
+    double delta_x = (3 - 0.67) / 25;
+    double delta_y = (3.3 - -3) / 25;
 
     for (double x = 0.67; x <= 3; x = x + delta_x) {
         for (double y = -3; y <= 3.3; y = y + delta_y) {
@@ -183,7 +184,8 @@ int main() {
 
             axis.matrix().normalize();
 
-            Vector force = -0.5 * dimer.effGradPerp() + dimer.effGradPar();
+            // Vector force = -(dimer.effGradPerp() - 2 * dimer.effGradPar());
+            Vector force = -dimer.actualGrad();
             std::cout << pos(0) << ' ' << pos(1) << ' ' << force(0) << ' '
                       << force(1) << std::endl;
         }

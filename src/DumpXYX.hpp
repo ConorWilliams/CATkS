@@ -5,7 +5,8 @@
 
 #include <utils.hpp>
 
-static std::string symbol[4] = {"Fe", "H", "C", "O"};
+// static std::string symbol[4] = {"Fe", "H", "C", "O"};
+// static int symbol[4] = {0, 1, 2, 3};
 
 template <typename K>
 void dumpXYX(std::string const &file, Vector const &coords, K kinds) {
@@ -19,7 +20,7 @@ void dumpXYX(std::string const &file, Vector const &coords, K kinds) {
 
     for (std::size_t i = 0; i < kinds.size(); ++i) {
         outfile << '\n'
-                << symbol[kinds[i]] << ' ' << coords[3 * i + 0] << ' '
+                << kinds[i] << ' ' << coords[3 * i + 0] << ' '
                 << coords[3 * i + 1] << ' ' << coords[3 * i + 2];
     }
 }

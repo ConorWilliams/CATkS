@@ -10,3 +10,9 @@
 [submodule "external/vmdstream"]
 	path = external/vmdstream
 	url = https://github.com/askeys/vmdstream
+[submodule "external/smhasher"]
+	path = external/smhasher
+	url = https://github.com/aappleby/smhasher
+[submodule "external/pcg-cpp"]
+	path = external/pcg-cpp
+	url = https://github.com/imneme/pcg-cpp

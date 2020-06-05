@@ -91,10 +91,20 @@ print("iterations", path.shape)
 f = plt.figure(figsize=(10, 7))
 
 
-plt.contourf(X, Y, Z, 10, cmap="coolwarm")
+plt.contour(X, Y, Z, 20, cmap="coolwarm")
 # plt.contour(X, Y, Z, 10, cmap="gray")
 
-plt.quiver(path[::, 0], path[::, 1], path[::, 2], path[::, 3], pivot="mid")
+plt.quiver(
+    path[::, 0],
+    path[::, 1],
+    path[::, 2],
+    path[::, 3],
+    width=0.0035,
+    headwidth=1,
+    headlength=0,
+    pivot="mid",
+    antialiased=True,
+)
 
 plt.legend()
 
@@ -106,6 +116,6 @@ plt.xlabel(r"$x$/\si{\angstrom}")
 plt.ylabel(r"$y$/\si{\angstrom}")
 
 plt.tight_layout()
-f.savefig(r"/home/cdt1902/dis/thesis/validation/Figs/ft.pdf")
+f.savefig(r"/home/cdt1902/dis/thesis/validation/Figs/ft3.pdf")
 
 plt.show()
