@@ -16,7 +16,7 @@ void dumpXYX(std::string const &file, Vector const &coords, K kinds) {
     std::ofstream outfile{file};
 
     outfile << kinds.size() << std::endl;
-    outfile << "This is C. J. Williams dumpfile";
+    outfile << "This is C.J.Williams' dumpfile";
 
     for (std::size_t i = 0; i < kinds.size(); ++i) {
         outfile << '\n'

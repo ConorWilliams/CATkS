@@ -136,8 +136,8 @@ class Box {
     Lim const &limits(std::size_t i) const { return m_limits[i]; }
 
     template <typename K>
-    inline double norm(Atom<K> const &a, Atom<K> const &b, double &dx,
-                       double &dy, double &dz) const {
+    inline double normSq(Atom<K> const &a, Atom<K> const &b, double &dx,
+                         double &dy, double &dz) const {
         dx = b[0] - a[0];
         dy = b[1] - a[1];
         dz = b[2] - a[2];
@@ -148,6 +148,23 @@ class Box {
               "two atoms in same position");
 
         return dx * dx + dy * dy + dz * dz;
+    }
+
+    inline double periodicNorm(double x1, double y1, double z1, double x2,
+                               double y2, double z2) const {
+        double dx = std::abs(x1 - x2);
+        double dy = std::abs(y1 - y2);
+        double dz = std::abs(z1 - z2);
+
+        dx -= static_cast<int>(dx * limits(0).inv + 0.5) * limits(0).len;
+        dy -= static_cast<int>(dy * limits(1).inv + 0.5) * limits(1).len;
+        dz -= static_cast<int>(dz * limits(2).inv + 0.5) * limits(2).len;
+
+        // dx -= limits(0).len * std::floor(dx * limits(0).inv + 0.5);
+        // dy -= limits(1).len * std::floor(dy * limits(1).inv + 0.5);
+        // dz -= limits(2).len * std::floor(dz * limits(2).inv + 0.5);
+
+        return std::sqrt(dx * dx + dy * dy + dz * dz);
     }
 
     template <typename T> inline std::size_t lambda(Atom<T> const &atom) const {
@@ -294,7 +311,7 @@ template <typename C> class FuncEAM {
             Atom<kind_t> const &neigh = list[index];
             if (&atom != &neigh) {
                 double dx, dy, dz;
-                double r_sq = box.norm(neigh, atom, dx, dy, dz);
+                double r_sq = box.normSq(neigh, atom, dx, dy, dz);
                 if (r_sq <= cut_sq) {
                     f(neigh, std::sqrt(r_sq), dx, dy, dz);
                 }
@@ -309,7 +326,7 @@ template <typename C> class FuncEAM {
                 // std::cout << "cell_t " << cell << std::endl;
                 Atom<kind_t> const &neigh = list[index];
                 double dx, dy, dz;
-                double r_sq = box.norm(neigh, atom, dx, dy, dz);
+                double r_sq = box.normSq(neigh, atom, dx, dy, dz);
                 if (r_sq <= cut_sq) {
                     f(neigh, std::sqrt(r_sq), dx, dy, dz);
                 }
@@ -416,7 +433,9 @@ template <typename C> class FuncEAM {
         }
     }
 
-    template <typename T> auto colour(T const &x) const {
+    auto rcut() const { return box.rcut(); }
+
+    template <typename T> auto colourAll(T const &x) const {
         fillCellList(x);
         makeGhosts();
         updateHead();
@@ -436,6 +455,11 @@ template <typename C> class FuncEAM {
         }
 
         return colours;
+    }
+
+    inline double norm(double x1, double y1, double z1, double x2, double y2,
+                       double z2) const {
+        return box.periodicNorm(x1, y1, z1, x2, y2, z2);
     }
 };
 

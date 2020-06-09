@@ -37,6 +37,10 @@ if(NOT EXISTS "${PROJECT_SOURCE_DIR}/external/smhasher/src/CMakeLists.txt")
     message(FATAL_ERROR "The submodules doctest was not downloaded! GIT_SUBMODULE was turned off or failed. Please update submodules and try again.")
 endif()
 
+if(NOT EXISTS "${PROJECT_SOURCE_DIR}/external/pcg-cpp/README.md")
+    message(FATAL_ERROR "The submodules doctest was not downloaded! GIT_SUBMODULE was turned off or failed. Please update submodules and try again.")
+endif()
+
 add_subdirectory("${PROJECT_SOURCE_DIR}/external/smhasher/src")
 add_subdirectory("${PROJECT_SOURCE_DIR}/external/eigen")
 add_subdirectory("${PROJECT_SOURCE_DIR}/external/doctest")
@@ -48,7 +52,7 @@ set(CMAKE_CXX_COMPILER /home/cdt1902/usr/bin/g++9.3)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # add external depandacies include paths
-include_directories(SYSTEM external/eigen external/doctest external/hilbert external/smhasher/src)
+include_directories(SYSTEM external/eigen external/doctest external/hilbert external/smhasher/src external/pcg-cpp/include)
 
 # all code is in src
 include_directories(src)

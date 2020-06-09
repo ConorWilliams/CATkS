@@ -38,8 +38,6 @@ struct Pot {
 
 #include <random>
 
-#include "hilbert.c"
-
 /*
  * hilbert_c2i
  *
@@ -58,13 +56,6 @@ int main() {
     constexpr int N = 2;
     Vector pos{N};
     Vector axis{N};
-
-    const long long unsigned coord[3] = {1, 1, 1};
-    int out = hilbert_c2i(3, 4, coord);
-
-    std::cout << out << std::endl;
-
-    return 0;
 
     std::random_device rd{};
     std::mt19937 gen{rd()};
