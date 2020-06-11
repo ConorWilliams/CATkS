@@ -46,7 +46,7 @@ add_subdirectory("${PROJECT_SOURCE_DIR}/external/eigen")
 add_subdirectory("${PROJECT_SOURCE_DIR}/external/doctest")
 
 # bad practice
-set(CMAKE_CXX_COMPILER /home/cdt1902/usr/bin/g++9.3)
+set(CMAKE_CXX_COMPILER /home/cdt1902/usr/bin/g++10)
 
 # for clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

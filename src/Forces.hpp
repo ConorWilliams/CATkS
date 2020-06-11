@@ -150,21 +150,31 @@ class Box {
         return dx * dx + dy * dy + dz * dz;
     }
 
-    inline double periodicNorm(double x1, double y1, double z1, double x2,
-                               double y2, double z2) const {
-        double dx = std::abs(x1 - x2);
-        double dy = std::abs(y1 - y2);
-        double dz = std::abs(z1 - z2);
+    inline Eigen::Vector3d minImage(double dx, double dy, double dz) const {
+        return {dx - limits(0).len * std::floor(dx * limits(0).inv + 0.5),
+                dy - limits(1).len * std::floor(dy * limits(1).inv + 0.5),
+                dz - limits(2).len * std::floor(dz * limits(2).inv + 0.5)};
+    }
 
-        dx -= static_cast<int>(dx * limits(0).inv + 0.5) * limits(0).len;
-        dy -= static_cast<int>(dy * limits(1).inv + 0.5) * limits(1).len;
-        dz -= static_cast<int>(dz * limits(2).inv + 0.5) * limits(2).len;
+    inline double periodicNormSq(double x1, double y1, double z1, double x2,
+                                 double y2, double z2) const {
+        // double dx = std::abs(x1 - x2);
+        // double dy = std::abs(y1 - y2);
+        // double dz = std::abs(z1 - z2);
+        //
+        // dx -= static_cast<int>(dx * limits(0).inv + 0.5) * limits(0).len;
+        // dy -= static_cast<int>(dy * limits(1).inv + 0.5) * limits(1).len;
+        // dz -= static_cast<int>(dz * limits(2).inv + 0.5) * limits(2).len;
 
-        // dx -= limits(0).len * std::floor(dx * limits(0).inv + 0.5);
-        // dy -= limits(1).len * std::floor(dy * limits(1).inv + 0.5);
-        // dz -= limits(2).len * std::floor(dz * limits(2).inv + 0.5);
+        double dx = x1 - x2;
+        double dy = y1 - y2;
+        double dz = z1 - z2;
 
-        return std::sqrt(dx * dx + dy * dy + dz * dz);
+        dx -= limits(0).len * std::floor(dx * limits(0).inv + 0.5);
+        dy -= limits(1).len * std::floor(dy * limits(1).inv + 0.5);
+        dz -= limits(2).len * std::floor(dz * limits(2).inv + 0.5);
+
+        return dx * dx + dy * dy + dz * dz;
     }
 
     template <typename T> inline std::size_t lambda(Atom<T> const &atom) const {
@@ -457,9 +467,14 @@ template <typename C> class FuncEAM {
         return colours;
     }
 
-    inline double norm(double x1, double y1, double z1, double x2, double y2,
-                       double z2) const {
-        return box.periodicNorm(x1, y1, z1, x2, y2, z2);
+    inline Eigen::Vector3d minImage(Eigen::Vector3d dr) const {
+        return box.minImage(dr[0], dr[1], dr[2]);
+    }
+
+    inline double periodicNormSq(double x1, double y1, double z1, double x2,
+                                 double y2, double z2) const {
+
+        return box.minImage(x2 - x1, y2 - y1, z2 - z1).squaredNorm();
     }
 };
 
