@@ -5,6 +5,7 @@
 #include <limits>
 #include <random>
 #include <tuple>
+#include <unordered_map>
 
 #include "pcg_random.hpp"
 
@@ -21,17 +22,6 @@ inline constexpr double TOL_NEAR = 0.1;
 
 constexpr double G_SPHERE = 4;
 constexpr double G_AMP = 0.325;
-
-int FRAME = 0;
-static const std::string head{"/home/cdt1902/dis/CATkS/plt/dump/all_"};
-static const std::string tail{".xyz"};
-
-template <typename T = std::vector<int>>
-void output(Vector const &x, T const &kinds) {
-    dumpXYX(head + std::to_string(FRAME++) + tail, x, kinds);
-}
-
-void output(Vector const &x) { output(x, std::vector<int>(x.size() / 3, 0)); }
 
 // init is a minimised (unporturbed) vector of atoms
 // idx is centre of displacemnet
@@ -192,29 +182,117 @@ int main() {
 
     min.findMin(init);
 
+    // while (true) {
+    //     auto [err, sp, end] = findSaddle(init, 12, f);
+    //
+    //     if (!err) {
+    //         auto [centre, ref] = classifyMech(init, end, f);
+    //
+    //         std::cout << "all good" << std::endl;
+    //
+    //         return 0;
+    //     }
+    // }
+
+    std::unordered_map<Rdf, Topology> map;
+
     while (true) {
-        std::vector<std::size_t> topos = f.colourAll(init);
+        std::vector<Rdf> topos = f.colourAll(init);
 
-        output(init, topos);
+        for (std::size_t i = 0; i < topos.size(); ++i) {
+            auto search = map.find(topos[i]);
 
-        auto [err, sp, end] = findSaddle(init, 12, f);
+            if (search != map.end()) {
+                // discovered topo before
+                ++(search->second.count);
+            } else {
+                // new topology
+                map.insert({topos[i], {1, 0, {}}});
+            }
 
-        if (!err) {
-            auto [centre, ref] = classifyMech(init, end, f);
+            if (map[topos[i]].sp_searches < 5) {
 
-            std::cout << " centre was " << centre << std::endl;
+                for (int j = 0; j < 5; ++j) {
+                    ++(map[topos[i]].sp_searches);
 
-            output(end);
+                    auto [err, sp, end] = findSaddle(init, i, f);
 
-            Vector recon = reconstruct(init, 12, ref, f);
+                    if (!err) {
+                        auto [centre, ref] = classifyMech(init, end, f);
 
-            output(recon);
+                        // double delta_E = ;
+                        // double rate = ;
 
-            std::cout << f(end) - f(init) << std::endl;
-            std::cout << f(recon) - f(init) << std::endl;
+                        Eigen::Vector3d vec = *std::max_element(
+                            ref.begin(), ref.end(), [](auto a, auto b) {
+                                return a.squaredNorm() < b.squaredNorm();
+                            });
 
-            return 0;
+                        std::vector<Mech> &mechs = map[topos[centre]].mechs;
+
+                        auto match_mech = std::find_if(
+                            mechs.begin(), mechs.end(), [&](Mech m) {
+                                return (std::abs(m.vec[0] - vec[0]) < 0.1) &&
+                                       (std::abs(m.vec[1] - vec[1]) < 0.1) &&
+                                       (std::abs(m.vec[2] - vec[2]) < 0.1);
+                            });
+
+                        std::cout << "at frame " << FRAME << ' ';
+                        if (match_mech == mechs.end()) {
+                            std::cout << "found new mech" << std::endl;
+
+                            std::cout << vec[0] << ' ' << vec[1] << ' '
+                                      << vec[2] << std::endl;
+
+                            //[[maybe_unused]] Mech m{1, 1, vec, ref};
+
+                            mechs.push_back(
+                                {f(sp) - f(init), f(end) - f(init), vec, ref});
+                            //     {f(sp) - d(init), f(end) - f(init), vec,
+                            //     ref});
+                        } else {
+                            std::cout << "found old mech" << std::endl;
+                        }
+                    }
+                }
+            }
         }
+
+        std::cout << map.size() << " vs " << topos.size() << std::endl;
+
+        for (auto &&[k, v] : map) {
+            std::cout << std::hash<Rdf>{}(k) << ' ' << v.count << ' '
+                      << v.sp_searches << ' ' << v.mechs.size() << std::endl;
+
+            for (auto &&m : v.mechs) {
+                std::cout << '\t' << m.rate << ' ' << m.delta_E << std::endl;
+            }
+        }
+
+        return 0;
+
+        ////////////////////OLD Reconstruct test////////////////////////////
+
+        // auto [err, sp, end] = findSaddle(init, 12, f);
+        //
+        // if (!err) {
+        //     auto [centre, ref] = classifyMech(init, end, f);
+        //
+        //     std::cout << " centre was " << centre << std::endl;
+        //
+        //     output(end);
+        //
+        //     Vector recon = reconstruct(init, 12, ref, f);
+        //
+        //     output(recon);
+        //
+        //     std::cout << f(end) - f(init) << std::endl;
+        //     std::cout << f(recon) - f(init) << std::endl;
+        //
+        //     return 0;
+        // }
+
+        //////////////////////////////////////////////////////
     }
 }
 

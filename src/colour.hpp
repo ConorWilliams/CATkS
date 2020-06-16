@@ -17,6 +17,19 @@ inline constexpr double BIN_WIDTH = 1. / RADIAL_BINS;
 
 inline constexpr double NEG_TOL = -0.01;
 
+#include "DumpXYX.hpp"
+
+int FRAME = 0;
+static const std::string head{"/home/cdt1902/dis/CATkS/plt/dump/all_"};
+static const std::string tail{".xyz"};
+
+template <typename T = std::vector<int>>
+void output(Vector const &x, T const &kinds) {
+    dumpXYX(head + std::to_string(FRAME++) + tail, x, kinds);
+}
+
+void output(Vector const &x) { output(x, std::vector<int>(x.size() / 3, 0)); }
+
 class Rdf {
   private:
     std::array<sint_t, RADIAL_BINS> rdf{};
@@ -59,6 +72,7 @@ template <> struct hash<Rdf> {
 struct Topo {
     Eigen::Vector3d pos;
     int idx;
+    double sum;
 };
 
 bool near(double x, double y) { return std::abs(x - y) < 0.01; }
@@ -100,11 +114,35 @@ std::vector<Topo> findNeighAtoms(Vector const &x, std::size_t centre,
             f.periodicNormSq(cx, cy, cz, x[i + 0], x[i + 1], x[i + 2]);
 
         if (dist_sq < f.rcut() * f.rcut()) {
-            neigh.push_back({{x[i + 0], x[i + 1], x[i + 2]}, i / 3});
+            neigh.push_back({{x[i + 0], x[i + 1], x[i + 2]}, i / 3, 0});
         }
     }
 
     return neigh;
+}
+
+Eigen::Vector3d symBreak(std::vector<Topo> &x) {
+
+    for (auto &&atom : x) {
+        for (auto &&neigh : x) {
+            atom.sum += (atom.pos - neigh.pos).squaredNorm();
+        }
+    }
+
+    std::sort(x.begin(), x.end(), [](auto a, auto b) { return a.sum < b.sum; });
+
+    // std::cout << std::endl << "sums*** " << std::endl;
+    // for (auto &&elem : x) {
+    //     std::cout << elem.sum << std::endl;
+    // }
+
+    for (std::size_t i = 1; i < x.size(); ++i) {
+        if (near(x[i].sum, x[i - 1].sum)) {
+            return 0.5 * (x[0].pos + x[i - 1].pos);
+        }
+    }
+
+    return {0, 0, 0};
 }
 
 // Maps positions of atoms in list to relative positions in inerta basis.
@@ -131,6 +169,15 @@ Eigen::Matrix3d toInertaBasis(std::vector<Topo> &list, T const &f) {
         I.noalias() += atom.pos.squaredNorm() * Eigen::Matrix3d::Identity() -
                        atom.pos * atom.pos.transpose();
     }
+
+    ///////////////////////////////////////////////////////
+
+    Eigen::Vector3d sb = symBreak(list);
+
+    I.noalias() +=
+        sb.squaredNorm() * Eigen::Matrix3d::Identity() - sb * sb.transpose();
+
+    //////////////////////////////////////////////////////////
 
     std::cout << std::endl << "Inerta tensor:" << std::endl;
     for (int i = 0; i < 3; ++i) {
@@ -161,7 +208,7 @@ Eigen::Matrix3d toInertaBasis(std::vector<Topo> &list, T const &f) {
     if (near(eVals[0], eVals[1])) {
         eVecs.col(0).swap(eVecs.col(2));
         std::swap(eVals[0], eVals[2]);
-        std::cout << "top: swap 0,2" << std::endl;
+        std::cout << "top detected: swapping 0,2" << std::endl;
     }
 
     // calculate projection sums
@@ -200,7 +247,7 @@ Eigen::Matrix3d toInertaBasis(std::vector<Topo> &list, T const &f) {
         std::cout << "Top: handedness corrected" << std::endl;
     }
 
-    /// map : rel_pos -> [corrected]_eigen_basis rel
+    /// map : rel_pos -> [corrected]_eigen_basis rel_pos
     for (auto &&atom : list) {
         atom.pos = eVecs.transpose() * atom.pos;
     }
@@ -247,7 +294,7 @@ classifyMech(Vector const &init, Vector const &end, T const &f) {
         }
     }
 
-    // std::vector<int> col(init.size() / 3, 0);
+    std::vector<int> col(init.size() / 3, 0);
     // col[centre] = 1;
     // output(end, col);
 
@@ -272,6 +319,7 @@ classifyMech(Vector const &init, Vector const &end, T const &f) {
     std::vector<Eigen::Vector3d> reference;
 
     ////// store normalised /////
+    std::cout << std::endl << "memory" << std::endl;
     for (auto &&atom : near_atoms) {
         atom.pos[0] = end[3 * atom.idx + 0] - init[3 * atom.idx + 0];
         atom.pos[1] = end[3 * atom.idx + 1] - init[3 * atom.idx + 1];
@@ -279,13 +327,10 @@ classifyMech(Vector const &init, Vector const &end, T const &f) {
 
         atom.pos = transform.transpose() * f.minImage(atom.pos);
 
-        reference.push_back(atom.pos);
-    }
-
-    std::cout << std::endl << "memory" << std::endl;
-    for (auto &&atom : near_atoms) {
         std::cout << atom.pos[0] << ' ' << atom.pos[1] << ' ' << atom.pos[2]
                   << std::endl;
+
+        reference.push_back(atom.pos);
     }
 
     return {centre, std::move(reference)};
@@ -312,3 +357,18 @@ Vector reconstruct(Vector const &init, std::size_t centre,
 
     return end;
 }
+
+struct Mech {
+    double rate;
+    double delta_E;
+
+    Eigen::Vector3d vec;
+
+    std::vector<Eigen::Vector3d> ref;
+};
+
+struct Topology {
+    std::size_t count = 0;
+    std::size_t sp_searches = 0;
+    std::vector<Mech> mechs{};
+};

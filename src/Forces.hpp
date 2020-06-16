@@ -450,8 +450,7 @@ template <typename C> class FuncEAM {
         makeGhosts();
         updateHead();
 
-        std::vector<std::size_t> colours;
-        std::hash<Rdf> hasher;
+        std::vector<Rdf> colours;
 
         for (auto atom = list.begin(); atom != list.begin() + numAtoms;
              ++atom) {
@@ -461,7 +460,7 @@ template <typename C> class FuncEAM {
             findNeigh(*atom, [&](auto const &, double r, double, double,
                                  double) { rdf.add(r / box.rcut()); });
 
-            colours.push_back(hasher(rdf));
+            colours.push_back(rdf);
         }
 
         return colours;

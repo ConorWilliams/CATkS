@@ -216,8 +216,8 @@ template <typename F, typename P> class Dimer {
         int strikes = 0;
 
         for (int iter = 0; iter < IT_MAX; ++iter) {
-            std::cout << "G_eff^2: " << dot(g_eff, g_eff) << ' ' << curv
-                      << std::endl;
+            // std::cout << "G_eff^2: " << dot(g_eff, g_eff) << ' ' << curv
+            //           << std::endl;
 
             if (dot(g_eff, g_eff) < F_TOL * F_TOL) {
                 return true;
