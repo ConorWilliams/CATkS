@@ -29,21 +29,27 @@ if(NOT EXISTS "${PROJECT_SOURCE_DIR}/external/eigen/CMakeLists.txt")
     message(FATAL_ERROR "The submodules eigen was not downloaded! GIT_SUBMODULE was turned off or failed. Please update submodules and try again.")
 endif()
 
-if(NOT EXISTS "${PROJECT_SOURCE_DIR}/external/doctest/CMakeLists.txt")
-    message(FATAL_ERROR "The submodules doctest was not downloaded! GIT_SUBMODULE was turned off or failed. Please update submodules and try again.")
-endif()
+
 
 if(NOT EXISTS "${PROJECT_SOURCE_DIR}/external/smhasher/src/CMakeLists.txt")
-    message(FATAL_ERROR "The submodules doctest was not downloaded! GIT_SUBMODULE was turned off or failed. Please update submodules and try again.")
+    message(FATAL_ERROR "The submodules smhasher was not downloaded! GIT_SUBMODULE was turned off or failed. Please update submodules and try again.")
 endif()
 
 if(NOT EXISTS "${PROJECT_SOURCE_DIR}/external/pcg-cpp/README.md")
-    message(FATAL_ERROR "The submodules doctest was not downloaded! GIT_SUBMODULE was turned off or failed. Please update submodules and try again.")
+    message(FATAL_ERROR "The submodules pcg-cpp was not downloaded! GIT_SUBMODULE was turned off or failed. Please update submodules and try again.")
 endif()
 
+if(NOT EXISTS "${PROJECT_SOURCE_DIR}/external/json/CMakeLists.txt")
+    message(FATAL_ERROR "The submodules json was not downloaded! GIT_SUBMODULE was turned off or failed. Please update submodules and try again.")
+endif()
+
+set(JSON_BuildTests OFF CACHE INTERNAL "")
+set(JSON_Install OFF CACHE INTERNAL "")
+
+add_subdirectory("${PROJECT_SOURCE_DIR}/external/json")
 add_subdirectory("${PROJECT_SOURCE_DIR}/external/smhasher/src")
 add_subdirectory("${PROJECT_SOURCE_DIR}/external/eigen")
-add_subdirectory("${PROJECT_SOURCE_DIR}/external/doctest")
+
 
 # bad practice
 set(CMAKE_CXX_COMPILER /home/cdt1902/usr/bin/g++10)
@@ -52,31 +58,40 @@ set(CMAKE_CXX_COMPILER /home/cdt1902/usr/bin/g++10)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # add external depandacies include paths
-include_directories(SYSTEM external/eigen external/doctest external/hilbert external/smhasher/src external/pcg-cpp/include)
+include_directories(SYSTEM external/smhasher/src
+                           external/pcg-cpp/include
+                           external/json/include)
 
 # all code is in src
 include_directories(src)
 
 
+
 # add the executables
 add_executable(bfgs src/L_BFGS.test.cpp)
 target_compile_options(bfgs PRIVATE -Wall -Wextra -pedantic -Werror -O3)
+target_link_libraries(bfgs PRIVATE Eigen3::Eigen)
 
 add_executable(2d src/2d.test.cpp)
 target_compile_options(2d PRIVATE -Wall -Wextra -pedantic -Werror -O3)
+target_link_libraries(2d PRIVATE Eigen3::Eigen)
 
 add_executable(quiver plt/quiver/quiver.cpp)
 target_compile_options(quiver PRIVATE -Wall -Wextra -pedantic -Werror -O3)
+target_link_libraries(quiver PRIVATE Eigen3::Eigen)
 
 add_executable(sort src/sort.test.cpp)
 target_compile_options(sort PRIVATE -Wall -Wextra -pedantic -O3 -march=native)
+target_link_libraries(sort PRIVATE Eigen3::Eigen)
 
 add_executable(force src/force.test.cpp)
 target_compile_options(force PRIVATE -Wall -Wextra -pedantic -Werror -O3)
+target_link_libraries(force PRIVATE Eigen3::Eigen)
 
 add_executable(xmd src/vmd.test.cpp)
 target_compile_options(xmd PRIVATE -Wall -Wextra -pedantic -Werror -O3 -march=native )
+target_link_libraries(xmd PRIVATE Eigen3::Eigen)
 
 add_executable(colour src/colour.test.cpp)
 target_compile_options(colour PRIVATE -Wall -Wextra -pedantic -Werror -O3 -march=native )
-target_link_libraries(colour SMHasherSupport)
+target_link_libraries(colour PRIVATE Eigen3::Eigen nlohmann_json::nlohmann_json SMHasherSupport)

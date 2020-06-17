@@ -156,11 +156,11 @@ int main() {
     // init[init.size() - 3] = LAT;
     // init[init.size() - 2] = LAT;
     // init[init.size() - 1] = 0.5 * LAT;
-
+    //
     // init[init.size() - 6] = LAT * 0.5;
     // init[init.size() - 5] = LAT * 0.25;
     // init[init.size() - 4] = LAT * 0;
-
+    //
     // kinds[kinds.size() - 2] = H;
 
     FuncEAM f{"/home/cdt1902/dis/CATkS/data/PotentialA.fs",
@@ -195,7 +195,7 @@ int main() {
                 ++(search->second.count);
             } else {
                 // new topology
-                map.insert({topos[i], {1, 0, {}}});
+                map.insert({topos[i], Topology{}});
             }
 
             if (map[topos[i]].sp_searches < 5) {
@@ -207,33 +207,8 @@ int main() {
                     if (!err) {
                         auto [centre, ref] = classifyMech(init, end, f);
 
-                        Eigen::Vector3d vec = *std::max_element(
-                            ref.begin(), ref.end(), [](auto a, auto b) {
-                                return a.squaredNorm() < b.squaredNorm();
-                            });
-
-                        std::vector<Mech> &mechs = map[topos[centre]].mechs;
-
-                        auto match_mech = std::find_if(
-                            mechs.begin(), mechs.end(), [&](Mech m) {
-                                return (std::abs(m.vec[0] - vec[0]) < 0.1) &&
-                                       (std::abs(m.vec[1] - vec[1]) < 0.1) &&
-                                       (std::abs(m.vec[2] - vec[2]) < 0.1);
-                            });
-
-                        std::cout << "at frame " << FRAME << ' ';
-                        if (match_mech == mechs.end()) {
-                            std::cout << "found new mech" << std::endl;
-
-                            std::cout << vec[0] << ' ' << vec[1] << ' '
-                                      << vec[2] << std::endl;
-
-                            mechs.push_back(
-                                {f(sp) - f(init), f(end) - f(init), vec, ref});
-
-                        } else {
-                            std::cout << "found old mech" << std::endl;
-                        }
+                        map[topos[centre]].pushMech(
+                            f(sp) - f(init), f(end) - f(init), std::move(ref));
                     }
                 }
             }
@@ -243,11 +218,11 @@ int main() {
 
         for (auto &&[k, v] : map) {
             std::cout << std::hash<Rdf>{}(k) << ' ' << v.count << ' '
-                      << v.sp_searches << ' ' << v.mechs.size() << std::endl;
+                      << v.sp_searches << std::endl;
 
-            for (auto &&m : v.mechs) {
-                std::cout << '\t' << m.rate << ' ' << m.delta_E << std::endl;
-            }
+            // for (auto &&m : v.mechs) {
+            //     std::cout << '\t' << m.rate << ' ' << m.delta_E << std::endl;
+            // }
         }
 
         return 0;

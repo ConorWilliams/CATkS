@@ -386,18 +386,3 @@ Vector reconstruct(Vector const &init, std::size_t centre,
 
     return end;
 }
-
-struct Mech {
-    double rate;
-    double delta_E;
-
-    Eigen::Vector3d vec;
-
-    std::vector<Eigen::Vector3d> ref;
-};
-
-struct Topology {
-    std::size_t count = 0;
-    std::size_t sp_searches = 0;
-    std::vector<Mech> mechs{};
-};
