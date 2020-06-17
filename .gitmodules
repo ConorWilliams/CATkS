@@ -1,12 +1,12 @@
 [submodule "external/eigen"]
 	path = external/eigen
 	url = https://gitlab.com/libeigen/eigen.git
-[submodule "external/doctest"]
-	path = external/doctest
-	url = https://github.com/onqtam/doctest
 [submodule "external/smhasher"]
 	path = external/smhasher
 	url = https://github.com/aappleby/smhasher
 [submodule "external/pcg-cpp"]
 	path = external/pcg-cpp
 	url = https://github.com/imneme/pcg-cpp
+[submodule "external/json"]
+	path = external/json
+	url = https://github.com/nlohmann/json
