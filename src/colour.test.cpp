@@ -70,7 +70,7 @@ std::tuple<int, Vector, Vector> findSaddle(Vector const &init, std::size_t idx,
 
     if (!dimer.findSaddle()) {
         // failed SP search
-        return std::make_tuple(1, Vector{}, Vector{});
+        return {1, Vector{}, Vector{}};
     }
 
     Vector old = sp + ax * NUDGE;
@@ -80,7 +80,7 @@ std::tuple<int, Vector, Vector> findSaddle(Vector const &init, std::size_t idx,
 
     if (!min.findMin(old) || !min.findMin(end)) {
         // failed minimisation
-        return std::make_tuple(2, Vector{}, Vector{});
+        return {2, Vector{}, Vector{}};
     }
 
     double distOld = dot(old - init, old - init);
@@ -97,17 +97,17 @@ std::tuple<int, Vector, Vector> findSaddle(Vector const &init, std::size_t idx,
         // disconnected SP
         std::cout << distOld << std::endl;
         std::cout << distFwd << std::endl;
-        return std::make_tuple(3, Vector{}, Vector{});
+        return {3, Vector{}, Vector{}};
     }
 
     if (dot(end - old, end - old) < TOL_NEAR) {
         // minimasations both converged to init
-        return std::make_tuple(4, Vector{}, Vector{});
+        return {4, Vector{}, Vector{}};
     }
 
     output(end, col); // tmp
 
-    return std::make_tuple(0, std::move(sp), std::move(end));
+    return {0, std::move(sp), std::move(end)};
 }
 
 enum : uint8_t { Fe = 0, H = 1 };
@@ -182,18 +182,6 @@ int main() {
 
     min.findMin(init);
 
-    // while (true) {
-    //     auto [err, sp, end] = findSaddle(init, 12, f);
-    //
-    //     if (!err) {
-    //         auto [centre, ref] = classifyMech(init, end, f);
-    //
-    //         std::cout << "all good" << std::endl;
-    //
-    //         return 0;
-    //     }
-    // }
-
     std::unordered_map<Rdf, Topology> map;
 
     while (true) {
@@ -211,7 +199,6 @@ int main() {
             }
 
             if (map[topos[i]].sp_searches < 5) {
-
                 for (int j = 0; j < 5; ++j) {
                     ++(map[topos[i]].sp_searches);
 
@@ -219,9 +206,6 @@ int main() {
 
                     if (!err) {
                         auto [centre, ref] = classifyMech(init, end, f);
-
-                        // double delta_E = ;
-                        // double rate = ;
 
                         Eigen::Vector3d vec = *std::max_element(
                             ref.begin(), ref.end(), [](auto a, auto b) {
@@ -244,12 +228,9 @@ int main() {
                             std::cout << vec[0] << ' ' << vec[1] << ' '
                                       << vec[2] << std::endl;
 
-                            //[[maybe_unused]] Mech m{1, 1, vec, ref};
-
                             mechs.push_back(
                                 {f(sp) - f(init), f(end) - f(init), vec, ref});
-                            //     {f(sp) - d(init), f(end) - f(init), vec,
-                            //     ref});
+
                         } else {
                             std::cout << "found old mech" << std::endl;
                         }
@@ -276,18 +257,20 @@ int main() {
         // auto [err, sp, end] = findSaddle(init, 12, f);
         //
         // if (!err) {
+        //     output(end);
+        //
         //     auto [centre, ref] = classifyMech(init, end, f);
         //
-        //     std::cout << " centre was " << centre << std::endl;
-        //
-        //     output(end);
+        //     std::cout << "\nCentre was " << centre << std::endl;
         //
         //     Vector recon = reconstruct(init, 12, ref, f);
         //
-        //     output(recon);
-        //
         //     std::cout << f(end) - f(init) << std::endl;
         //     std::cout << f(recon) - f(init) << std::endl;
+        //
+        //     min.findMin(recon);
+        //
+        //     output(recon);
         //
         //     return 0;
         // }

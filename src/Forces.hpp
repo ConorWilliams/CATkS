@@ -9,8 +9,8 @@
 #include <type_traits>
 #include <vector>
 
+#include "Colour.hpp"
 #include "EAM.hpp"
-#include "colour.hpp"
 #include "sort.hpp"
 #include "utils.hpp"
 
