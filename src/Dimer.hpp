@@ -201,7 +201,7 @@ template <typename F, typename P> class Dimer {
             alignAxis();
         }
 
-        std::cerr << "escaped convex" << std::endl;
+        // std::cerr << "escaped convex" << std::endl;
         // return false;
 
         Vector &p = s1;
@@ -239,7 +239,7 @@ template <typename F, typename P> class Dimer {
 
             // // optional // //
             if (ga <= g0 && curv > 0) {
-                std::cerr << "STRIKE: " << strikes + 1 << std::endl;
+                // std::cerr << "STRIKE: " << strikes + 1 << std::endl;
                 if (++strikes == 5) {
                     return false;
                 }

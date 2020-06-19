@@ -1,19 +1,23 @@
-// #define NDEBUG
-// #define EIGEN_NO_DEBUG
-
+#include <cmath>
 #include <iostream>
 #include <limits>
 #include <random>
 #include <tuple>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "pcg_random.hpp"
 
+#include "utils.hpp"
+
 #include "Dimer.hpp"
-#include "DumpXYX.hpp"
 #include "Forces.hpp"
 #include "Minimise.hpp"
-#include "utils.hpp"
+
+#include "Classes.hpp"
+#include "Colour.hpp"
+#include "DumpXYX.hpp"
+#include "Rdf.hpp"
 
 // controls displacement along mm at saddle
 inline constexpr double NUDGE = 0.1;
@@ -64,9 +68,9 @@ std::tuple<int, Vector, Vector> findSaddle(Vector const &init, std::size_t idx,
 
     // ax.matrix().normalize(); // not strictly nessaserry, done in ctr
 
-    output(sp, col); // tmp
+    // output(sp, col); // tmp
 
-    Dimer dimer{f, sp, ax, [&]() { output(sp, col); }};
+    Dimer dimer{f, sp, ax, [&]() { /*output(sp, col); */ }};
 
     if (!dimer.findSaddle()) {
         // failed SP search
@@ -95,8 +99,8 @@ std::tuple<int, Vector, Vector> findSaddle(Vector const &init, std::size_t idx,
 
     if (distOld > TOL_NEAR) {
         // disconnected SP
-        std::cout << distOld << std::endl;
-        std::cout << distFwd << std::endl;
+        // std::cout << distOld << std::endl;
+        // std::cout << distFwd << std::endl;
         return {3, Vector{}, Vector{}};
     }
 
@@ -105,9 +109,92 @@ std::tuple<int, Vector, Vector> findSaddle(Vector const &init, std::size_t idx,
         return {4, Vector{}, Vector{}};
     }
 
-    output(end, col); // tmp
+    // output(end, col); // tmp
 
     return {0, std::move(sp), std::move(end)};
+}
+
+inline constexpr double ARRHENIUS_PRE = 1e13;
+inline constexpr double KB_T = 8.617333262145 * 1e-5 * 500; // eV K^-1
+
+inline constexpr double INV_KB_T = 1 / KB_T;
+
+double activeToRate(double active_E) {
+
+    check(active_E > 0, "sp energy < init energy");
+
+    return ARRHENIUS_PRE * std::exp(-active_E * INV_KB_T);
+}
+
+//
+template <typename T>
+auto updateCatalog(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
+                   T const &f) {
+
+    std::vector<Rdf> topos = f.colourAll(x);
+
+    for (std::size_t i = 0; i < topos.size(); ++i) {
+        auto search = catalog.find(topos[i]);
+
+        if (search != catalog.end()) {
+            // discovered topo before
+            ++(search->second.count);
+        } else {
+            // new topology
+            catalog[topos[i]].count += 1;
+        }
+
+        std::size_t count = catalog[topos[i]].count;
+        std::size_t searches = catalog[topos[i]].sp_searches;
+
+        if (searches < 50 || searches < std::sqrt(count)) {
+            for (int j = 0; j < 5; ++j) {
+                ++(catalog[topos[i]].sp_searches);
+
+                std::cout << "Dimer launch ... " << std::flush;
+
+                auto [err, sp, end] = findSaddle(x, i, f);
+
+                if (!err) {
+                    std::cout << "success!" << std::endl;
+
+                    auto [centre, ref] = classifyMech(x, end, f);
+
+                    catalog[topos[centre]].pushMech(f(sp) - f(x), f(end) - f(x),
+                                                    std::move(ref));
+
+                } else {
+                    std::cout << "err:" << err << std::endl;
+                }
+            }
+        }
+    }
+
+    return topos;
+}
+
+template <typename T>
+void outputAllMechs(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
+                    T const &f) {
+    std::vector<Rdf> topos = f.colourAll(x);
+
+    std::unordered_set<Rdf> done{};
+
+    std::cout << "writing all mechanisms" << std::endl;
+
+    output(x);
+
+    for (std::size_t i = 0; i < topos.size(); ++i) {
+        if (done.count(topos[i]) == 0) {
+            done.insert(topos[i]);
+
+            for (auto &&m : catalog[topos[i]].getMechs()) {
+                std::cout << FRAME << ' ' << m.active_E << ' ' << m.delta_E
+                          << std::endl;
+                output(reconstruct(x, i, m.ref, f));
+            }
+        }
+    }
 }
 
 enum : uint8_t { Fe = 0, H = 1 };
@@ -117,8 +204,15 @@ inline constexpr int len = 5;
 
 static const std::string OUTFILE = "/home/cdt1902/dis/CATkS/raw.txt";
 
+struct LocalisedMech {
+    std::size_t atom;
+    double rate;
+    std::vector<Eigen::Vector3d> const &ref;
+};
+
 int main() {
-    Vector init(len * len * len * 3 * 2 - 3);
+
+    Vector init(len * len * len * 3 * 2 - 6);
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -129,7 +223,8 @@ int main() {
         for (int j = 0; j < len; ++j) {
             for (int k = 0; k < len; ++k) {
 
-                if (i == 1 && j == 1 && k == 1) {
+                if ((i == 1 && j == 1 && k == 1) ||
+                    (i == 4 && j == 1 && k == 1)) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
                     init[3 * cell + 1] = (j + 0.5) * LAT;
                     init[3 * cell + 2] = (k + 0.5) * LAT;
@@ -156,76 +251,79 @@ int main() {
     // init[init.size() - 3] = LAT;
     // init[init.size() - 2] = LAT;
     // init[init.size() - 1] = 0.5 * LAT;
-    //
-    // init[init.size() - 6] = LAT * 0.5;
-    // init[init.size() - 5] = LAT * 0.25;
-    // init[init.size() - 4] = LAT * 0;
-    //
-    // kinds[kinds.size() - 2] = H;
 
-    FuncEAM f{"/home/cdt1902/dis/CATkS/data/PotentialA.fs",
-              kinds,
-              0,
-              len * LAT,
-              0,
-              len * LAT,
-              0,
-              len * LAT};
+    FuncEAM f{
+        "/home/cdt1902/dis/CATkS/data/PotentialA.fs",
+        kinds,
+        0,
+        len * LAT,
+        0,
+        len * LAT,
+        0,
+        len * LAT,
+    };
 
     f.sort(init);
-
-    std::random_device rd{};
-    std::mt19937 gen{rd()};
-    std::normal_distribution<double> d{0, G_AMP};
 
     Minimise min{f, f, init.size()};
 
     min.findMin(init);
 
-    std::unordered_map<Rdf, Topology> map;
+    std::unordered_map<Rdf, Topology> catalog = readMap("dump");
 
-    while (true) {
-        std::vector<Rdf> topos = f.colourAll(init);
+    double time = 0;
+
+    pcg_extras::seed_seq_from<std::random_device> seed_source;
+    pcg64 rng(seed_source);
+    std::uniform_real_distribution<> uniform_dist(0, 1);
+
+    for (int anon = 0; anon < 50; ++anon) {
+
+        // if (anon == 0) {
+        //     outputAllMechs(catalog, init, f);
+        //     return 0;
+        // }
+
+        output(init, kinds);
+
+        std::vector<Rdf> topos = updateCatalog(catalog, init, f);
+
+        writeMap("dump", catalog);
+
+        std::vector<LocalisedMech> possible{};
 
         for (std::size_t i = 0; i < topos.size(); ++i) {
-            auto search = map.find(topos[i]);
-
-            if (search != map.end()) {
-                // discovered topo before
-                ++(search->second.count);
-            } else {
-                // new topology
-                map.insert({topos[i], Topology{}});
+            for (auto &&m : catalog[topos[i]].getMechs()) {
+                possible.push_back({i, activeToRate(m.active_E), m.ref});
             }
+        }
 
-            if (map[topos[i]].sp_searches < 5) {
-                for (int j = 0; j < 5; ++j) {
-                    ++(map[topos[i]].sp_searches);
+        double rate_sum = std::accumulate(
+            possible.begin(), possible.end(), 0.0,
+            [](double sum, LocalisedMech const &m) { return sum + m.rate; });
 
-                    auto [err, sp, end] = findSaddle(init, i, f);
+        double p1 = uniform_dist(rng);
 
-                    if (!err) {
-                        auto [centre, ref] = classifyMech(init, end, f);
-
-                        map[topos[centre]].pushMech(
-                            f(sp) - f(init), f(end) - f(init), std::move(ref));
-                    }
+        LocalisedMech choice = [&]() {
+            double sum = 0;
+            for (auto &&elem : possible) {
+                sum += elem.rate;
+                if (sum > p1 * rate_sum) {
+                    return elem;
                 }
             }
-        }
+            std::terminate();
+        }();
 
-        std::cout << map.size() << " vs " << topos.size() << std::endl;
+        time += -std::log(uniform_dist(rng)) / rate_sum;
 
-        for (auto &&[k, v] : map) {
-            std::cout << std::hash<Rdf>{}(k) << ' ' << v.count << ' '
-                      << v.sp_searches << std::endl;
+        init = reconstruct(init, choice.atom, choice.ref, f);
 
-            // for (auto &&m : v.mechs) {
-            //     std::cout << '\t' << m.rate << ' ' << m.delta_E << std::endl;
-            // }
-        }
+        min.findMin(init);
 
-        return 0;
+        std::cout << "TIME: " << time << std::endl;
+
+        // f.sort(init);
 
         ////////////////////OLD Reconstruct test////////////////////////////
 
@@ -253,9 +351,3 @@ int main() {
         //////////////////////////////////////////////////////
     }
 }
-
-/* Flow
- * compute all topology keys
- * for each topo key not in DB do SP searches
- * for each relevent topology reconstruct transitions, add to db
- */
