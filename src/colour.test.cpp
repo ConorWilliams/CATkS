@@ -1,3 +1,6 @@
+#define NDEBUG
+#define EIGEN_NO_DEBUG
+
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -5,6 +8,9 @@
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
+
+#include <future>
+#include <thread>
 
 #include "pcg_random.hpp"
 
@@ -29,89 +35,94 @@ constexpr double G_AMP = 0.325;
 
 // init is a minimised (unporturbed) vector of atoms
 // idx is centre of displacemnet
+// num is number of atempts
 // f is their force object
 template <typename T>
-std::tuple<int, Vector, Vector> findSaddle(Vector const &init, std::size_t idx,
-                                           T const &f) {
-    Vector sp = init;
-    Vector ax = Vector::Zero(init.size());
+std::vector<std::pair<Vector, Vector>>
+findSaddle(Vector const &init, std::size_t idx, std::size_t num, T const &f) {
 
-    // random pertabations
+    // Centre atom coordinates
+    double x = init[idx * 3 + 0];
+    double y = init[idx * 3 + 1];
+    double z = init[idx * 3 + 2];
 
     // Seed with a real random value, if available
     pcg_extras::seed_seq_from<std::random_device> seed_source;
     pcg64 rng(seed_source);
     std::normal_distribution<> gauss_dist(0, G_AMP);
 
-    double x = init[idx * 3 + 0];
-    double y = init[idx * 3 + 1];
-    double z = init[idx * 3 + 2];
-
-    std::vector<int> col(init.size() / 3, 0);
-
-    for (int i = 0; i < init.size(); i = i + 3) {
-        double dist =
-            f.periodicNormSq(x, y, z, init[i + 0], init[i + 1], init[i + 2]);
-
-        if (dist < G_SPHERE * G_SPHERE) {
-            sp[i + 0] += gauss_dist(rng);
-            sp[i + 1] += gauss_dist(rng);
-            sp[i + 2] += gauss_dist(rng);
-
-            ax[i + 0] = gauss_dist(rng);
-            ax[i + 1] = gauss_dist(rng);
-            ax[i + 2] = gauss_dist(rng);
-
-            col[i / 3] = 1;
-        }
-    }
-
-    // ax.matrix().normalize(); // not strictly nessaserry, done in ctr
-
-    // output(sp, col); // tmp
+    Vector sp{init.size()};
+    Vector ax{init.size()};
 
     Dimer dimer{f, sp, ax, [&]() { /*output(sp, col); */ }};
 
-    if (!dimer.findSaddle()) {
-        // failed SP search
-        return {1, Vector{}, Vector{}};
-    }
-
-    Vector old = sp + ax * NUDGE;
-    Vector end = sp - ax * NUDGE;
-
     Minimise min{f, f, init.size()};
 
-    if (!min.findMin(old) || !min.findMin(end)) {
-        // failed minimisation
-        return {2, Vector{}, Vector{}};
+    std::vector<std::pair<Vector, Vector>> saddle_points;
+
+    for (std::size_t anon = 0; anon < num; ++anon) {
+        for (int i = 0; i < init.size(); i = i + 3) {
+            double dist = f.periodicNormSq(x, y, z, init[i + 0], init[i + 1],
+                                           init[i + 2]);
+
+            if (dist < G_SPHERE * G_SPHERE) {
+                sp[i + 0] = init[i + 0] + gauss_dist(rng);
+                sp[i + 1] = init[i + 1] + gauss_dist(rng);
+                sp[i + 2] = init[i + 2] + gauss_dist(rng);
+
+                ax[i + 0] = gauss_dist(rng);
+                ax[i + 1] = gauss_dist(rng);
+                ax[i + 2] = gauss_dist(rng);
+            } else {
+                sp[i + 0] = init[i + 0];
+                sp[i + 1] = init[i + 1];
+                sp[i + 2] = init[i + 2];
+
+                ax[i + 0] = 0;
+                ax[i + 1] = 0;
+                ax[i + 2] = 0;
+            }
+        }
+
+        ax.matrix().normalize();
+
+        if (!dimer.findSaddle()) {
+            // failed SP search
+            continue;
+        }
+
+        Vector old = sp + ax * NUDGE;
+        Vector end = sp - ax * NUDGE;
+
+        if (!min.findMin(old) || !min.findMin(end)) {
+            // failed minimisation
+            continue;
+        }
+
+        double distOld = dot(old - init, old - init);
+        double distFwd = dot(end - init, end - init);
+
+        // want old to be init
+        if (distOld > distFwd) {
+            using std::swap;
+            swap(old, end);
+            swap(distOld, distFwd);
+        }
+
+        if (distOld > TOL_NEAR) {
+            // disconnected SP
+            continue;
+        }
+
+        if (dot(end - old, end - old) < TOL_NEAR) {
+            // minimasations both converged to init
+            continue;
+        }
+
+        saddle_points.emplace_back(sp, end);
     }
 
-    double distOld = dot(old - init, old - init);
-    double distFwd = dot(end - init, end - init);
-
-    // want old to be init
-    if (distOld > distFwd) {
-        using std::swap;
-        swap(old, end);
-        swap(distOld, distFwd);
-    }
-
-    if (distOld > TOL_NEAR) {
-        // disconnected SP
-        // std::cout << distOld << std::endl;
-        // std::cout << distFwd << std::endl;
-        return {3, Vector{}, Vector{}};
-    }
-
-    if (dot(end - old, end - old) < TOL_NEAR) {
-        // minimasations both converged to init
-        return {4, Vector{}, Vector{}};
-    }
-
-    // output(end, col); // tmp
-
-    return {0, std::move(sp), std::move(end)};
+    return saddle_points;
 }
 
 inline constexpr double ARRHENIUS_PRE = 1e13;
@@ -133,10 +144,13 @@ auto updateCatalog(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
 
     std::vector<Rdf> topos = f.colourAll(x);
 
-    for (std::size_t i = 0; i < topos.size(); ++i) {
-        auto search = catalog.find(topos[i]);
+    using sp_vec_t = std::vector<std::pair<Vector, Vector>>;
 
-        if (search != catalog.end()) {
+    std::vector<std::future<sp_vec_t>> saddle_points;
+
+    for (std::size_t i = 0; i < topos.size(); ++i) {
+
+        if (auto search = catalog.find(topos[i]); search != catalog.end()) {
             // discovered topo before
             ++(search->second.count);
         } else {
@@ -145,28 +159,34 @@ auto updateCatalog(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
         }
 
         std::size_t count = catalog[topos[i]].count;
-        std::size_t searches = catalog[topos[i]].sp_searches;
 
-        if (searches < 50 || searches < std::sqrt(count)) {
-            for (int j = 0; j < 5; ++j) {
-                ++(catalog[topos[i]].sp_searches);
+        constexpr std::size_t try_n = 5;
 
-                std::cout << "Dimer launch ... " << std::flush;
+        while (catalog[topos[i]].sp_searches < 50 ||
+               catalog[topos[i]].sp_searches < std::sqrt(count)) {
 
-                auto [err, sp, end] = findSaddle(x, i, f);
+            catalog[topos[i]].sp_searches += try_n;
 
-                if (!err) {
-                    std::cout << "success!" << std::endl;
+            std::cout << "@ " << i << " Dimer launch ... " << std::flush;
 
-                    auto [centre, ref] = classifyMech(x, end, f);
+            constexpr auto findSaddleHelp = [](auto &&... args) -> sp_vec_t {
+                return findSaddle(std::forward<decltype(args)>(args)...);
+            };
 
-                    catalog[topos[centre]].pushMech(f(sp) - f(x), f(end) - f(x),
-                                                    std::move(ref));
+            saddle_points.push_back(
+                std::async(std::launch::async, findSaddleHelp, x, i, try_n, f));
 
-                } else {
-                    std::cout << "err:" << err << std::endl;
-                }
-            }
+            std::cout << "found " << saddle_points.size() << std::endl;
+        }
+    }
+
+    for (auto &&sp_vec : saddle_points) {
+        for (auto &&[sp, end] : sp_vec.get()) {
+
+            auto [centre, ref] = classifyMech(x, end, f);
+
+            catalog[topos[centre]].pushMech(f(sp) - f(x), f(end) - f(x),
+                                            std::move(ref));
         }
     }
 
@@ -212,7 +232,7 @@ struct LocalisedMech {
 
 int main() {
 
-    Vector init(len * len * len * 3 * 2 - 6);
+    Vector init(len * len * len * 3 * 2 - 3);
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -223,8 +243,8 @@ int main() {
         for (int j = 0; j < len; ++j) {
             for (int k = 0; k < len; ++k) {
 
-                if ((i == 1 && j == 1 && k == 1) ||
-                    (i == 4 && j == 1 && k == 1)) {
+                if ((i == 1 && j == 1 && k == 1) /*||
+                    (i == 4 && j == 1 && k == 1)*/) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
                     init[3 * cell + 1] = (j + 0.5) * LAT;
                     init[3 * cell + 2] = (k + 0.5) * LAT;
@@ -269,7 +289,7 @@ int main() {
 
     min.findMin(init);
 
-    std::unordered_map<Rdf, Topology> catalog = readMap("dump");
+    std::unordered_map<Rdf, Topology> catalog; // = readMap("dump");
 
     double time = 0;
 
@@ -284,11 +304,11 @@ int main() {
         //     return 0;
         // }
 
-        output(init, kinds);
+        output(init, f.quasiColourAll(init));
 
         std::vector<Rdf> topos = updateCatalog(catalog, init, f);
 
-        writeMap("dump", catalog);
+        // writeMap("dump", catalog);
 
         std::vector<LocalisedMech> possible{};
 
@@ -319,7 +339,7 @@ int main() {
 
         init = reconstruct(init, choice.atom, choice.ref, f);
 
-        min.findMin(init);
+        // min.findMin(init);
 
         std::cout << "TIME: " << time << std::endl;
 

@@ -52,6 +52,9 @@ add_subdirectory("${PROJECT_SOURCE_DIR}/external/json")
 add_subdirectory("${PROJECT_SOURCE_DIR}/external/smhasher/src")
 add_subdirectory("${PROJECT_SOURCE_DIR}/external/eigen")
 
+#threading
+find_package (Threads)
+
 
 # bad practice
 set(CMAKE_CXX_COMPILER /home/cdt1902/usr/bin/g++10)
@@ -69,6 +72,8 @@ include_directories(src)
 
 
 
+
+
 # add the executables
 add_executable(bfgs src/L_BFGS.test.cpp)
 target_compile_options(bfgs PRIVATE -Wall -Wextra -pedantic -Werror -O3)
@@ -83,7 +88,7 @@ target_compile_options(quiver PRIVATE -Wall -Wextra -pedantic -Werror -O3)
 target_link_libraries(quiver PRIVATE Eigen3::Eigen)
 
 add_executable(sort src/sort.test.cpp)
-target_compile_options(sort PRIVATE -Wall -Wextra -pedantic -O3 -march=native)
+target_compile_options(sort PRIVATE -Wall -Wextra -pedantic -O2 -march=native)
 target_link_libraries(sort PRIVATE Eigen3::Eigen)
 
 add_executable(force src/force.test.cpp)
@@ -95,5 +100,5 @@ target_compile_options(xmd PRIVATE -Wall -Wextra -pedantic -Werror -O3 -march=na
 target_link_libraries(xmd PRIVATE Eigen3::Eigen)
 
 add_executable(colour src/colour.test.cpp)
-target_compile_options(colour PRIVATE -Wall -Wextra -pedantic -Werror -O3 -march=native )
-target_link_libraries(colour PRIVATE Eigen3::Eigen nlohmann_json::nlohmann_json SMHasherSupport)
+target_compile_options(colour PRIVATE -Wall -Wextra -pedantic -Werror -O3 -lpthread -march=native )
+target_link_libraries(colour PRIVATE Eigen3::Eigen nlohmann_json::nlohmann_json SMHasherSupport ${CMAKE_THREAD_LIBS_INIT})

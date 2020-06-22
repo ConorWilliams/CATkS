@@ -133,7 +133,10 @@ std::unordered_map<Rdf, Topology> readMap(std::string const &dir) {
     json rdfs = json::parse(std::ifstream(dir + "/rdf.json"));
 
     for (auto &&elem : rdfs) {
+
         Rdf r = elem.get<Rdf>();
+
+        // std::cout << dir + '/' + r.to_string() << std::endl;
 
         json j = json::parse(std::ifstream(dir + '/' + r.to_string()));
 

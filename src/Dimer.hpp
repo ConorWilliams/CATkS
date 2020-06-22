@@ -74,9 +74,7 @@ template <typename F, typename P> class Dimer {
     Dimer(F const &grad, Vector &R_in, Vector &N_in, P const &printer)
         : grad{grad}, printer{printer}, dims{R_in.size()}, lbfgs_rot(dims),
           lbfgs_trn(dims), R_0{R_in}, N{N_in}, g_0{dims}, s1{dims}, s2{dims},
-          s3{dims}, g_1{dims}, gp_1{dims}, Np{dims}, theta{dims} {
-        N /= std::sqrt(dot(N, N));
-    }
+          s3{dims}, g_1{dims}, gp_1{dims}, Np{dims}, theta{dims} {}
 
   private:
     // Aligns the dimer with the minimum curvature mode, returns the curvature

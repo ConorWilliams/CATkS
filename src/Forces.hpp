@@ -445,7 +445,7 @@ template <typename C> class FuncEAM {
 
     auto rcut() const { return box.rcut(); }
 
-    template <typename T> auto colourAll(T const &x) const {
+    template <typename T> std::vector<Rdf> colourAll(T const &x) const {
         fillCellList(x);
         makeGhosts();
         updateHead();
@@ -461,6 +461,31 @@ template <typename C> class FuncEAM {
                                  double) { rdf.add(r / box.rcut()); });
 
             colours.push_back(rdf);
+        }
+
+        return colours;
+    }
+
+    template <typename T> auto quasiColourAll(T const &x) const {
+        fillCellList(x);
+        makeGhosts();
+        updateHead();
+
+        std::vector<std::size_t> colours;
+
+        for (auto atom = list.begin(); atom != list.begin() + numAtoms;
+             ++atom) {
+
+            std::size_t count = 0;
+
+            findNeigh(*atom,
+                      [&](auto const &, double r, double, double, double) {
+                          if (r < 2.6) {
+                              ++count;
+                          }
+                      });
+
+            colours.push_back(count);
         }
 
         return colours;
