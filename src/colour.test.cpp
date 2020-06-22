@@ -134,38 +134,31 @@ auto updateCatalog(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
     std::vector<Rdf> topos = f.colourAll(x);
 
     for (std::size_t i = 0; i < topos.size(); ++i) {
-        auto search = catalog.find(topos[i]);
 
-        if (search != catalog.end()) {
-            // discovered topo before
-            ++(search->second.count);
-        } else {
-            // new topology
-            catalog[topos[i]].count += 1;
-        }
+        catalog[topos[i]].count += 1;
 
         std::size_t count = catalog[topos[i]].count;
-        std::size_t searches = catalog[topos[i]].sp_searches;
 
-        if (searches < 50 || searches < std::sqrt(count)) {
-            for (int j = 0; j < 5; ++j) {
-                ++(catalog[topos[i]].sp_searches);
+        while (catalog[topos[i]].sp_searches < 50 ||
+               catalog[topos[i]].sp_searches < std::sqrt(count)) {
 
-                std::cout << "Dimer launch ... " << std::flush;
+            ++(catalog[topos[i]].sp_searches);
 
-                auto [err, sp, end] = findSaddle(x, i, f);
+            std::cout << "@ " << i << '/' << topos.size()
+                      << " dimer launch ... " << std::flush;
 
-                if (!err) {
-                    std::cout << "success!" << std::endl;
+            auto [err, sp, end] = findSaddle(x, i, f);
 
-                    auto [centre, ref] = classifyMech(x, end, f);
+            if (!err) {
+                std::cout << "success!" << std::endl;
 
-                    catalog[topos[centre]].pushMech(f(sp) - f(x), f(end) - f(x),
-                                                    std::move(ref));
+                auto [centre, ref] = classifyMech(x, end, f);
 
-                } else {
-                    std::cout << "err:" << err << std::endl;
-                }
+                catalog[topos[centre]].pushMech(f(sp) - f(x), f(end) - f(x),
+                                                std::move(ref));
+
+            } else {
+                std::cout << "err:" << err << std::endl;
             }
         }
     }
@@ -191,7 +184,8 @@ void outputAllMechs(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
             for (auto &&m : catalog[topos[i]].getMechs()) {
                 std::cout << FRAME << ' ' << m.active_E << ' ' << m.delta_E
                           << std::endl;
-                output(reconstruct(x, i, m.ref, f));
+                Vector recon = reconstruct(x, i, m.ref, f);
+                output(recon, f.quasiColourAll(recon));
             }
         }
     }
@@ -284,7 +278,7 @@ int main() {
         //     return 0;
         // }
 
-        output(init, kinds);
+        output(init, f.quasiColourAll(init));
 
         std::vector<Rdf> topos = updateCatalog(catalog, init, f);
 

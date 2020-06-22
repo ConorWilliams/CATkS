@@ -466,6 +466,31 @@ template <typename C> class FuncEAM {
         return colours;
     }
 
+    template <typename T> auto quasiColourAll(T const &x) const {
+        fillCellList(x);
+        makeGhosts();
+        updateHead();
+
+        std::vector<std::size_t> colours;
+
+        for (auto atom = list.begin(); atom != list.begin() + numAtoms;
+             ++atom) {
+
+            std::size_t count = 0;
+
+            findNeigh(*atom,
+                      [&](auto const &, double r, double, double, double) {
+                          if (r < 2.6) {
+                              ++count;
+                          }
+                      });
+
+            colours.push_back(count);
+        }
+
+        return colours;
+    }
+
     inline Eigen::Vector3d minImage(Eigen::Vector3d dr) const {
         return box.minImage(dr[0], dr[1], dr[2]);
     }
