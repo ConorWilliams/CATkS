@@ -146,7 +146,7 @@ auto updateCatalog(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
 
     using sp_vec_t = std::vector<std::pair<Vector, Vector>>;
 
-    std::vector<std::future<sp_vec_t>> saddle_points;
+    std::vector<sp_vec_t> saddle_points;
 
     for (std::size_t i = 0; i < topos.size(); ++i) {
 
@@ -155,6 +155,7 @@ auto updateCatalog(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
             ++(search->second.count);
         } else {
             // new topology
+            std::cout << "new topo" << std::endl;
             catalog[topos[i]].count += 1;
         }
 
@@ -169,19 +170,24 @@ auto updateCatalog(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
 
             std::cout << "@ " << i << " Dimer launch ... " << std::flush;
 
-            constexpr auto findSaddleHelp = [](auto &&... args) -> sp_vec_t {
-                return findSaddle(std::forward<decltype(args)>(args)...);
-            };
+            // constexpr auto findSaddleHelp = [](Vector const &init,
+            //                                    std::size_t idx, std::size_t
+            //                                    num, auto f) -> sp_vec_t {
+            //     return findSaddle(init, idx, num, std::move(f));
+            // };
 
-            saddle_points.push_back(
-                std::async(std::launch::async, findSaddleHelp, x, i, try_n, f));
+            // saddle_points.push_back(
+            //     std::async(std::launch::async, findSaddleHelp, x, i, try_n,
+            //     f));
+
+            saddle_points.push_back(findSaddle(x, i, try_n, f));
 
             std::cout << "found " << saddle_points.size() << std::endl;
         }
     }
 
     for (auto &&sp_vec : saddle_points) {
-        for (auto &&[sp, end] : sp_vec.get()) {
+        for (auto &&[sp, end] : sp_vec) {
 
             auto [centre, ref] = classifyMech(x, end, f);
 
@@ -228,6 +234,7 @@ struct LocalisedMech {
     std::size_t atom;
     double rate;
     std::vector<Eigen::Vector3d> const &ref;
+    double delta_E;
 };
 
 int main() {
@@ -289,7 +296,7 @@ int main() {
 
     min.findMin(init);
 
-    std::unordered_map<Rdf, Topology> catalog; // = readMap("dump");
+    std::unordered_map<Rdf, Topology> catalog = readMap("dump");
 
     double time = 0;
 
@@ -308,13 +315,18 @@ int main() {
 
         std::vector<Rdf> topos = updateCatalog(catalog, init, f);
 
-        // writeMap("dump", catalog);
+        writeMap("dump", catalog);
+
+        // outputAllMechs(catalog, init, f);
+        //
+        // return 0;
 
         std::vector<LocalisedMech> possible{};
 
         for (std::size_t i = 0; i < topos.size(); ++i) {
             for (auto &&m : catalog[topos[i]].getMechs()) {
-                possible.push_back({i, activeToRate(m.active_E), m.ref});
+                possible.push_back(
+                    {i, activeToRate(m.active_E), m.ref, m.delta_E});
             }
         }
 
@@ -337,9 +349,16 @@ int main() {
 
         time += -std::log(uniform_dist(rng)) / rate_sum;
 
-        init = reconstruct(init, choice.atom, choice.ref, f);
+        Vector next = reconstruct(init, choice.atom, choice.ref, f);
 
-        // min.findMin(init);
+        min.findMin(next);
+
+        double delta = f(next) - f(init);
+
+        std::cout << "goal: " << choice.delta_E << " recon:" << delta
+                  << std::endl;
+
+        init = next;
 
         std::cout << "TIME: " << time << std::endl;
 
