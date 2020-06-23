@@ -218,7 +218,7 @@ template <typename C> class FuncEAM {
     using kind_t = typename std::remove_reference_t<C>::value_type;
 
     TabEAM data;
-    C kinds;
+    C const &kinds;
     Box box;
 
     std::size_t numAtoms;
@@ -227,10 +227,27 @@ template <typename C> class FuncEAM {
     mutable std::vector<Atom<kind_t>> list;
 
   public:
-    FuncEAM(std::string const &file, C &&kinds, double xmin, double xmax,
+    FuncEAM(std::string const &file, C &kinds, double xmin, double xmax,
             double ymin, double ymax, double zmin, double zmax)
         : data{parseTabEAM(file)}, kinds{std::forward<C>(kinds)},
           box{data.rCut, xmin, xmax, ymin, ymax, zmin, zmax},
+          numAtoms{kinds.size()}, head(box.numCells()) {
+
+        static_assert(std::is_integral_v<kind_t>, "kinds must be integers");
+
+        check(*std::max_element(kinds.begin(), kinds.end()) <
+                  kind_t(data.numSpecies),
+              "found kinds that are not in the EAM species data");
+
+        check(*std::min_element(kinds.begin(), kinds.end()) >= kind_t(0),
+              "found kinds that are negative?");
+
+        static_assert(std::is_trivially_destructible_v<Atom<kind_t>>,
+                      "can't clear atoms in constant time");
+    }
+
+    FuncEAM(FuncEAM const &other)
+        : data{other.data}, kinds{other.kinds}, box{other.box},
           numAtoms{kinds.size()}, head(box.numCells()) {
 
         static_assert(std::is_integral_v<kind_t>, "kinds must be integers");
@@ -422,25 +439,26 @@ template <typename C> class FuncEAM {
     }
 
     // remaps into cell and performs sort
-    void sort(Eigen::ArrayXd &x) const {
+    void sort(Eigen::ArrayXd &) const {
 
-        fillCellList(x);
-
-        std::sort(list.begin(), list.end(),
-                  [&](Atom<kind_t> const &a, Atom<kind_t> const &b) -> bool {
-                      return box.lambda(a) < box.lambda(b);
-                  });
-        // else
-        // cj::sort_clever(list.begin(), list.end(), 0, box.numCells(),
-        //                 [&](auto const &atom) { return box.lambda(atom); });
-
-        for (std::size_t i = 0; i < list.size(); ++i) {
-            x[3 * i + 0] = list[i][0];
-            x[3 * i + 1] = list[i][1];
-            x[3 * i + 2] = list[i][2];
-
-            kinds[i] = list[i].kind();
-        }
+        // fillCellList(x);
+        //
+        // std::sort(list.begin(), list.end(),
+        //           [&](Atom<kind_t> const &a, Atom<kind_t> const &b) -> bool {
+        //               return box.lambda(a) < box.lambda(b);
+        //           });
+        // // else
+        // // cj::sort_clever(list.begin(), list.end(), 0, box.numCells(),
+        // //                 [&](auto const &atom) { return box.lambda(atom);
+        // });
+        //
+        // for (std::size_t i = 0; i < list.size(); ++i) {
+        //     x[3 * i + 0] = list[i][0];
+        //     x[3 * i + 1] = list[i][1];
+        //     x[3 * i + 2] = list[i][2];
+        //
+        //     kinds[i] = list[i].kind();
+        // }
     }
 
     auto rcut() const { return box.rcut(); }
@@ -460,7 +478,7 @@ template <typename C> class FuncEAM {
             findNeigh(*atom, [&](auto const &, double r, double, double,
                                  double) { rdf.add(r / box.rcut()); });
 
-            colours.push_back(rdf);
+            colours.push_back(std::move(rdf));
         }
 
         return colours;
@@ -480,7 +498,7 @@ template <typename C> class FuncEAM {
 
             findNeigh(*atom,
                       [&](auto const &, double r, double, double, double) {
-                          if (r < 2.6) {
+                          if (r < 2.7) {
                               ++count;
                           }
                       });
@@ -501,8 +519,3 @@ template <typename C> class FuncEAM {
         return box.minImage(x2 - x1, y2 - y1, z2 - z1).squaredNorm();
     }
 };
-
-template <typename C>
-FuncEAM(std::string const &, C &&, double, double, double, double, double,
-        double)
-    ->FuncEAM<C>;

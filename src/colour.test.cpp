@@ -1,5 +1,7 @@
-#define NDEBUG
-#define EIGEN_NO_DEBUG
+// #define NDEBUG
+// #define EIGEN_NO_DEBUG
+
+#define EIGEN_DONT_PARALLELIZE
 
 #include <cmath>
 #include <iostream>
@@ -146,17 +148,27 @@ auto updateCatalog(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
 
     using sp_vec_t = std::vector<std::pair<Vector, Vector>>;
 
-    std::vector<sp_vec_t> saddle_points;
+    std::vector<std::future<sp_vec_t>> saddle_points;
 
     for (std::size_t i = 0; i < topos.size(); ++i) {
 
-        if (auto search = catalog.find(topos[i]); search != catalog.end()) {
-            // discovered topo before
-            ++(search->second.count);
-        } else {
-            // new topology
-            std::cout << "new topo" << std::endl;
-            catalog[topos[i]].count += 1;
+        if (catalog.find(topos[i]) == catalog.end()) {
+            std::cout << "NEW TOPO" << std::endl;
+        }
+
+        catalog[topos[i]].count += 1;
+
+        if (topos[i].to_string() ==
+            "rdf.0.0.0.0.0.0.0.0.0.0.0.0.0.7.3.3.0.0.0.0."
+            "3.9.0.0.6.19.7.0.0.0.6.0.json") {
+            std::cout << std::hash<Rdf>{}(topos[i]) << std::endl;
+
+            std::vector<std::size_t> col;
+
+            std::transform(topos.begin(), topos.end(), std::back_inserter(col),
+                           std::hash<Rdf>{});
+
+            output(x, col);
         }
 
         std::size_t count = catalog[topos[i]].count;
@@ -170,24 +182,22 @@ auto updateCatalog(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
 
             std::cout << "@ " << i << " Dimer launch ... " << std::flush;
 
-            // constexpr auto findSaddleHelp = [](Vector const &init,
-            //                                    std::size_t idx, std::size_t
-            //                                    num, auto f) -> sp_vec_t {
-            //     return findSaddle(init, idx, num, std::move(f));
-            // };
+            auto findSaddleHelp = [=, &x]() -> sp_vec_t {
+                return findSaddle(x, i, try_n, f);
+            };
 
-            // saddle_points.push_back(
-            //     std::async(std::launch::async, findSaddleHelp, x, i, try_n,
-            //     f));
+            saddle_points.emplace_back(
+                std::async(std::launch::async, findSaddleHelp));
 
-            saddle_points.push_back(findSaddle(x, i, try_n, f));
+            // saddle_points.emplace_back(findSaddle(x, i, try_n, f));
 
             std::cout << "found " << saddle_points.size() << std::endl;
         }
     }
 
     for (auto &&sp_vec : saddle_points) {
-        for (auto &&[sp, end] : sp_vec) {
+
+        for (auto &&[sp, end] : sp_vec.get()) {
 
             auto [centre, ref] = classifyMech(x, end, f);
 
@@ -214,10 +224,14 @@ void outputAllMechs(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
         if (done.count(topos[i]) == 0) {
             done.insert(topos[i]);
 
+            std::cout << topos[i].to_string() << std::endl;
+            std::cout << std::hash<Rdf>{}(topos[i]) << std::endl;
+
             for (auto &&m : catalog[topos[i]].getMechs()) {
                 std::cout << FRAME << ' ' << m.active_E << ' ' << m.delta_E
                           << std::endl;
-                output(reconstruct(x, i, m.ref, f));
+                Vector tmp = reconstruct(x, i, m.ref, f);
+                output(tmp, f.quasiColourAll(tmp));
             }
         }
     }
@@ -239,7 +253,7 @@ struct LocalisedMech {
 
 int main() {
 
-    Vector init(len * len * len * 3 * 2 - 3);
+    Vector init(len * len * len * 3 * 2 - 6);
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -250,8 +264,8 @@ int main() {
         for (int j = 0; j < len; ++j) {
             for (int k = 0; k < len; ++k) {
 
-                if ((i == 1 && j == 1 && k == 1) /*||
-                    (i == 4 && j == 1 && k == 1)*/) {
+                if ((i == 1 && j == 1 && k == 1) ||
+                    (i == 4 && j == 1 && k == 1)) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
                     init[3 * cell + 1] = (j + 0.5) * LAT;
                     init[3 * cell + 2] = (k + 0.5) * LAT;
@@ -315,11 +329,15 @@ int main() {
 
         std::vector<Rdf> topos = updateCatalog(catalog, init, f);
 
+        outputAllMechs(catalog, init, f);
+
         writeMap("dump", catalog);
 
         // outputAllMechs(catalog, init, f);
-        //
-        // return 0;
+
+        // if (anon == 0) {
+        //     return 0;
+        // }
 
         std::vector<LocalisedMech> possible{};
 
@@ -351,12 +369,14 @@ int main() {
 
         Vector next = reconstruct(init, choice.atom, choice.ref, f);
 
-        min.findMin(next);
-
         double delta = f(next) - f(init);
 
         std::cout << "goal: " << choice.delta_E << " recon:" << delta
                   << std::endl;
+
+        check(std::abs(choice.delta_E - delta) < 0.1, "reconstruct fail");
+
+        min.findMin(next);
 
         init = next;
 
