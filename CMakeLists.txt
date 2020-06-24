@@ -67,7 +67,12 @@ include_directories(SYSTEM external/smhasher/src
 # all code is in src
 include_directories(src)
 
+#////////////////////naughty///////////////////////
 
+include_directories(external/nauty27r1)
+
+add_library(Nauty SHARED IMPORTED)
+set_target_properties(Nauty PROPERTIES IMPORTED_LOCATION "${PROJECT_SOURCE_DIR}/external/nauty27r1/nauty.a")
 
 # add the executables
 add_executable(bfgs src/L_BFGS.test.cpp)
@@ -96,20 +101,7 @@ target_link_libraries(xmd PRIVATE Eigen3::Eigen)
 
 add_executable(colour src/colour.test.cpp)
 target_compile_options(colour PRIVATE -Wall -Wextra -pedantic -Werror -O3 -march=native )
-target_link_libraries(colour PRIVATE Eigen3::Eigen nlohmann_json::nlohmann_json SMHasherSupport)
-
-
-
-
-
-
-
-#////////////////////naughty///////////////////////
-
-include_directories(external/nauty27r1)
-
-add_library(Nauty SHARED IMPORTED)
-set_target_properties(Nauty PROPERTIES IMPORTED_LOCATION "${PROJECT_SOURCE_DIR}/external/nauty27r1/nauty.a")
+target_link_libraries(colour PRIVATE Eigen3::Eigen nlohmann_json::nlohmann_json SMHasherSupport Nauty)
 
 add_executable(nauty src/nauty.test.cpp)
 target_link_libraries(nauty PRIVATE Nauty)

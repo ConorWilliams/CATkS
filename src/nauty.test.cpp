@@ -14,6 +14,14 @@ int main(int argc, char *argv[]) {
 
     tmp.print();
 
+    std::cout << '\n';
+
+    tmp.addEdge(0, 1);
+
+    tmp.print();
+
+    std::cout << '\n';
+
     int const *ptr = tmp.getCanonical();
 
     tmp.printCanon();

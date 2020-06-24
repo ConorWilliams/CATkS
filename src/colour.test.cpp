@@ -15,7 +15,7 @@
 #include "Minimise.hpp"
 
 #include "Classes.hpp"
-#include "Colour.hpp"
+#include "ColourNauty.hpp"
 #include "DumpXYX.hpp"
 #include "Rdf.hpp"
 
@@ -185,6 +185,7 @@ void outputAllMechs(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
                 std::cout << FRAME << ' ' << m.active_E << ' ' << m.delta_E
                           << std::endl;
                 Vector recon = reconstruct(x, i, m.ref, f);
+
                 output(recon, f.quasiColourAll(recon));
             }
         }
@@ -272,7 +273,7 @@ int main() {
 
     // json j = json::parse(std::ifstream("dump/toporef.json"));
 
-    std::unordered_map<Rdf, TopoRef> topo_cat; // =
+    std::unordered_map<Rdf, TopoRef> topo_cat; //=
     //     j.get<std::unordered_map<Rdf, TopoRef>>();
 
     ///////////////////////////////
@@ -283,7 +284,41 @@ int main() {
     pcg64 rng(seed_source);
     std::uniform_real_distribution<> uniform_dist(0, 1);
 
-    for (int anon = 0; anon < 50; ++anon) {
+    ////////////////////OLD Reconstruct test////////////////////////////
+
+    // while (true) {
+    //     auto [err, sp, end] = findSaddle(init, 12, f);
+    //
+    //     if (!err) {
+    //         output(end);
+    //
+    //         auto [centre, ref] = classifyMech(init, end, f);
+    //
+    //         std::cou    // json j =
+    //         json::parse(std::ifstream("dump/toporef.json"));
+    //
+    // std::unordered_map<Rdf, TopoRef> topo_cat =
+    //     j.get<std::unordered_map<Rdf, TopoRef>>();t << "\nCentre was " <<
+    //     centre << std::endl;
+    //
+    //         Vector recon = reconstruct(init, 12, ref, f);
+    //
+    //         std::cout << f(end) - f(init) << std::endl;
+    //         std::cout << f(recon) - f(init) << std::endl;
+    //
+    //         output(recon);
+    //
+    //         min.findMin(recon);
+    //
+    //         output(recon);
+    //
+    //         return 0;
+    //     }
+    // }
+
+    //////////////////////////////////////////////////////
+
+    for (int anon = 0; anon < 5; ++anon) {
 
         // if (anon == 0) {
         //     outputAllMechs(catalog, init, f);
@@ -309,9 +344,11 @@ int main() {
 
                     std::vector<std::size_t> col;
 
+                    // colour according to rdf hash
                     std::transform(toposA.begin(), toposA.end(),
                                    std::back_inserter(col), std::hash<Rdf>{});
 
+                    // unprocessed topos colour 0
                     std::transform(col.begin() + i + 1, col.end(),
                                    col.begin() + i + 1,
                                    [=](std::size_t) { return 0; });
@@ -320,9 +357,12 @@ int main() {
 
                     auto bad = col[i];
 
+                    // change color of topo collisions
                     std::transform(
                         col.begin(), col.begin() + i + 1, col.begin(),
                         [=](std::size_t h) { return h == bad ? 99 : h; });
+
+                    col[i] = 100;
 
                     output(init, col);
 
@@ -333,17 +373,18 @@ int main() {
                 topo_cat.insert({toposA[i], std::move(t)});
             }
         }
-        /////
+
+        std::cout << "All topos match!" << std::endl;
+
+        json j2 = topo_cat;
+
+        std::ofstream("dump/toporef.json") << j2.dump(2);
+
+        ///////////////////////////////////////////////
 
         std::vector<Rdf> topos = updateCatalog(catalog, init, f);
 
         writeMap("dump", catalog);
-
-        ////////////////////////////////
-        json j2 = topo_cat;
-
-        std::ofstream("dump/toporef.json") << j2.dump(2);
-        ////////////////////////////////
 
         std::vector<LocalisedMech> possible{};
 
@@ -389,30 +430,5 @@ int main() {
         std::cout << "TIME: " << time << std::endl;
 
         // f.sort(init);
-
-        ////////////////////OLD Reconstruct test////////////////////////////
-
-        // auto [err, sp, end] = findSaddle(init, 12, f);
-        //
-        // if (!err) {
-        //     output(end);
-        //
-        //     auto [centre, ref] = classifyMech(init, end, f);
-        //
-        //     std::cout << "\nCentre was " << centre << std::endl;
-        //
-        //     Vector recon = reconstruct(init, 12, ref, f);
-        //
-        //     std::cout << f(end) - f(init) << std::endl;
-        //     std::cout << f(recon) - f(init) << std::endl;
-        //
-        //     min.findMin(recon);
-        //
-        //     output(recon);
-        //
-        //     return 0;
-        // }
-
-        //////////////////////////////////////////////////////
     }
 }
