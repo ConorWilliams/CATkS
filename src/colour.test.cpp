@@ -139,7 +139,7 @@ auto updateCatalog(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
 
         std::size_t count = catalog[topos[i]].count;
 
-        while (catalog[topos[i]].sp_searches < 50 ||
+        while (catalog[topos[i]].sp_searches < 25 ||
                catalog[topos[i]].sp_searches < std::sqrt(count)) {
 
             ++(catalog[topos[i]].sp_searches);
@@ -202,11 +202,12 @@ struct LocalisedMech {
     std::size_t atom;
     double rate;
     std::vector<Eigen::Vector3d> const &ref;
+    double delta_E;
 };
 
 int main() {
 
-    Vector init(len * len * len * 3 * 2 - 6);
+    Vector init(len * len * len * 3 * 2 - 3);
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -217,8 +218,8 @@ int main() {
         for (int j = 0; j < len; ++j) {
             for (int k = 0; k < len; ++k) {
 
-                if ((i == 1 && j == 1 && k == 1) ||
-                    (i == 4 && j == 1 && k == 1)) {
+                if ((i == 1 && j == 1 && k == 1) /*||
+                    (i == 4 && j == 1 && k == 1)*/) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
                     init[3 * cell + 1] = (j + 0.5) * LAT;
                     init[3 * cell + 2] = (k + 0.5) * LAT;
@@ -263,7 +264,18 @@ int main() {
 
     min.findMin(init);
 
-    std::unordered_map<Rdf, Topology> catalog = readMap("dump");
+    std::unordered_map<Rdf, Topology> catalog; //= readMap("dump");
+
+    ////////////////////////////
+
+    using nlohmann::json;
+
+    // json j = json::parse(std::ifstream("dump/toporef.json"));
+
+    std::unordered_map<Rdf, TopoRef> topo_cat; // =
+    //     j.get<std::unordered_map<Rdf, TopoRef>>();
+
+    ///////////////////////////////
 
     double time = 0;
 
@@ -280,15 +292,65 @@ int main() {
 
         output(init, f.quasiColourAll(init));
 
+        /////
+
+        auto toposA = f.colourAll(init);
+
+        for (std::size_t i = 0; i < toposA.size(); ++i) {
+
+            std::cout << i << " " << std::hash<Rdf>{}(toposA[i]) << std::endl;
+
+            TopoRef t{classifyTopo(init, i, f)};
+
+            if (auto search = topo_cat.find(toposA[i]);
+                search != topo_cat.end()) {
+
+                if (!(search->second == t)) {
+
+                    std::vector<std::size_t> col;
+
+                    std::transform(toposA.begin(), toposA.end(),
+                                   std::back_inserter(col), std::hash<Rdf>{});
+
+                    std::transform(col.begin() + i + 1, col.end(),
+                                   col.begin() + i + 1,
+                                   [=](std::size_t) { return 0; });
+
+                    output(init, col);
+
+                    auto bad = col[i];
+
+                    std::transform(
+                        col.begin(), col.begin() + i + 1, col.begin(),
+                        [=](std::size_t h) { return h == bad ? 99 : h; });
+
+                    output(init, col);
+
+                    check(false, "topo collison");
+                }
+
+            } else {
+                topo_cat.insert({toposA[i], std::move(t)});
+            }
+        }
+        /////
+
         std::vector<Rdf> topos = updateCatalog(catalog, init, f);
 
         writeMap("dump", catalog);
+
+        ////////////////////////////////
+        json j2 = topo_cat;
+
+        std::ofstream("dump/toporef.json") << j2.dump(2);
+        ////////////////////////////////
 
         std::vector<LocalisedMech> possible{};
 
         for (std::size_t i = 0; i < topos.size(); ++i) {
             for (auto &&m : catalog[topos[i]].getMechs()) {
-                possible.push_back({i, activeToRate(m.active_E), m.ref});
+                possible.push_back(
+                    {i, activeToRate(m.active_E), m.ref, m.delta_E});
             }
         }
 
@@ -311,7 +373,16 @@ int main() {
 
         time += -std::log(uniform_dist(rng)) / rate_sum;
 
-        init = reconstruct(init, choice.atom, choice.ref, f);
+        Vector next = reconstruct(init, choice.atom, choice.ref, f);
+
+        double delta = f(next) - f(init);
+
+        std::cout << "Goal: " << choice.delta_E << " actual: " << delta
+                  << std::endl;
+
+        check(std::abs(delta - choice.delta_E) < 0.1, "recon err");
+
+        init = next;
 
         min.findMin(init);
 

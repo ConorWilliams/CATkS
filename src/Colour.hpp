@@ -14,6 +14,12 @@
 
 #include "DumpXYX.hpp"
 
+bool are_close(double a, double b, double tol = 0.02) {
+    double dif = std::abs(a - b);
+    double avg = 0.5 * (a + b);
+    return dif / avg < tol ? true : false;
+}
+
 struct AtomPlus {
     Eigen::Vector3d pos{0, 0, 0};
     long idx{};
@@ -26,7 +32,7 @@ struct AtomPlus {
 
         for (std::size_t i = 0; i < a.mem.size(); ++i) {
             std::size_t j = a.mem.size() - 1 - i;
-            if (std::abs(a.mem[j] - b.mem[j]) > 0.1) {
+            if (!are_close(a.mem[j], b.mem[j])) {
                 return false;
             }
         }
@@ -35,6 +41,9 @@ struct AtomPlus {
     }
 
     friend inline bool operator<(AtomPlus const &a, AtomPlus const &b) {
+
+        check(a.mem.size() == b.mem.size(), "comparing diff lengths");
+
         if (a.mem.size() < b.mem.size()) {
             return true;
         } else if (a.mem.size() > b.mem.size()) {
@@ -43,7 +52,7 @@ struct AtomPlus {
 
         for (std::size_t i = 0; i < a.mem.size(); ++i) {
             std::size_t j = a.mem.size() - 1 - i;
-            if (std::abs(a.mem[j] - b.mem[j]) > 0.1) {
+            if (!are_close(a.mem[j], b.mem[j])) {
                 return a.mem[j] < b.mem[j];
             }
         }
@@ -67,7 +76,7 @@ std::vector<AtomPlus> findNeighAtoms(Vector const &x, std::size_t centre,
         double dist_sq =
             f.periodicNormSq(cx, cy, cz, x[i + 0], x[i + 1], x[i + 2]);
 
-        if (dist_sq < f.rcut() * f.rcut()) {
+        if (dist_sq < 3 * 3) {
             neigh.push_back({{x[i + 0], x[i + 1], x[i + 2]}, i / 3});
         }
     }
@@ -101,7 +110,9 @@ void canonicalOrder(std::vector<AtomPlus> &list, T const &f) {
     //
     for (auto &&atom : list) {
         for (auto const &other : list) {
-            atom.mem.push_back(f.minImage(atom.pos - other.pos).squaredNorm());
+            if (&atom != &other) {
+                atom.mem.push_back(f.minImage(atom.pos - other.pos).norm());
+            }
         }
         std::sort(atom.mem.begin(), atom.mem.end());
     }
@@ -111,12 +122,22 @@ void canonicalOrder(std::vector<AtomPlus> &list, T const &f) {
         // O(n log n) comparisons at O(n) per comparison = O(n^2 ln n)
         std::sort(it, list.end());
 
+        std::cout << "\nSTART" << std::endl;
+
+        for (auto &&atom : list) {
+            for (auto &&r : atom.mem) {
+                std::cout << r << ' ';
+            }
+            std::cout << std::endl;
+        }
+
         if (auto pivot = firstUnique(it, list.end()); pivot != list.end()) {
+            std::cout << "Pivot: " << pivot - list.begin() << std::endl;
             std::iter_swap(it, pivot);
         }
 
         for (auto rem = std::next(it); rem != list.end(); ++rem) {
-            rem->mem.push_back(f.minImage(rem->pos - it->pos).squaredNorm());
+            rem->mem.push_back(f.minImage(rem->pos - it->pos).norm());
         }
     }
 }
@@ -179,7 +200,7 @@ Eigen::Matrix3d findBasis(std::vector<AtomPlus> const &list, T const &f) {
 
     basis.col(0) = f.minImage(list[1].pos - origin).normalized();
 
-    // std::cout << "e1 @ 0->" << 1 << std::endl;
+    std::cout << "e1 @ 0->" << 1 << std::endl;
 
     std::size_t index_e1 = [&]() {
         for (std::size_t i = 2; i < list.size(); ++i) {
@@ -191,7 +212,7 @@ Eigen::Matrix3d findBasis(std::vector<AtomPlus> const &list, T const &f) {
             if (cross.squaredNorm() > 0.1) {
                 basis.col(1) = e1;
                 basis.col(2) = cross;
-                // std::cout << "e1 @ 0->" << i << std::endl;
+                std::cout << "e1 @ 0->" << i << std::endl;
                 return i;
             }
         }
@@ -207,7 +228,7 @@ Eigen::Matrix3d findBasis(std::vector<AtomPlus> const &list, T const &f) {
         // check for coplanarity with e0, e1
         if (triple_prod > 0.1) {
             basis.col(2) = e2;
-            // std::cout << "e2 @ 0->" << i << std::endl;
+            std::cout << "e2 @ 0->" << i << std::endl;
             // std::cout << "Triple_prod " << triple_prod << std::endl;
             break;
         }
@@ -313,4 +334,47 @@ Vector reconstruct(Vector const &init, std::size_t centre,
     // output(end, col);
 
     return end;
+}
+
+// Returns the index of the central atom for the mechanisim as well as the
+// reference data to reconstruct mechanisim.
+template <typename T>
+std::vector<Eigen::Vector3d> classifyTopo(Vector const &x, std::size_t idx,
+                                          T const &f) {
+
+    std::vector<AtomPlus> near = findNeighAtoms(x, idx, f);
+
+    std::vector<int> col(x.size() / 3, 0);
+    // for (std::size_t i = 0; i < near.size(); ++i) {
+    //     col[near[i].idx] = 1;
+    // }
+    // output(init, col);
+
+    //////// find canonical-ordering ///////////
+
+    canonicalOrder(near, f);
+
+    for (std::size_t i = 0; i < near.size(); ++i) {
+        col[near[i].idx] = i + 1;
+    }
+    output(x, col);
+
+    ///////////// get basis vectors /////////////
+
+    Eigen::Matrix3d transform = findBasis(near, f);
+
+    std::vector<Eigen::Vector3d> reference;
+
+    std::transform(near.begin(), near.end(), std::back_inserter(reference),
+                   [&](AtomPlus const &atom) -> Eigen::Vector3d {
+                       Eigen::Vector3d delta = {
+                           x[3 * atom.idx + 0] - x[3 * idx + 0],
+                           x[3 * atom.idx + 1] - x[3 * idx + 1],
+                           x[3 * atom.idx + 2] - x[3 * idx + 2],
+                       };
+
+                       return transform.transpose() * f.minImage(delta);
+                   });
+
+    return reference;
 }
