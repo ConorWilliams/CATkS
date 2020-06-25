@@ -8,16 +8,15 @@
 
 #include "pcg_random.hpp"
 
-#include "utils.hpp"
+#include "Classes.hpp"
 
 #include "Dimer.hpp"
+#include "DumpXYX.hpp"
 #include "Forces.hpp"
 #include "Minimise.hpp"
-
-#include "Classes.hpp"
-#include "ColourNauty.hpp"
-#include "DumpXYX.hpp"
 #include "Rdf.hpp"
+#include "Topo.hpp"
+#include "utils.hpp"
 
 // controls displacement along mm at saddle
 inline constexpr double NUDGE = 0.1;
@@ -267,16 +266,7 @@ int main() {
 
     std::unordered_map<Rdf, Topology> catalog; //= readMap("dump");
 
-    ////////////////////////////
-
-    using nlohmann::json;
-
-    // json j = json::parse(std::ifstream("dump/toporef.json"));
-
-    std::unordered_map<Rdf, TopoRef> topo_cat; //=
-    //     j.get<std::unordered_map<Rdf, TopoRef>>();
-
-    ///////////////////////////////
+    TopoClassify classifyer(init.size() / 3, f.getBox());
 
     double time = 0;
 
@@ -327,60 +317,11 @@ int main() {
 
         output(init, f.quasiColourAll(init));
 
-        /////
+        classifyer.loadAtoms(init);
 
-        auto toposA = f.colourAll(init);
+        classifyer.verify(init);
 
-        for (std::size_t i = 0; i < toposA.size(); ++i) {
-
-            std::cout << i << " " << std::hash<Rdf>{}(toposA[i]) << std::endl;
-
-            TopoRef t{classifyTopo(init, i, f)};
-
-            if (auto search = topo_cat.find(toposA[i]);
-                search != topo_cat.end()) {
-
-                if (!(search->second == t)) {
-
-                    std::vector<std::size_t> col;
-
-                    // colour according to rdf hash
-                    std::transform(toposA.begin(), toposA.end(),
-                                   std::back_inserter(col), std::hash<Rdf>{});
-
-                    // unprocessed topos colour 0
-                    std::transform(col.begin() + i + 1, col.end(),
-                                   col.begin() + i + 1,
-                                   [=](std::size_t) { return 0; });
-
-                    output(init, col);
-
-                    auto bad = col[i];
-
-                    // change color of topo collisions
-                    std::transform(
-                        col.begin(), col.begin() + i + 1, col.begin(),
-                        [=](std::size_t h) { return h == bad ? 99 : h; });
-
-                    col[i] = 100;
-
-                    output(init, col);
-
-                    check(false, "topo collison");
-                }
-
-            } else {
-                topo_cat.insert({toposA[i], std::move(t)});
-            }
-        }
-
-        std::cout << "All topos match!" << std::endl;
-
-        json j2 = topo_cat;
-
-        std::ofstream("dump/toporef.json") << j2.dump(2);
-
-        ///////////////////////////////////////////////
+        std::cout << "All topos again!" << std::endl;
 
         std::vector<Rdf> topos = updateCatalog(catalog, init, f);
 

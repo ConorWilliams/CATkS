@@ -4,14 +4,12 @@
 #include <iostream>
 #include <memory>
 
-/* This program prints generators for the automorphism group of an
-n-vertex polygon, where n is a number supplied by the user.
-This version uses dynamic allocation.
-*/
+#include "MurmurHash3.h"
 #include "nauty.h"
+#include "utils.hpp"
 
 class NautyGraph {
-  public:
+  private:
     int n;
     int m;
 
@@ -23,6 +21,8 @@ class NautyGraph {
     std::unique_ptr<int[]> orbits;
 
     DEFAULTOPTIONS_GRAPH(options);
+
+    bool ready = false;
 
     statsblk stats;
 
@@ -38,18 +38,31 @@ class NautyGraph {
         options.defaultptn = true; // change for coloured graphs
     }
 
-    void clear() { EMPTYGRAPH(g.get(), m, n); }
+    void clear() {
+        EMPTYGRAPH(g.get(), m, n);
 
-    void addEdge(std::size_t v, std::size_t w) { ADDONEEDGE(g.get(), v, w, m) }
+        ready = false;
+    }
+
+    void addEdge(int v, int w) {
+        check(v < n && w < n, "out of bounds " << v << ' ' << w);
+        check(v >= 0 && w >= 0, "out of bounds " << v << ' ' << w);
+
+        ADDONEEDGE(g.get(), v, w, m);
+
+        ready = false;
+    }
 
     int const *getCanonical() {
         densenauty(g.get(), lab.get(), ptn.get(), orbits.get(), &options,
                    &stats, m, n, cg.get());
 
+        ready = true;
+
         return lab.get();
     }
 
-    void print() {
+    void print() const {
         for (int i = 0; i < n; ++i) {
             std::string str;
             for (int j = 0; j < m; ++j) {
@@ -59,7 +72,7 @@ class NautyGraph {
         }
     }
 
-    void printCanon() {
+    void printCanon() const {
         for (int i = 0; i < n; ++i) {
             std::string str;
             for (int j = 0; j < m; ++j) {
@@ -68,5 +81,18 @@ class NautyGraph {
             }
             std::cout << str.substr(0, n) << std::endl;
         }
+    }
+
+    std::array<std::size_t, 2> hash() const {
+        static_assert(sizeof(std::size_t) * 8 == 64, "need 64bit std::size_t");
+
+        check(ready, "gotta call nauty first");
+
+        std::array<std::size_t, 2> hash_out;
+
+        MurmurHash3_x86_128(cg.get(), sizeof(graph) * n * m, 0,
+                            hash_out.data());
+
+        return hash_out;
     }
 };

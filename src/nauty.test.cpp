@@ -24,8 +24,6 @@ int main(int argc, char *argv[]) {
 
     int const *ptr = tmp.getCanonical();
 
-    tmp.printCanon();
-
     for (int i = 0; i < nn; ++i) {
         std::cout << ptr[i] << std::endl;
     }

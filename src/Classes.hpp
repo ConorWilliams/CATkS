@@ -54,37 +54,6 @@ struct Mech {
     }
 };
 
-struct TopoRef {
-
-    std::vector<Eigen::Vector3d> ref{};
-
-    bool operator==(TopoRef const &other) const {
-        if (ref.size() != other.ref.size()) {
-            return false;
-        }
-
-        for (std::size_t i = 0; i < ref.size(); ++i) {
-            Eigen::Array3d dif = ref[i] - other.ref[i];
-            if ((dif.abs() > 0.5).any()) {
-
-                std::cout << i << ' ' << ref[i].transpose() << std::endl;
-                std::cout << i << ' ' << other.ref[i].transpose() << std::endl;
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    friend void to_json(nlohmann::json &j, TopoRef const &mech) {
-        j = nlohmann::json{{"ref", mech.ref}};
-    }
-
-    friend void from_json(nlohmann::json const &j, TopoRef &mech) {
-        j.at("ref").get_to(mech.ref);
-    }
-};
-
 class Topology {
 
     std::vector<Mech> mechs{}; // Mechs for this topology

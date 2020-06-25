@@ -104,4 +104,4 @@ target_compile_options(colour PRIVATE -Wall -Wextra -pedantic -Werror -O3 -march
 target_link_libraries(colour PRIVATE Eigen3::Eigen nlohmann_json::nlohmann_json SMHasherSupport Nauty)
 
 add_executable(nauty src/nauty.test.cpp)
-target_link_libraries(nauty PRIVATE Nauty)
+target_link_libraries(nauty PRIVATE Nauty SMHasherSupport Eigen3::Eigen )

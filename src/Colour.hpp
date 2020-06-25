@@ -14,7 +14,7 @@
 
 #include "DumpXYX.hpp"
 
-bool are_close(double a, double b, double tol = 0.02) {
+bool are_close(double a, double b, double tol = 0.04) {
     double dif = std::abs(a - b);
     double avg = 0.5 * (a + b);
     return dif / avg < tol ? true : false;
@@ -365,13 +365,11 @@ std::vector<Eigen::Vector3d> classifyTopo(Vector const &x, std::size_t idx,
 
     std::vector<Eigen::Vector3d> reference;
 
+    Eigen::Vector3d origin = near[0].pos;
+
     std::transform(near.begin(), near.end(), std::back_inserter(reference),
                    [&](AtomPlus const &atom) -> Eigen::Vector3d {
-                       Eigen::Vector3d delta = {
-                           x[3 * atom.idx + 0] - x[3 * idx + 0],
-                           x[3 * atom.idx + 1] - x[3 * idx + 1],
-                           x[3 * atom.idx + 2] - x[3 * idx + 2],
-                       };
+                       Eigen::Vector3d delta = atom.pos - origin;
 
                        return transform.transpose() * f.minImage(delta);
                    });

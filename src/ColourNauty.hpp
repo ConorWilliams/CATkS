@@ -118,7 +118,7 @@ Eigen::Matrix3d findBasis(std::vector<AtomPlus> const &list, T const &f) {
     return modifiedGramSchmidt(basis);
 }
 
-inline constexpr double BOND_DISTANCE = 3.0; // angstrom
+inline constexpr double BOND_DISTANCE = 2.66; // angstrom
 
 template <typename T>
 std::vector<AtomPlus> canonicalOrder(std::vector<AtomPlus> const &list,
@@ -126,21 +126,46 @@ std::vector<AtomPlus> canonicalOrder(std::vector<AtomPlus> const &list,
     NautyGraph graph(list.size());
 
     for (std::size_t i = 0; i < list.size(); ++i) {
-        for (std::size_t j = i + 1; j < list.size(); ++j) {
+        // int sum = 0;
+        for (std::size_t j = 0; j < list.size(); ++j) {
             double sqdist = f.minImage(list[i].pos - list[j].pos).squaredNorm();
-            if (sqdist < BOND_DISTANCE * BOND_DISTANCE) {
+            if (i != j && sqdist < BOND_DISTANCE * BOND_DISTANCE) {
                 graph.addEdge(i, j);
+                //++sum;
             }
         }
+        // std::cout << sum << ' ';
     }
+
+    // std::cout << '\n';
+    //
+    // graph.print();
 
     int const *order = graph.getCanonical();
 
+    // std::cout << '\n';
+    //
+    // graph.printCanon();
+    //
+    // for (unsigned i = 0; i < list.size(); ++i) {
+    //     std::cout << order[i] << ' ';
+    // }
+    //
+    // std::cout << '\n';
+
+    {
+        auto h = graph.hash();
+        std::cout << "Hash: " << h[0] << h[1] << '\n';
+    }
+
     std::vector<AtomPlus> ordered;
 
-    for (std::size_t i = 0; i < list.size(); ++i) {
-        ordered.push_back(list[order[i]]);
-    }
+    std::transform(order, order + list.size(), std::back_inserter(ordered),
+                   [&](int o) { return list[o]; });
+
+    // for (std::size_t i = 0; i < list.size(); ++i) {
+    //     ordered.push_back(list[order[i]]);
+    // }
 
     return ordered;
 }
@@ -275,7 +300,6 @@ std::vector<Eigen::Vector3d> classifyTopo(Vector const &x, std::size_t idx,
     std::transform(near.begin(), near.end(), std::back_inserter(reference),
                    [&](AtomPlus const &atom) -> Eigen::Vector3d {
                        Eigen::Vector3d delta = atom.pos - origin;
-
                        return transform.transpose() * f.minImage(delta);
                    });
 

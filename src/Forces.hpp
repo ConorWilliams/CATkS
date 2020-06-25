@@ -135,9 +135,9 @@ class Box {
 
     Lim const &limits(std::size_t i) const { return m_limits[i]; }
 
-    template <typename K>
-    inline double normSq(Atom<K> const &a, Atom<K> const &b, double &dx,
-                         double &dy, double &dz) const {
+    template <typename T>
+    inline double normSq(T const &a, T const &b, double &dx, double &dy,
+                         double &dz) const {
         dx = b[0] - a[0];
         dy = b[1] - a[1];
         dz = b[2] - a[2];
@@ -177,7 +177,7 @@ class Box {
         return dx * dx + dy * dy + dz * dz;
     }
 
-    template <typename T> inline std::size_t lambda(Atom<T> const &atom) const {
+    template <typename T> inline std::size_t lambda(T const &atom) const {
         check(atom[0] >= ox && atom[0] - ox < lx, "x out of +cell");
         check(atom[1] >= oy && atom[1] - oy < ly, "y out of +cell");
         check(atom[2] >= oz && atom[2] - oz < lz, "z out of +cell");
@@ -389,7 +389,7 @@ template <typename C> class FuncEAM {
         }
 
         list.resize(numAtoms); // deletes ghosts, should not realloc
-        makeGhosts();
+        makeGhosts();          // ghosts now have correct rho values
         updateHead();
 
         for (std::size_t i = 0; i < numAtoms; ++i) {
@@ -444,6 +444,8 @@ template <typename C> class FuncEAM {
     }
 
     auto rcut() const { return box.rcut(); }
+
+    auto getBox() const { return box; }
 
     template <typename T> auto colourAll(T const &x) const {
         fillCellList(x);
