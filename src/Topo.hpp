@@ -35,7 +35,7 @@ struct TopoRef {
 
         for (std::size_t i = 0; i < ref.size(); ++i) {
             Eigen::Array3d dif = ref[i] - other.ref[i];
-            if ((dif.abs() > 0.1).any()) {
+            if ((dif.abs() > 0.2).any()) {
 
                 std::cout << i << ' ' << ref[i].transpose() << std::endl;
                 std::cout << i << ' ' << other.ref[i].transpose() << std::endl;
@@ -179,7 +179,7 @@ class TopoClassify {
             check(y >= 0 && y < box.limits(1).len, "y out of box " << y);
             check(z >= 0 && z < box.limits(2).len, "z out of box " << z);
 
-            list.emplace_back(x, y, z, i / 3);
+            list.emplace_back(x, y, z, i);
         }
     }
 
@@ -245,10 +245,11 @@ class TopoClassify {
         } while (index != end);
 
         // in adjecent cells -- don't need check against self
-        for (std::size_t off : box.getAdjOff()) {
+        for (auto off : box.getAdjOff()) {
             index = head[lambda + off];
+            // std::cout << "cell_t " << lambda + off << std::endl;
             while (index != end) {
-                // std::cout << "cell_t " << cell << std::endl;
+
                 Atom2 const &neigh = list[index];
                 double dx, dy, dz;
                 double r_sq = box.normSq(neigh, atom, dx, dy, dz);
@@ -261,6 +262,10 @@ class TopoClassify {
     }
 
   public:
+    Rdf const &getRdf(std::size_t i) const { return rdfs[i]; };
+
+    std::size_t size() const { return numAtom2s; };
+
     template <typename T> void loadAtoms(T const &x) {
         fillCellList(x);
         makeGhosts();
@@ -280,12 +285,14 @@ class TopoClassify {
 
             rdfs.push_back(rdf);
         }
+
+        // std::cout << catalog.size() << " topoologies" << std::endl;
     }
 
     std::vector<Atom2> getNeighList(std::size_t centre) const {
         check(centre < numAtom2s, "out of bounds");
 
-        std::vector<Atom2> ns;
+        std::vector<Atom2> ns = {list[centre]};
 
         findNeigh(list[centre], [&](auto const &neigh, double, double, double,
                                     double) { ns.push_back(neigh); });
@@ -351,8 +358,10 @@ class TopoClassify {
     }
 
     bool verify(Vector const &x) {
-        for (std::size_t i = 0; i < rdfs.size(); ++i) {
+        for (std::size_t i = 0; i < numAtom2s; ++i) {
             auto search = catalog.find(rdfs[i]);
+
+            std::cout << i << ' ' << std::hash<Rdf>{}(rdfs[i]) << std::endl;
 
             if (search == catalog.end()) {
                 catalog.emplace(std::make_pair(rdfs[i], classifyTopo(i)));
@@ -365,6 +374,14 @@ class TopoClassify {
                     std::cout << search->second.graph_hash[0]
                               << search->second.graph_hash[1] << '\n';
                     std::cout << t.graph_hash[0] << t.graph_hash[1] << '\n';
+
+                    // colour near;
+                    std::vector<int> col2(x.size() / 3, 0);
+                    std::vector<Atom2> near = getNeighList(i);
+                    for (std::size_t i = 0; i < near.size(); ++i) {
+                        col2[near[i].index()] = 1;
+                    }
+                    output(x, col2);
 
                     // colour according to rdf hash
                     std::transform(rdfs.begin(), rdfs.end(),
@@ -456,9 +473,8 @@ class TopoClassify {
 
     // Returns the index of the central atom for the mechanisim as well as the
     // reference data to reconstruct mechanisim.
-    template <typename T>
     std::tuple<std::size_t, std::vector<Eigen::Vector3d>>
-    classifyMech(Vector const &end) const {
+    classifyMech(Vector const &init, Vector const &end) const {
         std::size_t centre = 0;
 
         { // find furthest moved
@@ -466,36 +482,42 @@ class TopoClassify {
 
             for (std::size_t i = 0; i < numAtom2s; ++i) {
 
-                Eigen::Vector3d end_pos{
-                    end[3 * i + 0],
-                    end[3 * i + 1],
-                    end[3 * i + 2],
+                Eigen::Vector3d delta{
+                    end[3 * i + 0] - init[3 * i + 0],
+                    end[3 * i + 1] - init[3 * i + 1],
+                    end[3 * i + 2] - init[3 * i + 2],
                 };
 
-                double dr_sq = (list[i].pos() - end_pos).squaredNorm();
+                double dr_sq = delta.squaredNorm();
 
                 if (dr_sq > dr_sq_max) {
                     centre = i;
                     dr_sq_max = dr_sq;
                 }
             }
+
+            // std::cout << "max move = " << std::sqrt(dr_sq_max) << '\n';
         }
 
         std::vector<Atom2> near = getNeighList(centre);
 
         // std::vector<int> col(init.size() / 3, 0);
+        //
         // for (std::size_t i = 0; i < near.size(); ++i) {
-        //     col[near[i].idx] = 1;
+        //     col[near[i].index()] = 1;
         // }
+        //
         // output(init, col);
 
-        //////// find canonical-ordering ///////////
+        ////// find canonical-ordering ///////////
 
         near = canonicalOrder(near, nullptr);
-
+        //
         // for (std::size_t i = 0; i < near.size(); ++i) {
-        //     col[near[i].idx] = i;
+        //     col[near[i].index()] = i;
         // }
+        //
+        // col[near[0].index()] = 99;
         //
         // output(init, col);
 
@@ -507,20 +529,55 @@ class TopoClassify {
 
         std::vector<Eigen::Vector3d> reference;
 
-        std::transform(near.begin(), near.end(), std::back_inserter(reference),
-                       [&](Atom2 const &atom) -> Eigen::Vector3d {
-                           Eigen::Vector3d end_pos{
-                               end[3 * atom.index() + 0],
-                               end[3 * atom.index() + 1],
-                               end[3 * atom.index() + 2],
-                           };
+        std::transform(
+            near.begin(), near.end(), std::back_inserter(reference),
+            [&](Atom2 const &atom) -> Eigen::Vector3d {
+                Eigen::Vector3d delta{
+                    end[3 * atom.index() + 0] - init[3 * atom.index() + 0],
+                    end[3 * atom.index() + 1] - init[3 * atom.index() + 1],
+                    end[3 * atom.index() + 2] - init[3 * atom.index() + 2],
+                };
 
-                           return transform * (end_pos - atom.pos());
-                       });
+                return transform * delta;
+            });
 
         // std::cout << "First atom delta: " << reference[0][0] << ' '
         //           << reference[0][1] << ' ' << reference[0][2] << "\n]\n";
 
         return {centre, std::move(reference)};
+    }
+
+    Vector reconstruct(Vector const &init, std::size_t centre,
+                       std::vector<Eigen::Vector3d> const &ref) const {
+
+        Vector end = init;
+
+        std::vector<Atom2> near = getNeighList(centre);
+
+        check(near.size() == ref.size(), "wrong num atoms in reconstruction");
+
+        near = canonicalOrder(near, nullptr);
+
+        // std::vector<int> col(init.size() / 3, 0);
+        // for (std::size_t i = 0; i < near.size(); ++i) {
+        //     check(near[i].idx < (int)col.size(), "bug in ordering alg
+        //     again"); col[near[i].idx] = i + 1;
+        // }
+        //
+        // output(init, col);
+
+        Eigen::Matrix3d transform = findBasis(near);
+
+        for (std::size_t i = 0; i < near.size(); ++i) {
+            Eigen::Vector3d delta = transform * ref[i];
+
+            end[3 * near[i].index() + 0] += delta[0];
+            end[3 * near[i].index() + 1] += delta[1];
+            end[3 * near[i].index() + 2] += delta[2];
+        }
+
+        // output(end, col);
+
+        return end;
     }
 };

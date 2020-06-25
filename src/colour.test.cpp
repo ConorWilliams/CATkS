@@ -127,48 +127,45 @@ double activeToRate(double active_E) {
 
 //
 template <typename T>
-auto updateCatalog(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
-                   T const &f) {
+void updateCatalog(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
+                   T const &f, TopoClassify const &cl) {
 
-    std::vector<Rdf> topos = f.colourAll(x);
+    double f_x = f(x);
 
-    for (std::size_t i = 0; i < topos.size(); ++i) {
+    for (std::size_t i = 0; i < cl.size(); ++i) {
 
-        catalog[topos[i]].count += 1;
+        catalog[cl.getRdf(i)].count += 1; // default constructs new
 
-        std::size_t count = catalog[topos[i]].count;
+        std::size_t count = catalog[cl.getRdf(i)].count;
 
-        while (catalog[topos[i]].sp_searches < 25 ||
-               catalog[topos[i]].sp_searches < std::sqrt(count)) {
+        while (catalog[cl.getRdf(i)].sp_searches < 25 ||
+               catalog[cl.getRdf(i)].sp_searches < std::sqrt(count)) {
 
-            ++(catalog[topos[i]].sp_searches);
+            ++(catalog[cl.getRdf(i)].sp_searches);
 
-            std::cout << "@ " << i << '/' << topos.size()
-                      << " dimer launch ... " << std::flush;
+            std::cout << "@ " << i << '/' << cl.size() << " dimer launch ... "
+                      << std::flush;
 
             auto [err, sp, end] = findSaddle(x, i, f);
 
             if (!err) {
                 std::cout << "success!" << std::endl;
 
-                auto [centre, ref] = classifyMech(x, end, f);
+                auto [centre, ref] = cl.classifyMech(x, end);
 
-                catalog[topos[centre]].pushMech(f(sp) - f(x), f(end) - f(x),
-                                                std::move(ref));
+                catalog[cl.getRdf(centre)].pushMech(f(sp) - f_x, f(end) - f_x,
+                                                    std::move(ref));
 
             } else {
                 std::cout << "err:" << err << std::endl;
             }
         }
     }
-
-    return topos;
 }
 
 template <typename T>
 void outputAllMechs(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
-                    T const &f) {
-    std::vector<Rdf> topos = f.colourAll(x);
+                    TopoClassify const &cl, T const &f) {
 
     std::unordered_set<Rdf> done{};
 
@@ -176,14 +173,14 @@ void outputAllMechs(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
 
     output(x);
 
-    for (std::size_t i = 0; i < topos.size(); ++i) {
-        if (done.count(topos[i]) == 0) {
-            done.insert(topos[i]);
+    for (std::size_t i = 0; i < cl.size(); ++i) {
+        if (done.count(cl.getRdf(i)) == 0) {
+            done.insert(cl.getRdf(i));
 
-            for (auto &&m : catalog[topos[i]].getMechs()) {
+            for (auto &&m : catalog[cl.getRdf(i)].getMechs()) {
                 std::cout << FRAME << ' ' << m.active_E << ' ' << m.delta_E
                           << std::endl;
-                Vector recon = reconstruct(x, i, m.ref, f);
+                Vector recon = cl.reconstruct(x, i, m.ref);
 
                 output(recon, f.quasiColourAll(recon));
             }
@@ -207,7 +204,7 @@ struct LocalisedMech {
 
 int main() {
 
-    Vector init(len * len * len * 3 * 2 - 3);
+    Vector init(len * len * len * 3 * 2 - 6);
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -218,8 +215,8 @@ int main() {
         for (int j = 0; j < len; ++j) {
             for (int k = 0; k < len; ++k) {
 
-                if ((i == 1 && j == 1 && k == 1) /*||
-                    (i == 4 && j == 1 && k == 1)*/) {
+                if ((i == 1 && j == 1 && k == 1) ||
+                    (i == 4 && j == 1 && k == 1)) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
                     init[3 * cell + 1] = (j + 0.5) * LAT;
                     init[3 * cell + 2] = (k + 0.5) * LAT;
@@ -264,7 +261,7 @@ int main() {
 
     min.findMin(init);
 
-    std::unordered_map<Rdf, Topology> catalog; //= readMap("dump");
+    std::unordered_map<Rdf, Topology> catalog = readMap("dump");
 
     TopoClassify classifyer(init.size() / 3, f.getBox());
 
@@ -274,29 +271,32 @@ int main() {
     pcg64 rng(seed_source);
     std::uniform_real_distribution<> uniform_dist(0, 1);
 
-    ////////////////////OLD Reconstruct test////////////////////////////
-
+    // //////////////////OLD Reconstruct test////////////////////////////
+    //
+    // classifyer.loadAtoms(init);
+    //
+    // classifyer.verify(init);
+    //
+    // std::cout << "loaded" << std::endl;
+    //
+    // output(init);
+    //
     // while (true) {
     //     auto [err, sp, end] = findSaddle(init, 12, f);
     //
     //     if (!err) {
     //         output(end);
     //
-    //         auto [centre, ref] = classifyMech(init, end, f);
+    //         auto [centre, ref] = classifyer.classifyMech(init, end);
     //
-    //         std::cou    // json j =
-    //         json::parse(std::ifstream("dump/toporef.json"));
+    //         std::cout << "\nCentre was " << centre << std::endl;
     //
-    // std::unordered_map<Rdf, TopoRef> topo_cat =
-    //     j.get<std::unordered_map<Rdf, TopoRef>>();t << "\nCentre was " <<
-    //     centre << std::endl;
-    //
-    //         Vector recon = reconstruct(init, 12, ref, f);
+    //         Vector recon = classifyer.reconstruct(init, 12, ref);
     //
     //         std::cout << f(end) - f(init) << std::endl;
     //         std::cout << f(recon) - f(init) << std::endl;
     //
-    //         output(recon);
+    //         output(recon);const T &f
     //
     //         min.findMin(recon);
     //
@@ -305,10 +305,10 @@ int main() {
     //         return 0;
     //     }
     // }
+    //
+    // ////////////////////////////////////////////////////
 
-    //////////////////////////////////////////////////////
-
-    for (int anon = 0; anon < 5; ++anon) {
+    for (int anon = 0; anon < 50; ++anon) {
 
         // if (anon == 0) {
         //     outputAllMechs(catalog, init, f);
@@ -321,16 +321,18 @@ int main() {
 
         classifyer.verify(init);
 
-        std::cout << "All topos again!" << std::endl;
+        std::cout << "All topos verified!" << std::endl;
 
-        std::vector<Rdf> topos = updateCatalog(catalog, init, f);
+        updateCatalog(catalog, init, f, classifyer);
 
         writeMap("dump", catalog);
 
+        //    outputAllMechs(catalog, init, classifyer, f);
+
         std::vector<LocalisedMech> possible{};
 
-        for (std::size_t i = 0; i < topos.size(); ++i) {
-            for (auto &&m : catalog[topos[i]].getMechs()) {
+        for (std::size_t i = 0; i < classifyer.size(); ++i) {
+            for (auto &&m : catalog[classifyer.getRdf(i)].getMechs()) {
                 possible.push_back(
                     {i, activeToRate(m.active_E), m.ref, m.delta_E});
             }
@@ -355,7 +357,9 @@ int main() {
 
         time += -std::log(uniform_dist(rng)) / rate_sum;
 
-        Vector next = reconstruct(init, choice.atom, choice.ref, f);
+        Vector next = classifyer.reconstruct(init, choice.atom, choice.ref);
+
+        std::cout << "here" << std::endl;
 
         double delta = f(next) - f(init);
 

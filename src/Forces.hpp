@@ -330,7 +330,7 @@ template <typename C> class FuncEAM {
         } while (index != end);
 
         // in adjecent cells -- don't need check against self
-        for (std::size_t off : box.getAdjOff()) {
+        for (auto off : box.getAdjOff()) {
             index = head[lambda + off];
             while (index != end) {
                 // std::cout << "cell_t " << cell << std::endl;
