@@ -13,10 +13,9 @@
 enum : uint8_t { Fe = 0, H = 1 };
 constexpr double LAT = 2.855700;
 
-inline constexpr int len = 7;
+std::string OUTFILE = "/home/cdt1902/defgehgf";
 
-static const std::string OUTFILE = "/home/cdt1902/dis/CATkS/raw.txt";
-constexpr double G_AMP = 0.1;
+inline constexpr int len = 7;
 
 int main() {
     Vector init(len * len * len * 3 * 2 - 3);

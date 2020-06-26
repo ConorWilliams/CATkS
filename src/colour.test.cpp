@@ -6,112 +6,13 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "pcg_random.hpp"
-
 #include "Classes.hpp"
 
 #include "Dimer.hpp"
 #include "DumpXYX.hpp"
 #include "Forces.hpp"
-#include "Minimise.hpp"
-#include "Rdf.hpp"
 #include "Topo.hpp"
 #include "utils.hpp"
-
-// controls displacement along mm at saddle
-inline constexpr double NUDGE = 0.1;
-// tollerence for 3N vectors to be considered the same vector
-inline constexpr double TOL_NEAR = 0.1;
-
-constexpr double G_SPHERE = 4;
-constexpr double G_AMP = 0.325;
-
-// init is a minimised (unporturbed) vector of atoms
-// idx is centre of displacemnet
-// f is their force object
-template <typename T>
-std::tuple<int, Vector, Vector> findSaddle(Vector const &init, std::size_t idx,
-                                           T const &f) {
-    Vector sp = init;
-    Vector ax = Vector::Zero(init.size());
-
-    // random pertabations
-
-    // Seed with a real random value, if available
-    pcg_extras::seed_seq_from<std::random_device> seed_source;
-    pcg64 rng(seed_source);
-    std::normal_distribution<> gauss_dist(0, G_AMP);
-
-    double x = init[idx * 3 + 0];
-    double y = init[idx * 3 + 1];
-    double z = init[idx * 3 + 2];
-
-    std::vector<int> col(init.size() / 3, 0);
-
-    for (int i = 0; i < init.size(); i = i + 3) {
-        double dist =
-            f.periodicNormSq(x, y, z, init[i + 0], init[i + 1], init[i + 2]);
-
-        if (dist < G_SPHERE * G_SPHERE) {
-            sp[i + 0] += gauss_dist(rng);
-            sp[i + 1] += gauss_dist(rng);
-            sp[i + 2] += gauss_dist(rng);
-
-            ax[i + 0] = gauss_dist(rng);
-            ax[i + 1] = gauss_dist(rng);
-            ax[i + 2] = gauss_dist(rng);
-
-            col[i / 3] = 1;
-        }
-    }
-
-    // ax.matrix().normalize(); // not strictly nessaserry, done in ctr
-
-    // output(sp, col); // tmp
-
-    Dimer dimer{f, sp, ax, [&]() { /*output(sp, col); */ }};
-
-    if (!dimer.findSaddle()) {
-        // failed SP search
-        return {1, Vector{}, Vector{}};
-    }
-
-    Vector old = sp + ax * NUDGE;
-    Vector end = sp - ax * NUDGE;
-
-    Minimise min{f, f, init.size()};
-
-    if (!min.findMin(old) || !min.findMin(end)) {
-        // failed minimisation
-        return {2, Vector{}, Vector{}};
-    }
-
-    double distOld = dot(old - init, old - init);
-    double distFwd = dot(end - init, end - init);
-
-    // want old to be init
-    if (distOld > distFwd) {
-        using std::swap;
-        swap(old, end);
-        swap(distOld, distFwd);
-    }
-
-    if (distOld > TOL_NEAR) {
-        // disconnected SP
-        // std::cout << distOld << std::endl;
-        // std::cout << distFwd << std::endl;
-        return {3, Vector{}, Vector{}};
-    }
-
-    if (dot(end - old, end - old) < TOL_NEAR) {
-        // minimasations both converged to init
-        return {4, Vector{}, Vector{}};
-    }
-
-    // output(end, col); // tmp
-
-    return {0, std::move(sp), std::move(end)};
-}
 
 inline constexpr double ARRHENIUS_PRE = 1e13;
 inline constexpr double KB_T = 8.617333262145 * 1e-5 * 500; // eV K^-1
@@ -127,8 +28,8 @@ double activeToRate(double active_E) {
 
 //
 template <typename T, typename K>
-void updateCatalog(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
-                   T const &f, TopoClassify<K> const &cl) {
+void updateCatalog(std::unordered_map<Graph, Topology> &catalog,
+                   Vector const &x, T const &f, TopoClassify<K> const &cl) {
 
     double f_x = f(x);
 
@@ -151,7 +52,7 @@ void updateCatalog(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
             if (!err) {
                 std::cout << "success!" << std::endl;
 
-                auto [centre, ref] = cl.classifyMech(x, end);
+                auto [centre, ref] = cl.classifyMech(end);
 
                 catalog[cl.getRdf(centre)].pushMech(f(sp) - f_x, f(end) - f_x,
                                                     std::move(ref));
@@ -164,10 +65,10 @@ void updateCatalog(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
 }
 
 template <typename T, typename K>
-void outputAllMechs(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
-                    TopoClassify<K> const &cl, T const &f) {
+void outputAllMechs(std::unordered_map<Graph, Topology> &catalog,
+                    Vector const &x, TopoClassify<K> const &cl, T const &f) {
 
-    std::unordered_set<Rdf> done{};
+    std::unordered_set<Graph> done{};
 
     std::cout << "writing all mechanisms" << std::endl;
 
@@ -180,7 +81,7 @@ void outputAllMechs(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
             for (auto &&m : catalog[cl.getRdf(i)].getMechs()) {
                 std::cout << FRAME << ' ' << m.active_E << ' ' << m.delta_E
                           << std::endl;
-                Vector recon = cl.reconstruct(x, i, m.ref);
+                Vector recon = cl.reconstruct(i, m.ref);
 
                 output(recon, f.quasiColourAll(recon));
             }
@@ -204,7 +105,7 @@ struct LocalisedMech {
 
 int main() {
 
-    Vector init(len * len * len * 3 * 2 - 3);
+    Vector init(len * len * len * 3 * 2 - 6);
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -215,8 +116,8 @@ int main() {
         for (int j = 0; j < len; ++j) {
             for (int k = 0; k < len; ++k) {
 
-                if ((i == 1 && j == 1 && k == 1) /*||
-                    (i == 4 && j == 1 && k == 1)*/) {
+                if ((i == 1 && j == 1 && k == 1) ||
+                    (i == 4 && j == 1 && k == 1)) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
                     init[3 * cell + 1] = (j + 0.5) * LAT;
                     init[3 * cell + 2] = (k + 0.5) * LAT;
@@ -269,7 +170,7 @@ int main() {
 
     min.findMin(init);
 
-    std::unordered_map<Rdf, Topology> catalog = readMap("dump");
+    std::unordered_map<Graph, Topology> catalog = readMap("dump");
 
     double time = 0;
 
@@ -314,7 +215,7 @@ int main() {
     //
     // ////////////////////////////////////////////////////
 
-    for (int anon = 0; anon < 5; ++anon) {
+    for (int anon = 0; anon < 50; ++anon) {
 
         // if (anon == 0) {
         //     outputAllMechs(catalog, init, f);
@@ -323,9 +224,9 @@ int main() {
 
         output(init, f.quasiColourAll(init));
 
-        classifyer.loadAtoms(init);
+        classifyer.analyzeTopology(init);
 
-        classifyer.verify(init);
+        classifyer.verify();
 
         std::cout << "All topos verified!" << std::endl;
 
@@ -363,20 +264,22 @@ int main() {
 
         time += -std::log(uniform_dist(rng)) / rate_sum;
 
-        Vector next = classifyer.reconstruct(init, choice.atom, choice.ref);
+        double f_x = f(init);
+
+        init = classifyer.reconstruct(choice.atom, choice.ref);
 
         std::cout << "here" << std::endl;
 
-        double delta = f(next) - f(init);
-
-        std::cout << "Goal: " << choice.delta_E << " actual: " << delta
-                  << std::endl;
-
-        check(std::abs(delta - choice.delta_E) < 0.1, "recon err");
-
-        init = next;
+        double recon = f(init) - f_x;
 
         min.findMin(init);
+
+        double relax = f(init) - f_x;
+
+        std::cout << "Goal: " << choice.delta_E << " Recon: " << recon
+                  << " Relaxed: " << relax << std::endl;
+
+        check(std::abs(recon - choice.delta_E) < 0.1, "recon err");
 
         std::cout << "TIME: " << time << std::endl;
 

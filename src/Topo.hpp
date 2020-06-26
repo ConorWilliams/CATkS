@@ -12,31 +12,32 @@
 #include "Box.hpp"
 #include "Cell.hpp"
 #include "DumpXYX.hpp"
-#include "Nauty.hpp"
-#include "Rdf.hpp"
+#include "NautyFunc.hpp"
 #include "utils.hpp"
 
-struct TopoRef {
-    std::vector<Eigen::Vector3d> ref{};
+inline constexpr double RCUT = 6; // angstrom
 
-    std::size_t rdf_hash;
-    std::array<std::size_t, 2> graph_hash;
-    std::size_t count;
+struct TopoRef {
+    std::array<std::size_t, 2> hash;
+
+    std::size_t count = 1;
+    std::vector<Eigen::Vector3d> ref{};
 
     bool operator==(TopoRef const &other) const {
         if (ref.size() != other.ref.size()) {
             return false;
         }
-        if (rdf_hash != other.rdf_hash) {
-            return false;
-        }
-        if (graph_hash != other.graph_hash) {
+        if (hash != other.hash) {
             return false;
         }
 
         for (std::size_t i = 0; i < ref.size(); ++i) {
             Eigen::Array3d dif = ref[i] - other.ref[i];
-            if ((dif.abs() > 0.2).any()) {
+            // double tol = 0.7 / RCUT * (ref[i] - ref[0]).norm();
+
+            // std::cout << (ref[i] - ref[0]).norm() << ' ' << tol << "\n";
+
+            if ((dif.abs() > 0.1).any()) {
 
                 std::cout << i << ' ' << ref[i].transpose() << std::endl;
                 std::cout << i << ' ' << other.ref[i].transpose() << std::endl;
@@ -49,8 +50,7 @@ struct TopoRef {
     }
 
     TopoRef &operator+=(TopoRef const &other) {
-        check(graph_hash == other.graph_hash, "cant add disimilar");
-        check(rdf_hash == other.rdf_hash, "cant add disimilar");
+        check(hash == other.hash, "cant add disimilar");
 
         double total = count + other.count;
 
@@ -66,21 +66,19 @@ struct TopoRef {
     friend void to_json(nlohmann::json &j, TopoRef const &topo) {
         j = nlohmann::json{
             {"ref", topo.ref},
-            {"rdf_hash", topo.rdf_hash},
-            {"graph_hash", topo.graph_hash},
+            {"hash", topo.hash},
             {"count", topo.count},
         };
     }
 
     friend void from_json(nlohmann::json const &j, TopoRef &topo) {
         j.at("ref").get_to(topo.ref);
-        j.at("rdf_hash").get_to(topo.rdf_hash);
-        j.at("graph_hash").get_to(topo.graph_hash);
+        j.at("hash").get_to(topo.hash);
         j.at("count").get_to(topo.count);
     }
 };
 
-Eigen::Matrix3d modifiedGramSchmidtX(Eigen::Matrix3d const &in) {
+Eigen::Matrix3d modifiedGramSchmidt(Eigen::Matrix3d const &in) {
     Eigen::Matrix3d out;
 
     out.col(0) = in.col(0);
@@ -105,6 +103,52 @@ Eigen::Matrix3d modifiedGramSchmidtX(Eigen::Matrix3d const &in) {
     return out;
 }
 
+template <typename T> Eigen::Matrix3d findBasis(std::vector<T> const &ns) {
+
+    Eigen::Vector3d origin = ns[0].pos();
+    Eigen::Matrix3d basis;
+
+    check(ns.size() > 2, "Not enough atoms to define basis");
+
+    basis.col(0) = (ns[1].pos() - origin).normalized();
+
+    // std::cout << "e0 @ 0->" << 1 << std::endl;
+
+    std::size_t index_e1 = [&]() {
+        for (std::size_t i = 2; i < ns.size(); ++i) {
+            Eigen::Vector3d e1 = (ns[i].pos() - origin).normalized();
+
+            Eigen::Vector3d cross = basis.col(0).cross(e1);
+
+            // check for colinearity
+            if (cross.squaredNorm() > 0.1) {
+                basis.col(1) = e1;
+                basis.col(2) = cross;
+                // std::cout << "e1 @ 0->" << i << std::endl;
+                return i;
+            }
+        }
+        std::cerr << "All atoms colinear" << std::endl;
+        std::terminate();
+    }();
+
+    for (std::size_t i = index_e1 + 1; i < ns.size(); ++i) {
+        Eigen::Vector3d e2 = (ns[i].pos() - origin).normalized();
+
+        double triple_prod = std::abs(basis.col(2).adjoint() * e2);
+
+        // check for coplanarity with e0, e1
+        if (triple_prod > 0.1) {
+            basis.col(2) = e2;
+            // std::cout << "e2 @ 0->" << i << std::endl;
+            // std::cout << "Triple_prod " << triple_prod << std::endl;
+            break;
+        }
+    }
+
+    return modifiedGramSchmidt(basis);
+}
+
 template <typename Kind_t> class TopoClassify {
   private:
     class Atom : public AtomBase {
@@ -120,106 +164,81 @@ template <typename Kind_t> class TopoClassify {
 
     CellList<Atom, Kind_t> cellList;
 
-    std::vector<Rdf> rdfs;
-    std::unordered_map<Rdf, TopoRef> catalog;
+    std::vector<Graph> keys;
+    std::vector<std::vector<Atom>> canon;
 
-    static constexpr double BOND_DISTANCE = 2.66; // angstrom
+    Vector const *prev;
+
+    std::unordered_map<Graph, TopoRef> catalog;
 
   public:
-    TopoClassify(Box const &box, Kind_t const &kinds) : cellList{box, kinds} {
-        using nlohmann::json;
-        json j = json::parse(std::ifstream("dump/toporef.json"));
-        catalog = j.get<std::unordered_map<Rdf, TopoRef>>();
+    TopoClassify(Box const &box, Kind_t const &kinds)
+        : cellList{box, kinds}, keys{kinds.size()}, canon{kinds.size()} {
+
+        static_assert(std::is_trivially_destructible_v<Graph>,
+                      "can't clear graphs in constant time");
+
+        constexpr auto fname = "dump/toporef.json";
+
+        if (fileExist(fname)) {
+            using nlohmann::json;
+            json j = json::parse(std::ifstream());
+            catalog = j.get<std::unordered_map<Graph, TopoRef>>();
+        } else {
+            std::cout << "Missing " << fname << std::endl;
+        }
     }
 
-    Rdf const &getRdf(std::size_t i) const { return rdfs[i]; };
+    void colourPrint() const {
+        output(*prev,
+               transform_into(keys.begin(), keys.end(), std::hash<Graph>{}));
+    }
 
     std::size_t size() const { return cellList.size(); };
 
-    template <typename T> void loadAtoms(T const &x) {
+    auto getRdf(std::size_t i) { return keys[i]; }
+    auto getRdf(std::size_t i) const { return keys[i]; }
+
+    void analyzeTopology(Vector &&x) = delete; // prevent tempories binding
+
+    void analyzeTopology(Vector const &x) {
+        // remember
+        prev = &x;
+
+        // Prime cell list
         cellList.fillList(x);
         cellList.makeGhosts();
         cellList.updateHead();
 
-        rdfs.clear();
+        std::vector<Atom> neigh;
 
-        check(size() * 3 == (std::size_t)x.size(), "wrong num atoms");
+        for (std::size_t i = 0; i < cellList.size(); ++i) {
+            neigh.clear();
+            // as forEach.. does not include centre
+            neigh.push_back(cellList[i]);
 
-        for (auto &&atom : cellList) {
+            cellList.forEachNeigh(cellList[i],
+                                  [&](auto const &n, double, double, double,
+                                      double) { neigh.push_back(n); });
 
-            Rdf rdf{};
+            canon[i].clear();
 
-            cellList.findNeigh(atom, [&](auto const &, double r, double, double,
-                                         double) { rdf.add(r / 6.0); });
-
-            rdfs.push_back(rdf);
+            keys[i] = canonicalize(neigh, canon[i]);
         }
-
-        // std::cout << catalog.size() << " topoologies" << std::endl;
-    }
-
-    std::vector<Atom> getNeighList(std::size_t centre) const {
-        check(centre < size(), "out of bounds");
-
-        std::vector<Atom> ns = {cellList[centre]};
-
-        cellList.findNeigh(cellList[centre],
-                           [&](auto const &neigh, double, double, double,
-                               double) { ns.push_back(neigh); });
-
-        return ns;
-    }
-
-    std::vector<Atom> canonicalOrder(std::vector<Atom> const &ns,
-                                     std::array<std::size_t, 2> *hash) const {
-        NautyGraph graph(ns.size());
-
-        for (std::size_t i = 0; i < ns.size(); ++i) {
-            for (std::size_t j = i + 1; j < ns.size(); ++j) {
-
-                double sqdist = (ns[i].pos() - ns[j].pos()).squaredNorm();
-
-                if (sqdist < BOND_DISTANCE * BOND_DISTANCE) {
-                    graph.addEdge(i, j);
-                }
-            }
-        }
-
-        int const *order = graph.getCanonical();
-
-        if (hash) {
-            *hash = graph.hash();
-        }
-
-        std::vector<Atom> ordered;
-
-        std::transform(order, order + ns.size(), std::back_inserter(ordered),
-                       [&](int o) { return ns[o]; });
-
-        return ordered;
     }
 
     TopoRef classifyTopo(std::size_t idx) const {
         check(idx < size(), "out of bounds");
 
-        TopoRef topo{
-            {},
-            std::hash<Rdf>{}(rdfs[idx]),
-            {},
-            1,
-        };
+        TopoRef topo{keys[idx].hash()};
 
-        std::vector<Atom> ns = getNeighList(idx);
-
-        ns = canonicalOrder(ns, &topo.graph_hash);
-
-        Eigen::Matrix3d transform = findBasis(ns);
+        Eigen::Matrix3d transform = findBasis(canon[idx]);
 
         transform.transposeInPlace();
 
-        Eigen::Vector3d origin = ns[0].pos();
+        Eigen::Vector3d origin = canon[idx][0].pos();
 
-        std::transform(ns.begin(), ns.end(), std::back_inserter(topo.ref),
+        transform_into(canon[idx].begin(), canon[idx].end(), topo.ref,
                        [&](Atom const &atom) -> Eigen::Vector3d {
                            return transform * (atom.pos() - origin);
                        });
@@ -227,42 +246,40 @@ template <typename Kind_t> class TopoClassify {
         return topo;
     }
 
-    bool verify(Vector const &x) {
+    bool verify() {
         for (std::size_t i = 0; i < size(); ++i) {
-            auto search = catalog.find(rdfs[i]);
+            auto search = catalog.find(keys[i]);
 
-            // std::cout << i << ' ' << std::hash<Rdf>{}(rdfs[i]) << std::endl;
+            // std::cout << i << ' ' << std::hash<Rdf>{}(rdfs[i]) <<
+            // std::endl;
 
             if (search == catalog.end()) {
-                catalog.emplace(std::make_pair(rdfs[i], classifyTopo(i)));
+                catalog.emplace(std::make_pair(keys[i], classifyTopo(i)));
             } else {
                 TopoRef t = classifyTopo(i);
 
                 if (!(search->second == t)) {
-                    std::vector<std::size_t> col;
-
-                    std::cout << search->second.graph_hash[0]
-                              << search->second.graph_hash[1] << '\n';
-                    std::cout << t.graph_hash[0] << t.graph_hash[1] << '\n';
 
                     // colour near;
-                    std::vector<int> col2(x.size() / 3, 0);
-                    std::vector<Atom> near = getNeighList(i);
-                    for (std::size_t i = 0; i < near.size(); ++i) {
-                        col2[near[i].index()] = 1;
+                    std::vector<int> col2(prev->size() / 3, 0);
+
+                    for (auto &&atom : canon[i]) {
+                        col2[atom.index()] = 1;
                     }
-                    output(x, col2);
+                    output(*prev, col2);
+
+                    std::vector<std::size_t> col;
 
                     // colour according to rdf hash
-                    std::transform(rdfs.begin(), rdfs.end(),
-                                   std::back_inserter(col), std::hash<Rdf>{});
+                    std::transform(keys.begin(), keys.end(),
+                                   std::back_inserter(col), std::hash<Graph>{});
 
                     // unprocessed topos colour 0
                     std::transform(col.begin() + i + 1, col.end(),
                                    col.begin() + i + 1,
                                    [=](std::size_t) { return 0; });
 
-                    output(x, col);
+                    output(*prev, col);
 
                     auto bad = col[i];
 
@@ -273,7 +290,7 @@ template <typename Kind_t> class TopoClassify {
 
                     col[i] = 100;
 
-                    output(x, col);
+                    output(*prev, col);
 
                     check(false, "topology collison");
 
@@ -292,59 +309,10 @@ template <typename Kind_t> class TopoClassify {
         return true;
     }
 
-    Eigen::Matrix3d findBasis(std::vector<Atom> const &ns) const {
-
-        Eigen::Vector3d origin = ns[0].pos();
-        Eigen::Matrix3d basis;
-
-        check(ns.size() > 2, "Not enough atoms to define basis");
-
-        basis.col(0) = (ns[1].pos() - origin).normalized();
-
-        // std::cout << "e0 @ 0->" << 1 << std::endl;
-
-        std::size_t index_e1 = [&]() {
-            for (std::size_t i = 2; i < ns.size(); ++i) {
-                Eigen::Vector3d e1 = (ns[i].pos() - origin).normalized();
-
-                Eigen::Vector3d cross = basis.col(0).cross(e1);
-
-                // check for colinearity
-                if (cross.squaredNorm() > 0.1) {
-                    basis.col(1) = e1;
-                    basis.col(2) = cross;
-                    // std::cout << "e1 @ 0->" << i << std::endl;
-                    return i;
-                }
-            }
-            std::cerr << "All atoms colinear" << std::endl;
-            std::terminate();
-        }();
-
-        for (std::size_t i = index_e1 + 1; i < ns.size(); ++i) {
-            Eigen::Vector3d e2 = (ns[i].pos() - origin).normalized();
-
-            double triple_prod = std::abs(basis.col(2).adjoint() * e2);
-
-            // check for coplanarity with e0, e1
-            if (triple_prod > 0.1) {
-                basis.col(2) = e2;
-                // std::cout << "e2 @ 0->" << i << std::endl;
-                // std::cout << "Triple_prod " << triple_prod << std::endl;
-                break;
-            }
-        }
-
-        // std::cout << "\nTransformer (non-orthoganlaised) \n" << basis <<
-        // std::endl;
-
-        return modifiedGramSchmidtX(basis);
-    }
-
-    // Returns the index of the central atom for the mechanisim as well as the
-    // reference data to reconstruct mechanisim.
+    // Returns the index of the central atom for the mechanisim as well as
+    // the reference data to reconstruct mechanisim.
     std::tuple<std::size_t, std::vector<Eigen::Vector3d>>
-    classifyMech(Vector const &init, Vector const &end) const {
+    classifyMech(Vector const &end) const {
         std::size_t centre = 0;
 
         { // find furthest moved
@@ -353,9 +321,9 @@ template <typename Kind_t> class TopoClassify {
             for (std::size_t i = 0; i < size(); ++i) {
 
                 Eigen::Vector3d delta{
-                    end[3 * i + 0] - init[3 * i + 0],
-                    end[3 * i + 1] - init[3 * i + 1],
-                    end[3 * i + 2] - init[3 * i + 2],
+                    end[3 * i + 0] - (*prev)[3 * i + 0],
+                    end[3 * i + 1] - (*prev)[3 * i + 1],
+                    end[3 * i + 2] - (*prev)[3 * i + 2],
                 };
 
                 double dr_sq = delta.squaredNorm();
@@ -369,8 +337,6 @@ template <typename Kind_t> class TopoClassify {
             // std::cout << "max move = " << std::sqrt(dr_sq_max) << '\n';
         }
 
-        std::vector<Atom> near = getNeighList(centre);
-
         // std::vector<int> col(init.size() / 3, 0);
         //
         // for (std::size_t i = 0; i < near.size(); ++i) {
@@ -381,7 +347,6 @@ template <typename Kind_t> class TopoClassify {
 
         ////// find canonical-ordering ///////////
 
-        near = canonicalOrder(near, nullptr);
         //
         // for (std::size_t i = 0; i < near.size(); ++i) {
         //     col[near[i].index()] = i;
@@ -393,40 +358,33 @@ template <typename Kind_t> class TopoClassify {
 
         ///////////// get basis vectors /////////////
 
-        Eigen::Matrix3d transform = findBasis(near);
+        Eigen::Matrix3d transform = findBasis(canon[centre]);
 
         transform.transposeInPlace();
 
-        std::vector<Eigen::Vector3d> reference;
-
-        std::transform(
-            near.begin(), near.end(), std::back_inserter(reference),
+        auto reference = transform_into(
+            canon[centre].begin(), canon[centre].end(),
+            std::vector<Eigen::Vector3d>{},
             [&](Atom const &atom) -> Eigen::Vector3d {
                 Eigen::Vector3d delta{
-                    end[3 * atom.index() + 0] - init[3 * atom.index() + 0],
-                    end[3 * atom.index() + 1] - init[3 * atom.index() + 1],
-                    end[3 * atom.index() + 2] - init[3 * atom.index() + 2],
+                    end[3 * atom.index() + 0] - (*prev)[3 * atom.index() + 0],
+                    end[3 * atom.index() + 1] - (*prev)[3 * atom.index() + 1],
+                    end[3 * atom.index() + 2] - (*prev)[3 * atom.index() + 2],
                 };
 
                 return transform * delta;
             });
 
-        // std::cout << "First atom delta: " << reference[0][0] << ' '
-        //           << reference[0][1] << ' ' << reference[0][2] << "\n]\n";
-
         return {centre, std::move(reference)};
     }
 
-    Vector reconstruct(Vector const &init, std::size_t centre,
+    Vector reconstruct(std::size_t idx,
                        std::vector<Eigen::Vector3d> const &ref) const {
 
-        Vector end = init;
+        Vector end = *prev;
 
-        std::vector<Atom> near = getNeighList(centre);
-
-        check(near.size() == ref.size(), "wrong num atoms in reconstruction");
-
-        near = canonicalOrder(near, nullptr);
+        check(canon[idx].size() == ref.size(),
+              "wrong num atoms in reconstruction");
 
         // std::vector<int> col(init.size() / 3, 0);
         // for (std::size_t i = 0; i < near.size(); ++i) {
@@ -436,14 +394,14 @@ template <typename Kind_t> class TopoClassify {
         //
         // output(init, col);
 
-        Eigen::Matrix3d transform = findBasis(near);
+        Eigen::Matrix3d transform = findBasis(canon[idx]);
 
-        for (std::size_t i = 0; i < near.size(); ++i) {
+        for (std::size_t i = 0; i < canon[idx].size(); ++i) {
             Eigen::Vector3d delta = transform * ref[i];
 
-            end[3 * near[i].index() + 0] += delta[0];
-            end[3 * near[i].index() + 1] += delta[1];
-            end[3 * near[i].index() + 2] += delta[2];
+            end[3 * canon[idx][i].index() + 0] += delta[0];
+            end[3 * canon[idx][i].index() + 1] += delta[1];
+            end[3 * canon[idx][i].index() + 2] += delta[2];
         }
 
         // output(end, col);

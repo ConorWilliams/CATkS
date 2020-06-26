@@ -4,11 +4,12 @@
 #include <fstream>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
+#include "NautyFunc.hpp"
 #include "nlohmann/json.hpp"
 
-#include "Rdf.hpp"
 #include "utils.hpp"
 
 inline constexpr double DELTA_E_TOL = 0.01;
@@ -125,35 +126,54 @@ class Topology {
     }
 };
 
-std::unordered_map<Rdf, Topology> readMap(std::string const &dir) {
+std::unordered_map<Graph, Topology> readMap(std::string const &dir) {
     using nlohmann::json;
 
-    std::unordered_map<Rdf, Topology> map;
+    std::unordered_map<Graph, Topology> map;
 
-    json rdfs = json::parse(std::ifstream(dir + "/rdf.json"));
+    std::sting keys = dir + "/rdf.json";
 
-    for (auto &&elem : rdfs) {
-        Rdf r = elem.get<Rdf>();
+    if (fileExist(keys)) {
+        json rdfs = json::parse(std::ifstream(keys));
 
-        json j = json::parse(std::ifstream(dir + '/' + r.to_string()));
+        for (auto &&elem : rdfs) {
+            Graph r = elem.get<Graph>();
 
-        map[r] = j.get<Topology>();
+            auto fname = dir + '/' + r.to_string();
+
+            check(fileExist(fname), "missing a topo file");
+
+            json j = json::parse(std::ifstream(fname));
+
+            map[r] = j.get<Topology>();
+        }
+    } else {
+        stc::cout << "Missing " << keys << std::endl;
     }
 
     return map;
 }
 
 void writeMap(std::string const &dir,
-              std::unordered_map<Rdf, Topology> const &map) {
+              std::unordered_map<Graph, Topology> const &map) {
 
     using nlohmann::json;
 
     json keys;
 
+    std::unordered_set<std::string> names{};
+
     for (auto &&[rdf, topo] : map) {
         json j = topo;
-        std::ofstream(dir + '/' + rdf.to_string()) << j.dump(2);
+
+        std::string name = dir + '/' + rdf.to_string();
+
+        check(names.count(name) == 0, "need better naming");
+
+        std::ofstream(name) << j.dump(2);
         keys.push_back(rdf);
+
+        names.insert(std::move(name));
     }
 
     std::ofstream(dir + "/rdf.json") << keys.dump(2);

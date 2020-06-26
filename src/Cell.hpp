@@ -38,7 +38,7 @@ template <typename Atom_t, typename Kind_t> class CellList {
         : box{box}, kinds{kinds}, head(box.numCells()) {
 
         static_assert(std::is_trivially_destructible_v<Atom_t>,
-                      "can't clear Atom2s in constant time");
+                      "can't clear Atom_t in constant time");
 
         static_assert(std::is_base_of_v<AtomBase, Atom_t>,
                       "Atom_t must be derived from AtomBase");
@@ -114,7 +114,7 @@ template <typename Atom_t, typename Kind_t> class CellList {
 
     // applies f() for every neighbour (closer than rcut)
     template <typename F>
-    inline void findNeigh(Atom_t const &atom, F const &f) const {
+    inline void forEachNeigh(Atom_t const &atom, F &&f) const {
 
         std::size_t const lambda = box.lambda(atom);
         std::size_t const end = list.size();
