@@ -9,8 +9,9 @@
 #include <type_traits>
 #include <vector>
 
+#include "Box.hpp"
+#include "Cell.hpp"
 #include "DumpXYX.hpp"
-#include "Forces.hpp"
 #include "Nauty.hpp"
 #include "Rdf.hpp"
 #include "utils.hpp"
@@ -104,184 +105,52 @@ Eigen::Matrix3d modifiedGramSchmidtX(Eigen::Matrix3d const &in) {
     return out;
 }
 
-// Helper class holds Atom2 in LIST array of LCL with index of neighbours
-class Atom2 {
+template <typename Kind_t> class TopoClassify {
   private:
-    Eigen::Vector3d r;
-    std::size_t idx;
-    std::size_t n;
+    class Atom : public AtomBase {
+      private:
+        std::size_t idx;
 
-  public:
-    Atom2(double x, double y, double z, std::size_t idx)
-        : r{x, y, z}, idx{idx} {}
-    Atom2(Atom2 const &) = default;
-    Atom2(Atom2 &&) = default;
-    Atom2() = default;
-    Atom2 &operator=(Atom2 const &) = default;
-    Atom2 &operator=(Atom2 &&) = default;
+      public:
+        Atom(int, double x, double y, double z, std::size_t idx)
+            : AtomBase::AtomBase{x, y, z}, idx{idx} {}
 
-    inline std::size_t &next() { return n; }
-    inline std::size_t next() const { return n; }
+        inline std::size_t index() const { return idx; }
+    };
 
-    inline std::size_t index() const { return idx; }
-
-    inline Eigen::Vector3d const &pos() const { return r; }
-
-    inline double &operator[](std::size_t i) { return r[i]; }
-    inline double const &operator[](std::size_t i) const { return r[i]; }
-};
-
-class TopoClassify {
-  private:
-    Box box;
-
-    std::size_t numAtom2s;
-
-    Eigen::Array<std::size_t, Eigen::Dynamic, 1> head;
-    std::vector<Atom2> list;
+    CellList<Atom, Kind_t> cellList;
 
     std::vector<Rdf> rdfs;
-
     std::unordered_map<Rdf, TopoRef> catalog;
 
     static constexpr double BOND_DISTANCE = 2.66; // angstrom
 
   public:
-    TopoClassify(std::size_t numAtom2s, Box const &box)
-        : box{box}, numAtom2s{numAtom2s}, head(box.numCells()) {
-
-        static_assert(std::is_trivially_destructible_v<Atom2>,
-                      "can't clear Atom2s in constant time");
-
-        static_assert(std::is_trivially_destructible_v<Rdf>,
-                      "can't clear Atom2s in constant time");
-
+    TopoClassify(Box const &box, Kind_t const &kinds) : cellList{box, kinds} {
         using nlohmann::json;
         json j = json::parse(std::ifstream("dump/toporef.json"));
         catalog = j.get<std::unordered_map<Rdf, TopoRef>>();
     }
 
-  private:
-    template <typename T> void fillCellList(T const &x3n) {
-        check(static_cast<std::size_t>(x3n.size()) == 3 * numAtom2s,
-              "wrong number of Atom2s");
-
-        list.clear(); // should be order 1
-
-        // add all Atom2s to cell list
-        for (std::size_t i = 0; i < numAtom2s; ++i) {
-            // map Atom2s into cell (0->xlen, 0->ylen, 0->zlen)
-            auto [x, y, z] =
-                box.mapIntoCell(x3n[3 * i + 0], x3n[3 * i + 1], x3n[3 * i + 2]);
-
-            // check in cell
-            check(x >= 0 && x < box.limits(0).len, "x out of box " << x);
-            check(y >= 0 && y < box.limits(1).len, "y out of box " << y);
-            check(z >= 0 && z < box.limits(2).len, "z out of box " << z);
-
-            list.emplace_back(x, y, z, i);
-        }
-    }
-
-    // Alg 3.1
-    void updateHead() {
-        for (auto &&elem : head) {
-            elem = list.size();
-        }
-        for (std::size_t i = 0; i < list.size(); ++i) {
-            // update cell list
-            Atom2 &atom = list[i];
-
-            std::size_t lambda = box.lambda(atom);
-            atom.next() = head[lambda];
-            head[lambda] = i;
-        }
-    }
-
-    // Rapaport p.18
-    void makeGhosts() {
-        // TODO: could accelerate by only looking for ghosts at edge boxes
-        for (std::size_t i = 0; i < 3; ++i) {
-            // fixed end stops double copies
-            std::size_t end = list.size();
-
-            for (std::size_t j = 0; j < end; ++j) {
-                Atom2 atom = list[j];
-
-                if (atom[i] < box.rcut()) {
-                    list.push_back(atom);
-                    list.back()[i] += box.limits(i).len;
-                }
-
-                if (atom[i] > box.limits(i).len - box.rcut()) {
-                    list.push_back(atom);
-                    list.back()[i] -= box.limits(i).len;
-                }
-            }
-        }
-    }
-
-    // applies f() for every neighbour (closer than rcut)
-    template <typename F>
-    inline void findNeigh(Atom2 const &atom, F const &f) const {
-
-        std::size_t const lambda = box.lambda(atom);
-        std::size_t const end = list.size();
-        double const cut_sq = box.rcut() * box.rcut();
-
-        std::size_t index = head[lambda];
-
-        // in same cell as Atom2
-        do {
-            Atom2 const &neigh = list[index];
-            if (&atom != &neigh) {
-                double dx, dy, dz;
-                double r_sq = box.normSq(neigh, atom, dx, dy, dz);
-                if (r_sq <= cut_sq) {
-                    f(neigh, std::sqrt(r_sq), dx, dy, dz);
-                }
-            }
-            index = neigh.next();
-        } while (index != end);
-
-        // in adjecent cells -- don't need check against self
-        for (auto off : box.getAdjOff()) {
-            index = head[lambda + off];
-            // std::cout << "cell_t " << lambda + off << std::endl;
-            while (index != end) {
-
-                Atom2 const &neigh = list[index];
-                double dx, dy, dz;
-                double r_sq = box.normSq(neigh, atom, dx, dy, dz);
-                if (r_sq <= cut_sq) {
-                    f(neigh, std::sqrt(r_sq), dx, dy, dz);
-                }
-                index = neigh.next();
-            }
-        }
-    }
-
-  public:
     Rdf const &getRdf(std::size_t i) const { return rdfs[i]; };
 
-    std::size_t size() const { return numAtom2s; };
+    std::size_t size() const { return cellList.size(); };
 
     template <typename T> void loadAtoms(T const &x) {
-        fillCellList(x);
-        makeGhosts();
-        updateHead();
+        cellList.fillList(x);
+        cellList.makeGhosts();
+        cellList.updateHead();
 
         rdfs.clear();
 
-        check(numAtom2s * 3 == (std::size_t)x.size(), "wrong num atoms");
+        check(size() * 3 == (std::size_t)x.size(), "wrong num atoms");
 
-        for (auto atom = list.begin(); atom != list.begin() + numAtom2s;
-             ++atom) {
+        for (auto &&atom : cellList) {
 
             Rdf rdf{};
 
-            findNeigh(*atom, [&](auto const &, double r, double, double,
-                                 double) { rdf.add(r / box.rcut()); });
+            cellList.findNeigh(atom, [&](auto const &, double r, double, double,
+                                         double) { rdf.add(r / 6.0); });
 
             rdfs.push_back(rdf);
         }
@@ -289,19 +158,20 @@ class TopoClassify {
         // std::cout << catalog.size() << " topoologies" << std::endl;
     }
 
-    std::vector<Atom2> getNeighList(std::size_t centre) const {
-        check(centre < numAtom2s, "out of bounds");
+    std::vector<Atom> getNeighList(std::size_t centre) const {
+        check(centre < size(), "out of bounds");
 
-        std::vector<Atom2> ns = {list[centre]};
+        std::vector<Atom> ns = {cellList[centre]};
 
-        findNeigh(list[centre], [&](auto const &neigh, double, double, double,
-                                    double) { ns.push_back(neigh); });
+        cellList.findNeigh(cellList[centre],
+                           [&](auto const &neigh, double, double, double,
+                               double) { ns.push_back(neigh); });
 
         return ns;
     }
 
-    std::vector<Atom2> canonicalOrder(std::vector<Atom2> const &ns,
-                                      std::array<std::size_t, 2> *hash) const {
+    std::vector<Atom> canonicalOrder(std::vector<Atom> const &ns,
+                                     std::array<std::size_t, 2> *hash) const {
         NautyGraph graph(ns.size());
 
         for (std::size_t i = 0; i < ns.size(); ++i) {
@@ -321,7 +191,7 @@ class TopoClassify {
             *hash = graph.hash();
         }
 
-        std::vector<Atom2> ordered;
+        std::vector<Atom> ordered;
 
         std::transform(order, order + ns.size(), std::back_inserter(ordered),
                        [&](int o) { return ns[o]; });
@@ -330,7 +200,7 @@ class TopoClassify {
     }
 
     TopoRef classifyTopo(std::size_t idx) const {
-        check(idx < numAtom2s, "out of bounds");
+        check(idx < size(), "out of bounds");
 
         TopoRef topo{
             {},
@@ -339,7 +209,7 @@ class TopoClassify {
             1,
         };
 
-        std::vector<Atom2> ns = getNeighList(idx);
+        std::vector<Atom> ns = getNeighList(idx);
 
         ns = canonicalOrder(ns, &topo.graph_hash);
 
@@ -350,7 +220,7 @@ class TopoClassify {
         Eigen::Vector3d origin = ns[0].pos();
 
         std::transform(ns.begin(), ns.end(), std::back_inserter(topo.ref),
-                       [&](Atom2 const &atom) -> Eigen::Vector3d {
+                       [&](Atom const &atom) -> Eigen::Vector3d {
                            return transform * (atom.pos() - origin);
                        });
 
@@ -358,10 +228,10 @@ class TopoClassify {
     }
 
     bool verify(Vector const &x) {
-        for (std::size_t i = 0; i < numAtom2s; ++i) {
+        for (std::size_t i = 0; i < size(); ++i) {
             auto search = catalog.find(rdfs[i]);
 
-            std::cout << i << ' ' << std::hash<Rdf>{}(rdfs[i]) << std::endl;
+            // std::cout << i << ' ' << std::hash<Rdf>{}(rdfs[i]) << std::endl;
 
             if (search == catalog.end()) {
                 catalog.emplace(std::make_pair(rdfs[i], classifyTopo(i)));
@@ -377,7 +247,7 @@ class TopoClassify {
 
                     // colour near;
                     std::vector<int> col2(x.size() / 3, 0);
-                    std::vector<Atom2> near = getNeighList(i);
+                    std::vector<Atom> near = getNeighList(i);
                     for (std::size_t i = 0; i < near.size(); ++i) {
                         col2[near[i].index()] = 1;
                     }
@@ -422,7 +292,7 @@ class TopoClassify {
         return true;
     }
 
-    Eigen::Matrix3d findBasis(std::vector<Atom2> const &ns) const {
+    Eigen::Matrix3d findBasis(std::vector<Atom> const &ns) const {
 
         Eigen::Vector3d origin = ns[0].pos();
         Eigen::Matrix3d basis;
@@ -480,7 +350,7 @@ class TopoClassify {
         { // find furthest moved
             double dr_sq_max = 0;
 
-            for (std::size_t i = 0; i < numAtom2s; ++i) {
+            for (std::size_t i = 0; i < size(); ++i) {
 
                 Eigen::Vector3d delta{
                     end[3 * i + 0] - init[3 * i + 0],
@@ -499,7 +369,7 @@ class TopoClassify {
             // std::cout << "max move = " << std::sqrt(dr_sq_max) << '\n';
         }
 
-        std::vector<Atom2> near = getNeighList(centre);
+        std::vector<Atom> near = getNeighList(centre);
 
         // std::vector<int> col(init.size() / 3, 0);
         //
@@ -531,7 +401,7 @@ class TopoClassify {
 
         std::transform(
             near.begin(), near.end(), std::back_inserter(reference),
-            [&](Atom2 const &atom) -> Eigen::Vector3d {
+            [&](Atom const &atom) -> Eigen::Vector3d {
                 Eigen::Vector3d delta{
                     end[3 * atom.index() + 0] - init[3 * atom.index() + 0],
                     end[3 * atom.index() + 1] - init[3 * atom.index() + 1],
@@ -552,7 +422,7 @@ class TopoClassify {
 
         Vector end = init;
 
-        std::vector<Atom2> near = getNeighList(centre);
+        std::vector<Atom> near = getNeighList(centre);
 
         check(near.size() == ref.size(), "wrong num atoms in reconstruction");
 

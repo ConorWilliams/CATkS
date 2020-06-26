@@ -126,9 +126,9 @@ double activeToRate(double active_E) {
 }
 
 //
-template <typename T>
+template <typename T, typename K>
 void updateCatalog(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
-                   T const &f, TopoClassify const &cl) {
+                   T const &f, TopoClassify<K> const &cl) {
 
     double f_x = f(x);
 
@@ -163,9 +163,9 @@ void updateCatalog(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
     }
 }
 
-template <typename T>
+template <typename T, typename K>
 void outputAllMechs(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
-                    TopoClassify const &cl, T const &f) {
+                    TopoClassify<K> const &cl, T const &f) {
 
     std::unordered_set<Rdf> done{};
 
@@ -204,7 +204,7 @@ struct LocalisedMech {
 
 int main() {
 
-    Vector init(len * len * len * 3 * 2 - 6);
+    Vector init(len * len * len * 3 * 2 - 3);
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -215,8 +215,8 @@ int main() {
         for (int j = 0; j < len; ++j) {
             for (int k = 0; k < len; ++k) {
 
-                if ((i == 1 && j == 1 && k == 1) ||
-                    (i == 4 && j == 1 && k == 1)) {
+                if ((i == 1 && j == 1 && k == 1) /*||
+                    (i == 4 && j == 1 && k == 1)*/) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
                     init[3 * cell + 1] = (j + 0.5) * LAT;
                     init[3 * cell + 2] = (k + 0.5) * LAT;
@@ -244,6 +244,14 @@ int main() {
     // init[init.size() - 2] = LAT;
     // init[init.size() - 1] = 0.5 * LAT;
 
+    TabEAM data = parseTabEAM("/home/cdt1902/dis/CATkS/data/PotentialA.fs");
+
+    Box box{
+        data.rCut, 0, len * LAT, 0, len * LAT, 0, len * LAT,
+    };
+
+    TopoClassify classifyer{box, kinds};
+
     FuncEAM f{
         "/home/cdt1902/dis/CATkS/data/PotentialA.fs",
         kinds,
@@ -262,8 +270,6 @@ int main() {
     min.findMin(init);
 
     std::unordered_map<Rdf, Topology> catalog = readMap("dump");
-
-    TopoClassify classifyer(init.size() / 3, f.getBox());
 
     double time = 0;
 
@@ -308,7 +314,7 @@ int main() {
     //
     // ////////////////////////////////////////////////////
 
-    for (int anon = 0; anon < 50; ++anon) {
+    for (int anon = 0; anon < 5; ++anon) {
 
         // if (anon == 0) {
         //     outputAllMechs(catalog, init, f);
