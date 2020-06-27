@@ -102,10 +102,14 @@ template <typename Atom_t> void makeFirstOrigin(std::vector<Atom_t> &ordered) {
     return;
 }
 
-struct NautyCanon {
-    using Key_t = NautyGraph;
+class NautyCanon {
+  private:
+    enum : bool { colour = false, plain = true };
 
     static constexpr double BOND_DISTANCE = 2.55; // 2.47 -- 2.86 angstrom
+
+  public:
+    using Key_t = NautyGraph;
 
     // NOT thread safe.
     // Writes canonically ordered atoms to order and returns the canonically
@@ -137,7 +141,7 @@ struct NautyCanon {
         nauty_check(WORDSIZE, m, n, NAUTYVERSIONID);
 
         //// order by colour
-        options.defaultptn = false; // false for coloured graphs
+        options.defaultptn = colour;
 
         std::sort(atoms.begin(), atoms.end(),
                   [](Atom_t const &a, Atom_t const &b) {
