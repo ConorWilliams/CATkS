@@ -315,6 +315,8 @@ template <typename Canon> class TopoClassify {
         std::cout << "Found: " << count_new << '/' << size()
                   << " new topologies" << std::endl;
 
+        std::cout << "All topos verified!" << std::endl;
+
         return true;
     }
 

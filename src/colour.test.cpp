@@ -185,8 +185,6 @@ int main() {
 
         classifyer.verify();
 
-        std::cout << "All topos verified!" << std::endl;
-
         catalog.update(init, f, classifyer,
                        [&box](Eigen::Vector3d dr) { return box.minImage(dr); });
 

@@ -188,34 +188,41 @@ template <typename Canon> class Catalog {
     template <typename F, typename C, typename MinImage>
     void update(Vector const &x, F const &f, C const &cl, MinImage const &mi) {
 
-        double f_x = f(x);
+        using result_t = std::vector<std::tuple<Vector, Vector>>;
+
+        std::vector<result_t> searches;
 
         for (std::size_t i = 0; i < cl.size(); ++i) {
 
             catalog[cl[i]].count += 1; // default constructs new
 
+            constexpr std::size_t sp_trys = 5;
+
             while (catalog[cl[i]].sp_searches < 25 ||
                    catalog[cl[i]].sp_searches <
                        std::sqrt(catalog[cl[i]].count)) {
 
-                catalog[cl[i]].sp_searches += 1;
+                catalog[cl[i]].sp_searches += sp_trys;
 
                 std::cout << "@ " << i << '/' << cl.size()
                           << " dimer launch ... " << std::flush;
 
-                auto [err, sp, end] = findSaddle(x, i, f, mi);
+                searches.push_back(findSaddle(sp_trys, x, i, f, mi));
 
-                if (!err) {
-                    std::cout << "success!" << std::endl;
+                std::cout << searches.back().size() << " successful!"
+                          << std::endl;
+            }
+        }
 
-                    auto [centre, ref] = cl.classifyMech(end);
+        double f_x = f(x);
 
-                    catalog[cl[centre]].pushMech(f(sp) - f_x, f(end) - f_x,
-                                                 std::move(ref));
+        for (auto &&vec : searches) {
+            for (auto &&[sp, end] : vec) {
 
-                } else {
-                    std::cout << "err:" << err << std::endl;
-                }
+                auto [centre, ref] = cl.classifyMech(end);
+
+                catalog[cl[centre]].pushMech(f(sp) - f_x, f(end) - f_x,
+                                             std::move(ref));
             }
         }
     }
