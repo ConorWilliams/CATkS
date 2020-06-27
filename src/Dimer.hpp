@@ -4,12 +4,16 @@
 #include <cmath>
 #include <iostream>
 #include <random>
+#include <tuple>
 #include <utility>
 
+#include "pcg_random.hpp"
+
+#include "DumpXYX.hpp"
 #include "Eigen/Core"
 #include "L_BFGS.hpp"
+#include "Minimise.hpp"
 #include "utils.hpp"
-#include <DumpXYX.hpp>
 
 template <typename F, typename P> class Dimer {
     static constexpr int IR_MAX = 15;
@@ -254,3 +258,100 @@ template <typename F, typename P> class Dimer {
         return false;
     }
 };
+
+// controls displacement along mm at saddle
+inline constexpr double NUDGE = 0.1;
+// tollerence for 3N vectors to be considered the same vector
+inline constexpr double TOL_NEAR = 0.1;
+
+constexpr double G_SPHERE = 4;
+constexpr double G_AMP = 0.325;
+
+// init is a minimised (unporturbed) vector of atoms
+// idx is centre of displacemnet
+// f is their force object
+template <typename F, typename MinImage>
+std::tuple<int, Vector, Vector> findSaddle(Vector const &init, std::size_t idx,
+                                           F const &f, MinImage const &mi) {
+    Vector sp = init;
+    Vector ax = Vector::Zero(init.size());
+
+    // random pertabations
+
+    // Seed with a real random value, if available
+    pcg_extras::seed_seq_from<std::random_device> seed_source;
+    pcg64 rng(seed_source);
+    std::normal_distribution<> gauss_dist(0, G_AMP);
+
+    // std::vector<int> col(init.size() / 3, 0);
+
+    for (int i = 0; i < init.size(); i = i + 3) {
+
+        Eigen::Vector3d delta{
+            init[idx * 3 + 0] - init[i + 0],
+            init[idx * 3 + 1] - init[i + 1],
+            init[idx * 3 + 2] - init[i + 2],
+        };
+
+        double dist = mi(delta).squaredNorm();
+
+        if (dist < G_SPHERE * G_SPHERE) {
+            sp[i + 0] += gauss_dist(rng);
+            sp[i + 1] += gauss_dist(rng);
+            sp[i + 2] += gauss_dist(rng);
+
+            ax[i + 0] = gauss_dist(rng);
+            ax[i + 1] = gauss_dist(rng);
+            ax[i + 2] = gauss_dist(rng);
+
+            // col[i / 3] = 1;
+        }
+    }
+
+    // ax.matrix().normalize(); // not strictly nessaserry, done in ctr
+
+    // output(sp, col); // tmp
+
+    Dimer dimer{f, sp, ax, [&]() { /*output(sp, col); */ }};
+
+    if (!dimer.findSaddle()) {
+        // failed SP search
+        return {1, Vector{}, Vector{}};
+    }
+
+    Vector old = sp + ax * NUDGE;
+    Vector end = sp - ax * NUDGE;
+
+    Minimise min{f, f, init.size()};
+
+    if (!min.findMin(old) || !min.findMin(end)) {
+        // failed minimisation
+        return {2, Vector{}, Vector{}};
+    }
+
+    double distOld = dot(old - init, old - init);
+    double distFwd = dot(end - init, end - init);
+
+    // want old to be init
+    if (distOld > distFwd) {
+        using std::swap;
+        swap(old, end);
+        swap(distOld, distFwd);
+    }
+
+    if (distOld > TOL_NEAR) {
+        // disconnected SP
+        // std::cout << distOld << std::endl;
+        // std::cout << distFwd << std::endl;
+        return {3, Vector{}, Vector{}};
+    }
+
+    if (dot(end - old, end - old) < TOL_NEAR) {
+        // minimasations both converged to init
+        return {4, Vector{}, Vector{}};
+    }
+
+    // output(end, col); // tmp
+
+    return {0, std::move(sp), std::move(end)};
+}

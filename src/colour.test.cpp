@@ -6,126 +6,14 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
-#include <random>
-#include <tuple>
-#include <unordered_map>
-#include <unordered_set>
 
-#include <future>
-#include <thread>
-
-#include "pcg_random.hpp"
-
-#include "utils.hpp"
-
+#include "Catalog.hpp"
 #include "Dimer.hpp"
-#include "Forces.hpp"
-#include "Minimise.hpp"
-
-#include "Classes.hpp"
-#include "Colour.hpp"
 #include "DumpXYX.hpp"
-#include "Rdf.hpp"
-
-// controls displacement along mm at saddle
-inline constexpr double NUDGE = 0.1;
-// tollerence for 3N vectors to be considered the same vector
-inline constexpr double TOL_NEAR = 0.1;
-
-constexpr double G_SPHERE = 4;
-constexpr double G_AMP = 0.325;
-
-// init is a minimised (unporturbed) vector of atoms
-// idx is centre of displacemnet
-// num is number of atempts
-// f is their force object
-template <typename T>
-std::vector<std::pair<Vector, Vector>>
-findSaddle(Vector const &init, std::size_t idx, std::size_t num, T const &f) {
-
-    // Centre atom coordinates
-    double x = init[idx * 3 + 0];
-    double y = init[idx * 3 + 1];
-    double z = init[idx * 3 + 2];
-
-    // Seed with a real random value, if available
-    pcg_extras::seed_seq_from<std::random_device> seed_source;
-    pcg64 rng(seed_source);
-    std::normal_distribution<> gauss_dist(0, G_AMP);
-
-    Vector sp{init.size()};
-    Vector ax{init.size()};
-
-    Dimer dimer{f, sp, ax, [&]() { /*output(sp, col); */ }};
-
-    Minimise min{f, f, init.size()};
-
-    std::vector<std::pair<Vector, Vector>> saddle_points;
-
-    for (std::size_t anon = 0; anon < num; ++anon) {
-        for (int i = 0; i < init.size(); i = i + 3) {
-            double dist = f.periodicNormSq(x, y, z, init[i + 0], init[i + 1],
-                                           init[i + 2]);
-
-            if (dist < G_SPHERE * G_SPHERE) {
-                sp[i + 0] = init[i + 0] + gauss_dist(rng);
-                sp[i + 1] = init[i + 1] + gauss_dist(rng);
-                sp[i + 2] = init[i + 2] + gauss_dist(rng);
-
-                ax[i + 0] = gauss_dist(rng);
-                ax[i + 1] = gauss_dist(rng);
-                ax[i + 2] = gauss_dist(rng);
-            } else {
-                sp[i + 0] = init[i + 0];
-                sp[i + 1] = init[i + 1];
-                sp[i + 2] = init[i + 2];
-
-                ax[i + 0] = 0;
-                ax[i + 1] = 0;
-                ax[i + 2] = 0;
-            }
-        }
-
-        ax.matrix().normalize();
-
-        if (!dimer.findSaddle()) {
-            // failed SP search
-            continue;
-        }
-
-        Vector old = sp + ax * NUDGE;
-        Vector end = sp - ax * NUDGE;
-
-        if (!min.findMin(old) || !min.findMin(end)) {
-            // failed minimisation
-            continue;
-        }
-
-        double distOld = dot(old - init, old - init);
-        double distFwd = dot(end - init, end - init);
-
-        // want old to be init
-        if (distOld > distFwd) {
-            using std::swap;
-            swap(old, end);
-            swap(distOld, distFwd);
-        }
-
-        if (distOld > TOL_NEAR) {
-            // disconnected SP
-            continue;
-        }
-
-        if (dot(end - old, end - old) < TOL_NEAR) {
-            // minimasations both converged to init
-            continue;
-        }
-
-        saddle_points.emplace_back(sp, end);
-    }
-
-    return saddle_points;
-}
+#include "Forces.hpp"
+#include "NautyFunc.hpp"
+#include "Topo.hpp"
+#include "utils.hpp"
 
 inline constexpr double ARRHENIUS_PRE = 1e13;
 inline constexpr double KB_T = 8.617333262145 * 1e-5 * 500; // eV K^-1
@@ -139,103 +27,31 @@ double activeToRate(double active_E) {
     return ARRHENIUS_PRE * std::exp(-active_E * INV_KB_T);
 }
 
+// template <typename T, typename K>
+// void outputAllMechs(
+//     std::unordered_map<typename NautyCanon::Key_t, Topology> &catalog,
+//     Vector const &x, K const &cl, T const &f) {
 //
-template <typename T>
-auto updateCatalog(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
-                   T const &f) {
-
-    std::vector<Rdf> topos = f.colourAll(x);
-
-    using sp_vec_t = std::vector<std::pair<Vector, Vector>>;
-
-    std::vector<std::future<sp_vec_t>> saddle_points;
-
-    for (std::size_t i = 0; i < topos.size(); ++i) {
-
-        if (catalog.find(topos[i]) == catalog.end()) {
-            std::cout << "NEW TOPO" << std::endl;
-        }
-
-        catalog[topos[i]].count += 1;
-
-        if (topos[i].to_string() ==
-            "rdf.0.0.0.0.0.0.0.0.0.0.0.0.0.7.3.3.0.0.0.0."
-            "3.9.0.0.6.19.7.0.0.0.6.0.json") {
-            std::cout << std::hash<Rdf>{}(topos[i]) << std::endl;
-
-            std::vector<std::size_t> col;
-
-            std::transform(topos.begin(), topos.end(), std::back_inserter(col),
-                           std::hash<Rdf>{});
-
-            output(x, col);
-        }
-
-        std::size_t count = catalog[topos[i]].count;
-
-        constexpr std::size_t try_n = 5;
-
-        while (catalog[topos[i]].sp_searches < 50 ||
-               catalog[topos[i]].sp_searches < std::sqrt(count)) {
-
-            catalog[topos[i]].sp_searches += try_n;
-
-            std::cout << "@ " << i << " Dimer launch ... " << std::flush;
-
-            auto findSaddleHelp = [=, &x]() -> sp_vec_t {
-                return findSaddle(x, i, try_n, f);
-            };
-
-            saddle_points.emplace_back(
-                std::async(std::launch::async, findSaddleHelp));
-
-            // saddle_points.emplace_back(findSaddle(x, i, try_n, f));
-
-            std::cout << "found " << saddle_points.size() << std::endl;
-        }
-    }
-
-    for (auto &&sp_vec : saddle_points) {
-
-        for (auto &&[sp, end] : sp_vec.get()) {
-
-            auto [centre, ref] = classifyMech(x, end, f);
-
-            catalog[topos[centre]].pushMech(f(sp) - f(x), f(end) - f(x),
-                                            std::move(ref));
-        }
-    }
-
-    return topos;
-}
-
-template <typename T>
-void outputAllMechs(std::unordered_map<Rdf, Topology> &catalog, Vector const &x,
-                    T const &f) {
-    std::vector<Rdf> topos = f.colourAll(x);
-
-    std::unordered_set<Rdf> done{};
-
-    std::cout << "writing all mechanisms" << std::endl;
-
-    output(x);
-
-    for (std::size_t i = 0; i < topos.size(); ++i) {
-        if (done.count(topos[i]) == 0) {
-            done.insert(topos[i]);
-
-            std::cout << topos[i].to_string() << std::endl;
-            std::cout << std::hash<Rdf>{}(topos[i]) << std::endl;
-
-            for (auto &&m : catalog[topos[i]].getMechs()) {
-                std::cout << FRAME << ' ' << m.active_E << ' ' << m.delta_E
-                          << std::endl;
-                Vector tmp = reconstruct(x, i, m.ref, f);
-                output(tmp, f.quasiColourAll(tmp));
-            }
-        }
-    }
-}
+//     std::unordered_set<typename NautyCanon::Key_t> done{};
+//
+//     std::cout << "writing all mechanisms" << std::endl;
+//
+//     output(x);
+//
+//     for (std::size_t i = 0; i < cl.size(); ++i) {
+//         if (done.count(cl.getRdf(i)) == 0) {
+//             done.insert(cl.getRdf(i));
+//
+//             for (auto &&m : catalog[cl.getRdf(i)].getMechs()) {
+//                 std::cout << FRAME << ' ' << m.active_E << ' ' << m.delta_E
+//                           << std::endl;
+//                 Vector recon = cl.reconstruct(i, m.ref);
+//
+//                 output(recon, f.quasiColourAll(recon));
+//             }
+//         }
+//     }
+// }
 
 enum : uint8_t { Fe = 0, H = 1 };
 constexpr double LAT = 2.855700;
@@ -293,30 +109,66 @@ int main() {
     // init[init.size() - 2] = LAT;
     // init[init.size() - 1] = 0.5 * LAT;
 
-    FuncEAM f{
-        "/home/cdt1902/dis/CATkS/data/PotentialA.fs",
-        kinds,
-        0,
-        len * LAT,
-        0,
-        len * LAT,
-        0,
-        len * LAT,
+    TabEAM data = parseTabEAM("/home/cdt1902/dis/CATkS/data/PotentialA.fs");
+
+    Box box{
+        data.rCut, 0, len * LAT, 0, len * LAT, 0, len * LAT,
     };
 
-    f.sort(init);
+    TopoClassify<NautyCanon> classifyer{box, kinds};
+
+    FuncEAM f{box, kinds, data};
+
+    Catalog<NautyCanon> catalog;
+
+    // f.sort(init);
 
     Minimise min{f, f, init.size()};
 
     min.findMin(init);
-
-    std::unordered_map<Rdf, Topology> catalog = readMap("dump");
 
     double time = 0;
 
     pcg_extras::seed_seq_from<std::random_device> seed_source;
     pcg64 rng(seed_source);
     std::uniform_real_distribution<> uniform_dist(0, 1);
+
+    // //////////////////OLD Reconstruct test////////////////////////////
+    //
+    // classifyer.loadAtoms(init);
+    //
+    // classifyer.verify(init);
+    //
+    // std::cout << "loaded" << std::endl;
+    //
+    // output(init);
+    //
+    // while (true) {
+    //     auto [err, sp, end] = findSaddle(init, 12, f);
+    //
+    //     if (!err) {
+    //         output(end);
+    //
+    //         auto [centre, ref] = classifyer.classifyMech(init, end);
+    //
+    //         std::cout << "\nCentre was " << centre << std::endl;
+    //
+    //         Vector recon = classifyer.reconstruct(init, 12, ref);
+    //
+    //         std::cout << f(end) - f(init) << std::endl;
+    //         std::cout << f(recon) - f(init) << std::endl;
+    //
+    //         output(recon);const T &f
+    //
+    //         min.findMin(recon);
+    //
+    //         output(recon);
+    //
+    //         return 0;
+    //     }
+    // }
+    //
+    // ////////////////////////////////////////////////////
 
     for (int anon = 0; anon < 50; ++anon) {
 
@@ -327,11 +179,21 @@ int main() {
 
         output(init, f.quasiColourAll(init));
 
-        std::vector<Rdf> topos = updateCatalog(catalog, init, f);
+        classifyer.analyzeTopology(init);
 
-        outputAllMechs(catalog, init, f);
+        // classifyer.colourPrint();
 
-        writeMap("dump", catalog);
+        classifyer.verify();
+
+        std::cout << "All topos verified!" << std::endl;
+
+        catalog.update(init, f, classifyer,
+                       [&box](Eigen::Vector3d dr) { return box.minImage(dr); });
+
+        classifyer.write();
+        catalog.write();
+
+        //    outputAllMechs(catalog, init, classifyer, f);
 
         // outputAllMechs(catalog, init, f);
 
@@ -341,8 +203,8 @@ int main() {
 
         std::vector<LocalisedMech> possible{};
 
-        for (std::size_t i = 0; i < topos.size(); ++i) {
-            for (auto &&m : catalog[topos[i]].getMechs()) {
+        for (std::size_t i = 0; i < classifyer.size(); ++i) {
+            for (auto &&m : catalog[classifyer[i]]) {
                 possible.push_back(
                     {i, activeToRate(m.active_E), m.ref, m.delta_E});
             }
@@ -367,46 +229,23 @@ int main() {
 
         time += -std::log(uniform_dist(rng)) / rate_sum;
 
-        Vector next = reconstruct(init, choice.atom, choice.ref, f);
+        double f_x = f(init);
 
-        double delta = f(next) - f(init);
+        init = classifyer.reconstruct(choice.atom, choice.ref);
 
-        std::cout << "goal: " << choice.delta_E << " recon:" << delta
-                  << std::endl;
+        double recon = f(init) - f_x;
 
-        check(std::abs(choice.delta_E - delta) < 0.1, "reconstruct fail");
+        min.findMin(init);
 
-        min.findMin(next);
+        double relax = f(init) - f_x;
 
-        init = next;
+        std::cout << "Memory: " << choice.delta_E << " Recon: " << recon
+                  << " Relaxed: " << relax << std::endl;
+
+        check(std::abs(recon - choice.delta_E) < 0.1, "recon err");
 
         std::cout << "TIME: " << time << std::endl;
 
         // f.sort(init);
-
-        ////////////////////OLD Reconstruct test////////////////////////////
-
-        // auto [err, sp, end] = findSaddle(init, 12, f);
-        //
-        // if (!err) {
-        //     output(end);
-        //
-        //     auto [centre, ref] = classifyMech(init, end, f);
-        //
-        //     std::cout << "\nCentre was " << centre << std::endl;
-        //
-        //     Vector recon = reconstruct(init, 12, ref, f);
-        //
-        //     std::cout << f(end) - f(init) << std::endl;
-        //     std::cout << f(recon) - f(init) << std::endl;
-        //
-        //     min.findMin(recon);
-        //
-        //     output(recon);
-        //
-        //     return 0;
-        // }
-
-        //////////////////////////////////////////////////////
     }
 }

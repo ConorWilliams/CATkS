@@ -10,56 +10,13 @@
 #include <utility>
 #include <vector>
 
-#include "utils.hpp"
-
 #include "DumpXYX.hpp"
-
-bool are_close(double a, double b, double tol = 0.04) {
-    double dif = std::abs(a - b);
-    double avg = 0.5 * (a + b);
-    return dif / avg < tol ? true : false;
-}
+#include "Nauty.hpp"
+#include "utils.hpp"
 
 struct AtomPlus {
     Eigen::Vector3d pos{0, 0, 0};
     long idx{};
-    std::vector<double> mem{};
-
-    friend inline bool operator==(AtomPlus const &a, AtomPlus const &b) {
-        if (a.mem.size() != b.mem.size()) {
-            return false;
-        }
-
-        for (std::size_t i = 0; i < a.mem.size(); ++i) {
-            std::size_t j = a.mem.size() - 1 - i;
-            if (!are_close(a.mem[j], b.mem[j])) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    friend inline bool operator<(AtomPlus const &a, AtomPlus const &b) {
-
-        check(a.mem.size() == b.mem.size(), "comparing diff lengths");
-
-        if (a.mem.size() < b.mem.size()) {
-            return true;
-        } else if (a.mem.size() > b.mem.size()) {
-            return false;
-        }
-
-        for (std::size_t i = 0; i < a.mem.size(); ++i) {
-            std::size_t j = a.mem.size() - 1 - i;
-            if (!are_close(a.mem[j], b.mem[j])) {
-                return a.mem[j] < b.mem[j];
-            }
-        }
-
-        // equal is not less!
-        return false;
-    }
 };
 
 // Build a list of atoms near atom at index centre in x.
@@ -76,91 +33,12 @@ std::vector<AtomPlus> findNeighAtoms(Vector const &x, std::size_t centre,
         double dist_sq =
             f.periodicNormSq(cx, cy, cz, x[i + 0], x[i + 1], x[i + 2]);
 
-        if (dist_sq < 3 * 3) {
+        if (dist_sq < f.rcut() * f.rcut()) {
             neigh.push_back({{x[i + 0], x[i + 1], x[i + 2]}, i / 3});
         }
     }
 
     return neigh;
-}
-
-template <typename It> It firstUnique(It begin, It end) {
-
-    auto start = begin;
-    auto probe = begin;
-
-    while (start != end) {
-        if (probe != end && *start == *probe) {
-            ++probe;
-        } else {
-            if (std::next(start) == probe) {
-                return start;
-            } else {
-                start = probe;
-            }
-        }
-    }
-
-    return end;
-}
-
-// sorts a list of AtomPluss into a canonicle ordering in O(n^3 ln n)
-template <typename T>
-void canonicalOrder(std::vector<AtomPlus> &list, T const &f) {
-    //
-    for (auto &&atom : list) {
-        for (auto const &other : list) {
-            if (&atom != &other) {
-                atom.mem.push_back(f.minImage(atom.pos - other.pos).norm());
-            }
-        }
-        std::sort(atom.mem.begin(), atom.mem.end());
-    }
-
-    // O(n)
-    for (auto it = list.begin(); it != list.end(); ++it) {
-        // O(n log n) comparisons at O(n) per comparison = O(n^2 ln n)
-        std::sort(it, list.end());
-
-        std::cout << "\nSTART" << std::endl;
-
-        for (auto &&atom : list) {
-            for (auto &&r : atom.mem) {
-                std::cout << r << ' ';
-            }
-            std::cout << std::endl;
-        }
-
-        if (auto pivot = firstUnique(it, list.end()); pivot != list.end()) {
-            std::cout << "Pivot: " << pivot - list.begin() << std::endl;
-            std::iter_swap(it, pivot);
-        }
-
-        for (auto rem = std::next(it); rem != list.end(); ++rem) {
-            rem->mem.push_back(f.minImage(rem->pos - it->pos).norm());
-        }
-    }
-}
-
-// sorts a list of AtomPluss into a canonicle ordering in O(n^2 ln n)
-template <typename T>
-void canonicalOrder2(std::vector<AtomPlus> &list, T const &f) {
-    // Compute sums for each atom
-    for (auto &&atom : list) {
-        for (auto &&other : list) {
-            atom.mem.push_back(f.minImage(atom.pos - other.pos).squaredNorm());
-        }
-        std::sort(atom.mem.begin(), atom.mem.end());
-    }
-
-    for (auto it = list.begin(); it != list.end(); ++it) {
-
-        std::iter_swap(it, std::min_element(it, list.end()));
-
-        for (auto rem = std::next(it); rem != list.end(); ++rem) {
-            rem->mem.push_back(f.minImage(rem->pos - it->pos).squaredNorm());
-        }
-    }
 }
 
 Eigen::Matrix3d modifiedGramSchmidt(Eigen::Matrix3d const &in) {
@@ -200,7 +78,7 @@ Eigen::Matrix3d findBasis(std::vector<AtomPlus> const &list, T const &f) {
 
     basis.col(0) = f.minImage(list[1].pos - origin).normalized();
 
-    std::cout << "e1 @ 0->" << 1 << std::endl;
+    std::cout << "e0 @ 0->" << 1 << std::endl;
 
     std::size_t index_e1 = [&]() {
         for (std::size_t i = 2; i < list.size(); ++i) {
@@ -240,6 +118,58 @@ Eigen::Matrix3d findBasis(std::vector<AtomPlus> const &list, T const &f) {
     return modifiedGramSchmidt(basis);
 }
 
+inline constexpr double BOND_DISTANCE = 2.66; // angstrom
+
+template <typename T>
+std::vector<AtomPlus> canonicalOrder(std::vector<AtomPlus> const &list,
+                                     T const &f) {
+    NautyGraph graph(list.size());
+
+    for (std::size_t i = 0; i < list.size(); ++i) {
+        // int sum = 0;
+        for (std::size_t j = 0; j < list.size(); ++j) {
+            double sqdist = f.minImage(list[i].pos - list[j].pos).squaredNorm();
+            if (i != j && sqdist < BOND_DISTANCE * BOND_DISTANCE) {
+                graph.addEdge(i, j);
+                //++sum;
+            }
+        }
+        // std::cout << sum << ' ';
+    }
+
+    // std::cout << '\n';
+    //
+    // graph.print();
+
+    int const *order = graph.getCanonical();
+
+    // std::cout << '\n';
+    //
+    // graph.printCanon();
+    //
+    // for (unsigned i = 0; i < list.size(); ++i) {
+    //     std::cout << order[i] << ' ';
+    // }
+    //
+    // std::cout << '\n';
+
+    {
+        auto h = graph.hash();
+        std::cout << "Hash: " << h[0] << h[1] << '\n';
+    }
+
+    std::vector<AtomPlus> ordered;
+
+    std::transform(order, order + list.size(), std::back_inserter(ordered),
+                   [&](int o) { return list[o]; });
+
+    // for (std::size_t i = 0; i < list.size(); ++i) {
+    //     ordered.push_back(list[order[i]]);
+    // }
+
+    return ordered;
+}
+
 // Returns the index of the central atom for the mechanisim as well as the
 // reference data to reconstruct mechanisim.
 template <typename T>
@@ -272,11 +202,12 @@ classifyMech(Vector const &init, Vector const &end, T const &f) {
 
     //////// find canonical-ordering ///////////
 
-    canonicalOrder(near, f);
+    near = canonicalOrder(near, f);
 
     // for (std::size_t i = 0; i < near.size(); ++i) {
-    //     col[near[i].idx] = i + 1;
+    //     col[near[i].idx] = i;
     // }
+    //
     // output(init, col);
 
     ///////////// get basis vectors /////////////
@@ -311,7 +242,7 @@ Vector reconstruct(Vector const &init, std::size_t centre,
 
     check(near.size() == ref.size(), "wrong num atoms in reconstruction");
 
-    canonicalOrder(near, f);
+    near = canonicalOrder(near, f);
 
     // std::vector<int> col(init.size() / 3, 0);
     // for (std::size_t i = 0; i < near.size(); ++i) {
@@ -336,8 +267,6 @@ Vector reconstruct(Vector const &init, std::size_t centre,
     return end;
 }
 
-// Returns the index of the central atom for the mechanisim as well as the
-// reference data to reconstruct mechanisim.
 template <typename T>
 std::vector<Eigen::Vector3d> classifyTopo(Vector const &x, std::size_t idx,
                                           T const &f) {
@@ -352,11 +281,12 @@ std::vector<Eigen::Vector3d> classifyTopo(Vector const &x, std::size_t idx,
 
     //////// find canonical-ordering ///////////
 
-    canonicalOrder(near, f);
+    near = canonicalOrder(near, f);
 
     for (std::size_t i = 0; i < near.size(); ++i) {
-        col[near[i].idx] = i + 1;
+        col[near[i].idx] = i;
     }
+    col[near[0].idx] = 99;
     output(x, col);
 
     ///////////// get basis vectors /////////////
@@ -370,7 +300,6 @@ std::vector<Eigen::Vector3d> classifyTopo(Vector const &x, std::size_t idx,
     std::transform(near.begin(), near.end(), std::back_inserter(reference),
                    [&](AtomPlus const &atom) -> Eigen::Vector3d {
                        Eigen::Vector3d delta = atom.pos - origin;
-
                        return transform.transpose() * f.minImage(delta);
                    });
 

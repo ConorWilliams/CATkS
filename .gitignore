@@ -1,4 +1,5 @@
 # Custom
+external/nauty27r1/*
 build/*
 plt/dump/*
 *compile_commands.json
