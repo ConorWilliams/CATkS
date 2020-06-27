@@ -30,8 +30,6 @@ inline auto dot(Tl const &v1, Tr const &v2) {
     return (v1 * v2).sum();
 }
 
-template <typename T> inline auto abs(T x) { return std::abs(x); }
-
 template <typename InputIt, typename Container, typename UnaryOperation>
 Container transform_into(InputIt first, InputIt last, Container &&container,
                          UnaryOperation &&unary_op) {

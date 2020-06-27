@@ -10,31 +10,35 @@
 // Helper class to derive atoms from for use in cellList
 class AtomBase {
   private:
+    int k;
     Eigen::Vector3d r;
     std::size_t n;
 
   public:
-    AtomBase(double x, double y, double z) : r{x, y, z}, n{} {}
+    AtomBase(int k, double x, double y, double z) : k{k}, r{x, y, z}, n{} {}
+    AtomBase() = default;
 
     inline std::size_t &next() { return n; }
     inline std::size_t next() const { return n; }
 
     inline Eigen::Vector3d const &pos() const { return r; }
 
+    inline int const &kind() const { return k; }
+
     inline double &operator[](std::size_t i) { return r[i]; }
     inline double const &operator[](std::size_t i) const { return r[i]; }
 };
 
-template <typename Atom_t, typename Kind_t> class CellList {
+template <typename Atom_t> class CellList {
   private:
     Box const &box;
-    Kind_t const &kinds;
+    std::vector<int> const &kinds;
 
     Eigen::Array<std::size_t, Eigen::Dynamic, 1> head;
     std::vector<Atom_t> list;
 
   public:
-    CellList(Box const &box, Kind_t const &kinds)
+    CellList(Box const &box, std::vector<int> const &kinds)
         : box{box}, kinds{kinds}, head(box.numCells()) {
 
         static_assert(std::is_trivially_destructible_v<Atom_t>,
@@ -54,6 +58,8 @@ template <typename Atom_t, typename Kind_t> class CellList {
 
     inline Atom_t &operator[](std::size_t i) { return list[i]; }
     inline Atom_t const &operator[](std::size_t i) const { return list[i]; }
+
+    inline void clearGhosts() { list.resize(kinds.size()); }
 
     template <typename T> void fillList(T const &x3n) {
         check(static_cast<std::size_t>(x3n.size()) == 3 * kinds.size(),

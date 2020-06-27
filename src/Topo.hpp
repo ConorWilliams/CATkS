@@ -9,74 +9,12 @@
 #include <type_traits>
 #include <vector>
 
+#include "nlohmann/json.hpp"
+
 #include "Box.hpp"
 #include "Cell.hpp"
 #include "DumpXYX.hpp"
-#include "NautyFunc.hpp"
 #include "utils.hpp"
-
-inline constexpr double RCUT = 6; // angstrom
-
-struct TopoRef {
-    std::array<std::size_t, 2> hash;
-
-    std::size_t count = 1;
-    std::vector<Eigen::Vector3d> ref{};
-
-    bool operator==(TopoRef const &other) const {
-        if (ref.size() != other.ref.size()) {
-            return false;
-        }
-        if (hash != other.hash) {
-            return false;
-        }
-
-        for (std::size_t i = 0; i < ref.size(); ++i) {
-            Eigen::Array3d dif = ref[i] - other.ref[i];
-            // double tol = 0.7 / RCUT * (ref[i] - ref[0]).norm();
-
-            // std::cout << (ref[i] - ref[0]).norm() << ' ' << tol << "\n";
-
-            if ((dif.abs() > 0.1).any()) {
-
-                std::cout << i << ' ' << ref[i].transpose() << std::endl;
-                std::cout << i << ' ' << other.ref[i].transpose() << std::endl;
-
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    TopoRef &operator+=(TopoRef const &other) {
-        check(hash == other.hash, "cant add disimilar");
-
-        double total = count + other.count;
-
-        for (std::size_t i = 0; i < ref.size(); ++i) {
-            ref[i] = (ref[i] * count + other.ref[i] * other.count) / total;
-        }
-
-        count = total;
-
-        return *this;
-    }
-
-    friend void to_json(nlohmann::json &j, TopoRef const &topo) {
-        j = nlohmann::json{
-            {"ref", topo.ref},
-            {"hash", topo.hash},
-            {"count", topo.count},
-        };
-    }
-
-    friend void from_json(nlohmann::json const &j, TopoRef &topo) {
-        j.at("ref").get_to(topo.ref);
-        j.at("hash").get_to(topo.hash);
-        j.at("count").get_to(topo.count);
-    }
-};
 
 Eigen::Matrix3d modifiedGramSchmidt(Eigen::Matrix3d const &in) {
     Eigen::Matrix3d out;
@@ -149,41 +87,124 @@ template <typename T> Eigen::Matrix3d findBasis(std::vector<T> const &ns) {
     return modifiedGramSchmidt(basis);
 }
 
-template <typename Kind_t> class TopoClassify {
+template <typename Canon> class TopoClassify {
   private:
+    struct Topo {
+        std::array<std::size_t, 2> hash;
+
+        std::size_t count = 1;
+        std::vector<Eigen::Vector3d> ref{};
+
+        bool operator==(Topo const &other) const {
+            if (ref.size() != other.ref.size()) {
+                return false;
+            }
+            if (hash != other.hash) {
+                return false;
+            }
+
+            for (std::size_t i = 0; i < ref.size(); ++i) {
+                Eigen::Array3d dif = ref[i] - other.ref[i];
+                // double tol = 0.7 / RCUT * (ref[i] - ref[0]).norm();
+
+                // std::cout << (ref[i] - ref[0]).norm() << ' ' << tol << "\n";
+
+                if ((dif.abs() > 0.25).any()) {
+
+                    std::cout << i << ' ' << ref[i].transpose() << std::endl;
+                    std::cout << i << ' ' << other.ref[i].transpose()
+                              << std::endl;
+
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        Topo &operator+=(Topo const &other) {
+            check(hash == other.hash, "cant add disimilar");
+
+            double total = count + other.count;
+
+            for (std::size_t i = 0; i < ref.size(); ++i) {
+                ref[i] = (ref[i] * count + other.ref[i] * other.count) / total;
+            }
+
+            count = total;
+
+            return *this;
+        }
+
+        friend void to_json(nlohmann::json &j, Topo const &topo) {
+            j = nlohmann::json{
+                {"ref", topo.ref},
+                {"hash", topo.hash},
+                {"count", topo.count},
+            };
+        }
+
+        friend void from_json(nlohmann::json const &j, Topo &topo) {
+            j.at("ref").get_to(topo.ref);
+            j.at("hash").get_to(topo.hash);
+            j.at("count").get_to(topo.count);
+        }
+    };
+
     class Atom : public AtomBase {
       private:
         std::size_t idx;
 
       public:
-        Atom(int, double x, double y, double z, std::size_t idx)
-            : AtomBase::AtomBase{x, y, z}, idx{idx} {}
+        Atom(int k, double x, double y, double z, std::size_t idx)
+            : AtomBase::AtomBase{k, x, y, z}, idx{idx} {}
 
         inline std::size_t index() const { return idx; }
     };
 
-    CellList<Atom, Kind_t> cellList;
+    using Key_t = typename Canon::Key_t;
 
-    std::vector<Graph> keys;
+    CellList<Atom> cellList;
+
+    std::vector<Key_t> keys;
     std::vector<std::vector<Atom>> canon;
 
     Vector const *prev;
 
-    std::unordered_map<Graph, TopoRef> catalog;
+    std::unordered_map<Key_t, Topo> catalog;
+
+    static constexpr auto fname = "dump/toporef.json";
+
+    Topo classifyTopo(std::size_t idx) const {
+        check(idx < size(), "out of bounds");
+
+        Topo topo{keys[idx].hash()};
+
+        Eigen::Matrix3d transform = findBasis(canon[idx]);
+
+        transform.transposeInPlace();
+
+        Eigen::Vector3d origin = canon[idx][0].pos();
+
+        transform_into(canon[idx].begin(), canon[idx].end(), topo.ref,
+                       [&](Atom const &atom) -> Eigen::Vector3d {
+                           return transform * (atom.pos() - origin);
+                       });
+
+        return topo;
+    }
 
   public:
-    TopoClassify(Box const &box, Kind_t const &kinds)
+    TopoClassify(Box const &box, std::vector<int> const &kinds)
         : cellList{box, kinds}, keys{kinds.size()}, canon{kinds.size()} {
 
-        static_assert(std::is_trivially_destructible_v<Graph>,
+        static_assert(std::is_trivially_destructible_v<Key_t>,
                       "can't clear graphs in constant time");
-
-        constexpr auto fname = "dump/toporef.json";
 
         if (fileExist(fname)) {
             using nlohmann::json;
-            json j = json::parse(std::ifstream());
-            catalog = j.get<std::unordered_map<Graph, TopoRef>>();
+            json j = json::parse(std::ifstream(fname));
+            catalog = j.get<std::unordered_map<Key_t, Topo>>();
         } else {
             std::cout << "Missing " << fname << std::endl;
         }
@@ -191,13 +212,13 @@ template <typename Kind_t> class TopoClassify {
 
     void colourPrint() const {
         output(*prev,
-               transform_into(keys.begin(), keys.end(), std::hash<Graph>{}));
+               transform_into(keys.begin(), keys.end(), std::hash<Key_t>{}));
     }
 
     std::size_t size() const { return cellList.size(); };
 
-    auto getRdf(std::size_t i) { return keys[i]; }
-    auto getRdf(std::size_t i) const { return keys[i]; }
+    inline Key_t &operator[](std::size_t i) { return keys[i]; }
+    inline Key_t const &operator[](std::size_t i) const { return keys[i]; }
 
     void analyzeTopology(Vector &&x) = delete; // prevent tempories binding
 
@@ -223,90 +244,85 @@ template <typename Kind_t> class TopoClassify {
 
             canon[i].clear();
 
-            keys[i] = canonicalize(neigh, canon[i]);
+            keys[i] = Canon::canonicalize(neigh, canon[i]);
         }
     }
 
-    TopoRef classifyTopo(std::size_t idx) const {
-        check(idx < size(), "out of bounds");
-
-        TopoRef topo{keys[idx].hash()};
-
-        Eigen::Matrix3d transform = findBasis(canon[idx]);
-
-        transform.transposeInPlace();
-
-        Eigen::Vector3d origin = canon[idx][0].pos();
-
-        transform_into(canon[idx].begin(), canon[idx].end(), topo.ref,
-                       [&](Atom const &atom) -> Eigen::Vector3d {
-                           return transform * (atom.pos() - origin);
-                       });
-
-        return topo;
-    }
-
     bool verify() {
+        std::size_t count_new = 0;
+
         for (std::size_t i = 0; i < size(); ++i) {
             auto search = catalog.find(keys[i]);
 
             // std::cout << i << ' ' << std::hash<Rdf>{}(rdfs[i]) <<
             // std::endl;
 
+            Topo t = classifyTopo(i);
+
             if (search == catalog.end()) {
-                catalog.emplace(std::make_pair(keys[i], classifyTopo(i)));
-            } else {
-                TopoRef t = classifyTopo(i);
+                ++count_new;
+                catalog.emplace(std::make_pair(keys[i], std::move(t)));
 
-                if (!(search->second == t)) {
+            } else if (!(search->second == t)) {
+                // colour near;
+                std::vector<int> col2(prev->size() / 3, 0);
 
-                    // colour near;
-                    std::vector<int> col2(prev->size() / 3, 0);
-
-                    for (auto &&atom : canon[i]) {
-                        col2[atom.index()] = 1;
-                    }
-                    output(*prev, col2);
-
-                    std::vector<std::size_t> col;
-
-                    // colour according to rdf hash
-                    std::transform(keys.begin(), keys.end(),
-                                   std::back_inserter(col), std::hash<Graph>{});
-
-                    // unprocessed topos colour 0
-                    std::transform(col.begin() + i + 1, col.end(),
-                                   col.begin() + i + 1,
-                                   [=](std::size_t) { return 0; });
-
-                    output(*prev, col);
-
-                    auto bad = col[i];
-
-                    // change color of topo collisions
-                    std::transform(
-                        col.begin(), col.begin() + i + 1, col.begin(),
-                        [=](std::size_t h) { return h == bad ? 99 : h; });
-
-                    col[i] = 100;
-
-                    output(*prev, col);
-
-                    check(false, "topology collison");
-
-                    return false;
-                } else {
-                    search->second += t;
+                for (auto &&atom : canon[i]) {
+                    col2[atom.index()] = 1;
                 }
+                output(*prev, col2);
+
+                for (std::size_t j = 0; j < canon[i].size(); ++j) {
+                    col2[canon[i][j].index()] = j;
+                }
+
+                col2[canon[i][0].index()] = 99;
+
+                output(*prev, col2);
+
+                // colour according to rdf hash
+                auto col = transform_into(keys.begin(), keys.end(),
+                                          std::hash<Key_t>{});
+
+                // unprocessed topos colour 0
+                std::transform(col.begin() + i + 1, col.end(),
+                               col.begin() + i + 1,
+                               [=](std::size_t) { return 0; });
+
+                output(*prev, col);
+
+                auto bad = col[i];
+
+                // change color of topo collisions
+                std::transform(
+                    col.begin(), col.begin() + i + 1, col.begin(),
+                    [=](std::size_t h) { return h == bad ? 99 : h; });
+
+                col[i] = 100;
+
+                output(*prev, col);
+
+                check(false, "topology collison");
+
+                std::terminate();
+
+                return false;
+            } else {
+                search->second += t;
             }
         }
 
+        std::cout << "Found: " << count_new << '/' << size()
+                  << " new topologies" << std::endl;
+
+        return true;
+    }
+
+    void write() {
         using nlohmann::json;
 
         json j = catalog;
-        std::ofstream("dump/toporef.json") << j.dump(2);
-
-        return true;
+        std::ofstream(fname) << j.dump(2);
     }
 
     // Returns the index of the central atom for the mechanisim as well as
@@ -333,49 +349,25 @@ template <typename Kind_t> class TopoClassify {
                     dr_sq_max = dr_sq;
                 }
             }
-
-            // std::cout << "max move = " << std::sqrt(dr_sq_max) << '\n';
         }
-
-        // std::vector<int> col(init.size() / 3, 0);
-        //
-        // for (std::size_t i = 0; i < near.size(); ++i) {
-        //     col[near[i].index()] = 1;
-        // }
-        //
-        // output(init, col);
-
-        ////// find canonical-ordering ///////////
-
-        //
-        // for (std::size_t i = 0; i < near.size(); ++i) {
-        //     col[near[i].index()] = i;
-        // }
-        //
-        // col[near[0].index()] = 99;
-        //
-        // output(init, col);
-
-        ///////////// get basis vectors /////////////
 
         Eigen::Matrix3d transform = findBasis(canon[centre]);
 
         transform.transposeInPlace();
 
-        auto reference = transform_into(
-            canon[centre].begin(), canon[centre].end(),
-            std::vector<Eigen::Vector3d>{},
-            [&](Atom const &atom) -> Eigen::Vector3d {
-                Eigen::Vector3d delta{
-                    end[3 * atom.index() + 0] - (*prev)[3 * atom.index() + 0],
-                    end[3 * atom.index() + 1] - (*prev)[3 * atom.index() + 1],
-                    end[3 * atom.index() + 2] - (*prev)[3 * atom.index() + 2],
-                };
+        return {centre,
+                transform_into(canon[centre].begin(), canon[centre].end(),
+                               [&](Atom const &atom) -> Eigen::Vector3d {
+                                   auto i = 3 * atom.index();
 
-                return transform * delta;
-            });
+                                   Eigen::Vector3d delta{
+                                       end[i + 0] - (*prev)[i + 0],
+                                       end[i + 1] - (*prev)[i + 1],
+                                       end[i + 2] - (*prev)[i + 2],
+                                   };
 
-        return {centre, std::move(reference)};
+                                   return transform * delta;
+                               })};
     }
 
     Vector reconstruct(std::size_t idx,
@@ -385,14 +377,6 @@ template <typename Kind_t> class TopoClassify {
 
         check(canon[idx].size() == ref.size(),
               "wrong num atoms in reconstruction");
-
-        // std::vector<int> col(init.size() / 3, 0);
-        // for (std::size_t i = 0; i < near.size(); ++i) {
-        //     check(near[i].idx < (int)col.size(), "bug in ordering alg
-        //     again"); col[near[i].idx] = i + 1;
-        // }
-        //
-        // output(init, col);
 
         Eigen::Matrix3d transform = findBasis(canon[idx]);
 

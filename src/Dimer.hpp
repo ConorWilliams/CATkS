@@ -4,6 +4,7 @@
 #include <cmath>
 #include <iostream>
 #include <random>
+#include <tuple>
 #include <utility>
 
 #include "pcg_random.hpp"
@@ -271,9 +272,9 @@ constexpr double G_AMP = 0.325;
 // init is a minimised (unporturbed) vector of atoms
 // idx is centre of displacemnet
 // f is their force object
-template <typename T>
+template <typename F, typename MinImage>
 std::tuple<int, Vector, Vector> findSaddle(Vector const &init, std::size_t idx,
-                                           T const &f) {
+                                           F const &f, MinImage const &mi) {
     Vector sp = init;
     Vector ax = Vector::Zero(init.size());
 
@@ -284,15 +285,17 @@ std::tuple<int, Vector, Vector> findSaddle(Vector const &init, std::size_t idx,
     pcg64 rng(seed_source);
     std::normal_distribution<> gauss_dist(0, G_AMP);
 
-    double x = init[idx * 3 + 0];
-    double y = init[idx * 3 + 1];
-    double z = init[idx * 3 + 2];
-
-    std::vector<int> col(init.size() / 3, 0);
+    // std::vector<int> col(init.size() / 3, 0);
 
     for (int i = 0; i < init.size(); i = i + 3) {
-        double dist =
-            f.periodicNormSq(x, y, z, init[i + 0], init[i + 1], init[i + 2]);
+
+        Eigen::Vector3d delta{
+            init[idx * 3 + 0] - init[i + 0],
+            init[idx * 3 + 1] - init[i + 1],
+            init[idx * 3 + 2] - init[i + 2],
+        };
+
+        double dist = mi(delta).squaredNorm();
 
         if (dist < G_SPHERE * G_SPHERE) {
             sp[i + 0] += gauss_dist(rng);
@@ -303,7 +306,7 @@ std::tuple<int, Vector, Vector> findSaddle(Vector const &init, std::size_t idx,
             ax[i + 1] = gauss_dist(rng);
             ax[i + 2] = gauss_dist(rng);
 
-            col[i / 3] = 1;
+            // col[i / 3] = 1;
         }
     }
 

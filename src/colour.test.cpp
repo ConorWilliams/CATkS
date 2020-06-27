@@ -1,16 +1,14 @@
+// #define NDEBUG
+
 #include <cmath>
 #include <iostream>
 #include <limits>
-#include <random>
-#include <tuple>
-#include <unordered_map>
-#include <unordered_set>
 
-#include "Classes.hpp"
-
+#include "Catalog.hpp"
 #include "Dimer.hpp"
 #include "DumpXYX.hpp"
 #include "Forces.hpp"
+#include "NautyFunc.hpp"
 #include "Topo.hpp"
 #include "utils.hpp"
 
@@ -27,67 +25,31 @@ double activeToRate(double active_E) {
 }
 
 //
-template <typename T, typename K>
-void updateCatalog(std::unordered_map<Graph, Topology> &catalog,
-                   Vector const &x, T const &f, TopoClassify<K> const &cl) {
-
-    double f_x = f(x);
-
-    for (std::size_t i = 0; i < cl.size(); ++i) {
-
-        catalog[cl.getRdf(i)].count += 1; // default constructs new
-
-        std::size_t count = catalog[cl.getRdf(i)].count;
-
-        while (catalog[cl.getRdf(i)].sp_searches < 25 ||
-               catalog[cl.getRdf(i)].sp_searches < std::sqrt(count)) {
-
-            ++(catalog[cl.getRdf(i)].sp_searches);
-
-            std::cout << "@ " << i << '/' << cl.size() << " dimer launch ... "
-                      << std::flush;
-
-            auto [err, sp, end] = findSaddle(x, i, f);
-
-            if (!err) {
-                std::cout << "success!" << std::endl;
-
-                auto [centre, ref] = cl.classifyMech(end);
-
-                catalog[cl.getRdf(centre)].pushMech(f(sp) - f_x, f(end) - f_x,
-                                                    std::move(ref));
-
-            } else {
-                std::cout << "err:" << err << std::endl;
-            }
-        }
-    }
-}
-
-template <typename T, typename K>
-void outputAllMechs(std::unordered_map<Graph, Topology> &catalog,
-                    Vector const &x, TopoClassify<K> const &cl, T const &f) {
-
-    std::unordered_set<Graph> done{};
-
-    std::cout << "writing all mechanisms" << std::endl;
-
-    output(x);
-
-    for (std::size_t i = 0; i < cl.size(); ++i) {
-        if (done.count(cl.getRdf(i)) == 0) {
-            done.insert(cl.getRdf(i));
-
-            for (auto &&m : catalog[cl.getRdf(i)].getMechs()) {
-                std::cout << FRAME << ' ' << m.active_E << ' ' << m.delta_E
-                          << std::endl;
-                Vector recon = cl.reconstruct(i, m.ref);
-
-                output(recon, f.quasiColourAll(recon));
-            }
-        }
-    }
-}
+// template <typename T, typename K>
+// void outputAllMechs(
+//     std::unordered_map<typename NautyCanon::Key_t, Topology> &catalog,
+//     Vector const &x, K const &cl, T const &f) {
+//
+//     std::unordered_set<typename NautyCanon::Key_t> done{};
+//
+//     std::cout << "writing all mechanisms" << std::endl;
+//
+//     output(x);
+//
+//     for (std::size_t i = 0; i < cl.size(); ++i) {
+//         if (done.count(cl.getRdf(i)) == 0) {
+//             done.insert(cl.getRdf(i));
+//
+//             for (auto &&m : catalog[cl.getRdf(i)].getMechs()) {
+//                 std::cout << FRAME << ' ' << m.active_E << ' ' << m.delta_E
+//                           << std::endl;
+//                 Vector recon = cl.reconstruct(i, m.ref);
+//
+//                 output(recon, f.quasiColourAll(recon));
+//             }
+//         }
+//     }
+// }
 
 enum : uint8_t { Fe = 0, H = 1 };
 constexpr double LAT = 2.855700;
@@ -151,26 +113,17 @@ int main() {
         data.rCut, 0, len * LAT, 0, len * LAT, 0, len * LAT,
     };
 
-    TopoClassify classifyer{box, kinds};
+    TopoClassify<NautyCanon> classifyer{box, kinds};
 
-    FuncEAM f{
-        "/home/cdt1902/dis/CATkS/data/PotentialA.fs",
-        kinds,
-        0,
-        len * LAT,
-        0,
-        len * LAT,
-        0,
-        len * LAT,
-    };
+    FuncEAM f{box, kinds, data};
 
-    f.sort(init);
+    Catalog<NautyCanon> catalog;
+
+    // f.sort(init);
 
     Minimise min{f, f, init.size()};
 
     min.findMin(init);
-
-    std::unordered_map<Graph, Topology> catalog = readMap("dump");
 
     double time = 0;
 
@@ -226,20 +179,24 @@ int main() {
 
         classifyer.analyzeTopology(init);
 
+        // classifyer.colourPrint();
+
         classifyer.verify();
 
         std::cout << "All topos verified!" << std::endl;
 
-        updateCatalog(catalog, init, f, classifyer);
+        catalog.update(init, f, classifyer,
+                       [&box](Eigen::Vector3d dr) { return box.minImage(dr); });
 
-        writeMap("dump", catalog);
+        classifyer.write();
+        catalog.write();
 
         //    outputAllMechs(catalog, init, classifyer, f);
 
         std::vector<LocalisedMech> possible{};
 
         for (std::size_t i = 0; i < classifyer.size(); ++i) {
-            for (auto &&m : catalog[classifyer.getRdf(i)].getMechs()) {
+            for (auto &&m : catalog[classifyer[i]]) {
                 possible.push_back(
                     {i, activeToRate(m.active_E), m.ref, m.delta_E});
             }
@@ -267,8 +224,6 @@ int main() {
         double f_x = f(init);
 
         init = classifyer.reconstruct(choice.atom, choice.ref);
-
-        std::cout << "here" << std::endl;
 
         double recon = f(init) - f_x;
 

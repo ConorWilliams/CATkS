@@ -75,29 +75,29 @@ add_library(Nauty SHARED IMPORTED)
 set_target_properties(Nauty PROPERTIES IMPORTED_LOCATION "${PROJECT_SOURCE_DIR}/external/nauty27r1/nauty.a")
 
 # add the executables
-add_executable(bfgs src/L_BFGS.test.cpp)
-target_compile_options(bfgs PRIVATE -Wall -Wextra -pedantic -Werror -O3)
-target_link_libraries(bfgs PRIVATE Eigen3::Eigen)
+# add_executable(bfgs src/L_BFGS.test.cpp)
+# target_compile_options(bfgs PRIVATE -Wall -Wextra -pedantic -Werror -O3)
+# target_link_libraries(bfgs PRIVATE Eigen3::Eigen)
+#
+# add_executable(2d src/2d.test.cpp)
+# target_compile_options(2d PRIVATE -Wall -Wextra -pedantic -Werror -O3)
+# target_link_libraries(2d PRIVATE Eigen3::Eigen)
+#
+# add_executable(quiver plt/quiver/quiver.cpp)
+# target_compile_options(quiver PRIVATE -Wall -Wextra -pedantic -Werror -O3)
+# target_link_libraries(quiver PRIVATE Eigen3::Eigen)
+#
+# add_executable(sort src/sort.test.cpp)
+# target_compile_options(sort PRIVATE -Wall -Wextra -pedantic -O3 -march=native)
+# target_link_libraries(sort PRIVATE Eigen3::Eigen)
 
-add_executable(2d src/2d.test.cpp)
-target_compile_options(2d PRIVATE -Wall -Wextra -pedantic -Werror -O3)
-target_link_libraries(2d PRIVATE Eigen3::Eigen)
-
-add_executable(quiver plt/quiver/quiver.cpp)
-target_compile_options(quiver PRIVATE -Wall -Wextra -pedantic -Werror -O3)
-target_link_libraries(quiver PRIVATE Eigen3::Eigen)
-
-add_executable(sort src/sort.test.cpp)
-target_compile_options(sort PRIVATE -Wall -Wextra -pedantic -O3 -march=native)
-target_link_libraries(sort PRIVATE Eigen3::Eigen)
-
-add_executable(force src/force.test.cpp)
-target_compile_options(force PRIVATE -Wall -Wextra -pedantic -Werror -O3)
-target_link_libraries(force PRIVATE Eigen3::Eigen)
-
-add_executable(xmd src/vmd.test.cpp)
-target_compile_options(xmd PRIVATE -Wall -Wextra -pedantic -Werror -O3 -march=native )
-target_link_libraries(xmd PRIVATE Eigen3::Eigen)
+# add_executable(force src/force.test.cpp)
+# target_compile_options(force PRIVATE -Wall -Wextra -pedantic -Werror -O3)
+# target_link_libraries(force PRIVATE Eigen3::Eigen)
+#
+# add_executable(xmd src/vmd.test.cpp)
+# target_compile_options(xmd PRIVATE -Wall -Wextra -pedantic -Werror -O3 -march=native )
+# target_link_libraries(xmd PRIVATE Eigen3::Eigen)
 
 add_executable(colour src/colour.test.cpp)
 target_compile_options(colour PRIVATE -Wall -Wextra -pedantic -Werror -O3 -march=native )
