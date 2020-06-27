@@ -7,11 +7,11 @@
 #include <iostream>
 #include <limits>
 
+#include "Canon.hpp"
 #include "Catalog.hpp"
 #include "Dimer.hpp"
 #include "DumpXYX.hpp"
 #include "Forces.hpp"
-#include "NautyFunc.hpp"
 #include "Topo.hpp"
 #include "utils.hpp"
 
