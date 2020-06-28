@@ -237,12 +237,13 @@ int main() {
 
         double relax = f(init) - f_x;
 
-        std::cout << "Memory: " << choice.delta_E << " Recon: " << recon
-                  << " Relaxed: " << relax << std::endl;
+        std::cout << "Memory:  " << choice.delta_E << '\n';
+        std::cout << "Recon:   " << recon << '\n';
+        std::cout << "Relaxed: " << relax << '\n';
 
         check(std::abs(recon - choice.delta_E) < 0.1, "recon err");
 
-        std::cout << "TIME: " << time << std::endl;
+        std::cout << "TIME: " << time << '\n' << std::endl;
 
         // f.sort(init);
     }

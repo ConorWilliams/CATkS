@@ -161,7 +161,7 @@ class FuncEAM {
 
             cellList.forEachNeigh(
                 atom, [&](auto const &, double r, double, double, double) {
-                    if (r < 2.6) {
+                    if (r < 2.55) {
                         ++count;
                     }
                 });

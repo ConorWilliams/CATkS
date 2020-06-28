@@ -12,6 +12,7 @@
 #include "nlohmann/json.hpp"
 
 #include "Box.hpp"
+#include "Catalog.hpp"
 #include "Cell.hpp"
 #include "DumpXYX.hpp"
 #include "utils.hpp"
@@ -109,7 +110,7 @@ template <typename Canon> class TopoClassify {
 
                 // std::cout << (ref[i] - ref[0]).norm() << ' ' << tol << "\n";
 
-                if ((dif.abs() > 0.25).any()) {
+                if ((dif.abs() > DIST_TOL).any()) {
 
                     std::cout << i << ' ' << ref[i].transpose() << std::endl;
                     std::cout << i << ' ' << other.ref[i].transpose()
@@ -312,10 +313,9 @@ template <typename Canon> class TopoClassify {
             }
         }
 
-        std::cout << "Found: " << count_new << '/' << size()
-                  << " new topologies" << std::endl;
+        std::cout << "All topos verified! ";
 
-        std::cout << "All topos verified!" << std::endl;
+        std::cout << count_new << '/' << size() << " are new.\n";
 
         return true;
     }

@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <fstream>
+#include <future>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -11,8 +12,8 @@
 
 #include "utils.hpp"
 
-inline constexpr double DELTA_E_TOL = 0.01;
-inline constexpr double DIST_TOL = 0.1;
+inline constexpr double DELTA_E_TOL = 0.1;
+inline constexpr double DIST_TOL = 0.2;
 
 namespace nlohmann {
 template <> struct adl_serializer<Eigen::Vector3d> {
@@ -84,7 +85,7 @@ template <typename Canon> class Catalog {
 
         inline std::vector<Mech> const &getMechs() const { return mechs; }
 
-        void pushMech(double active_E, double delta_E,
+        bool pushMech(double active_E, double delta_E,
                       std::vector<Eigen::Vector3d> &&ref) {
 
             for (auto &&m : mechs) {
@@ -116,7 +117,8 @@ template <typename Canon> class Catalog {
                                 (m.count * m.ref[i] + ref[i]) / (m.count + 1);
                         }
                         m.count += 1;
-                        return;
+
+                        return false;
                     }
                 }
             }
@@ -126,6 +128,8 @@ template <typename Canon> class Catalog {
             ++count_mechs;
 
             mechs.emplace_back(active_E, delta_E, std::move(ref));
+
+            return true;
         }
     };
 
@@ -190,13 +194,13 @@ template <typename Canon> class Catalog {
 
         using result_t = std::vector<std::tuple<Vector, Vector>>;
 
-        std::vector<result_t> searches;
+        std::vector<std::future<result_t>> searches;
+
+        constexpr std::size_t sp_trys = 5;
 
         for (std::size_t i = 0; i < cl.size(); ++i) {
 
             catalog[cl[i]].count += 1; // default constructs new
-
-            constexpr std::size_t sp_trys = 5;
 
             while (catalog[cl[i]].sp_searches < 25 ||
                    catalog[cl[i]].sp_searches <
@@ -204,26 +208,50 @@ template <typename Canon> class Catalog {
 
                 catalog[cl[i]].sp_searches += sp_trys;
 
-                std::cout << "@ " << i << '/' << cl.size()
-                          << " dimer launch ... " << std::flush;
+                // std::cout << "@ " << i << '/' << cl.size()
+                //           << " dimer launch ... " << std::flush;
 
-                searches.push_back(findSaddle(sp_trys, x, i, f, mi));
+                searches.push_back(
+                    std::async(std::launch::async, [=, &x, &mi]() -> result_t {
+                        return findSaddle(sp_trys, x, i, f, mi);
+                    }));
 
-                std::cout << searches.back().size() << " successful!"
-                          << std::endl;
+                // searches.push_back(findSaddle(sp_trys, x, i, f, mi));
+
+                // std::cout << searches.size() << " successful!" << std::endl;
             }
         }
+
+        std::cout << "Launched " << searches.size()
+                  << " threads = " << searches.size() * sp_trys
+                  << " sp searches.\n";
 
         double f_x = f(x);
 
+        std::size_t sps = 0;
+        std::size_t new_mechs = 0;
+
         for (auto &&vec : searches) {
-            for (auto &&[sp, end] : vec) {
+            for (auto &&[sp, end] : vec.get()) {
+
+                sps += 1;
 
                 auto [centre, ref] = cl.classifyMech(end);
 
-                catalog[cl[centre]].pushMech(f(sp) - f_x, f(end) - f_x,
-                                             std::move(ref));
+                double barrier = f(sp) - f_x;
+                double delta = f(end) - f_x;
+
+                if (catalog[cl[centre]].pushMech(barrier, delta,
+                                                 std::move(ref))) {
+                    new_mechs += 1;
+                }
             }
         }
+
+        std::cout << sps << '/' << searches.size() * sp_trys
+                  << " searches found saddles.\n";
+
+        std::cout << new_mechs << '/' << sps
+                  << " saddles identified new mechanisims.\n";
     }
 };
