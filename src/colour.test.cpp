@@ -3,6 +3,23 @@
 
 #define EIGEN_DONT_PARALLELIZE
 
+/*
+ * Move subclasses from classifyer classes to namespaces.
+ *
+ * Base class for mechanism and toporef::topo.
+ *
+ * Make force functor default constructable in thread and take kinds as
+ *  parameter to force call, use static const member to refere to shard EAM data
+ *  state.
+ *
+ * Make a compile_time_constants.hpp file
+ *
+ * Make minimiser default constructable take kinds in function call, take f as template parameter.
+ *
+ * Make dimer take f as template param
+ *
+ */
+
 #include <cmath>
 #include <iostream>
 #include <limits>

@@ -47,7 +47,7 @@ template <typename T> Eigen::Matrix3d findBasis(std::vector<T> const &ns) {
     Eigen::Vector3d origin = ns[0].pos();
     Eigen::Matrix3d basis;
 
-    check(ns.size() > 2, "Not enough atoms to define basis");
+    check(ns.size() > 3, "Not enough atoms to define basis");
 
     basis.col(0) = (ns[1].pos() - origin).normalized();
 
@@ -174,7 +174,7 @@ template <typename Canon> class TopoClassify {
 
     std::unordered_map<Key_t, Topo> catalog;
 
-    static constexpr auto fname = "dump/toporef.json";
+    static constexpr auto fname = "toporef.json";
 
     Topo classifyTopo(std::size_t idx) const {
         check(idx < size(), "out of bounds");

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <cstdlib>
 #include <fstream>
 #include <future>
 #include <string>
@@ -65,7 +66,7 @@ template <typename Canon> class Catalog {
       public:
         std::size_t count = 0;       // Num times occured in the simulation
         std::size_t sp_searches = 0; // Total sp searches initated from topology
-        std::size_t count_mechs = 0;
+        std::size_t count_mechs = 0; // total number of mechs in this topo
 
         friend void to_json(nlohmann::json &j, Topo const &topo) {
             j = nlohmann::json{
@@ -104,7 +105,7 @@ template <typename Canon> class Catalog {
                     }
 
                     if (match_count == ref.size()) {
-                        std::cout << "Exact match" << std::endl;
+                        // std::cout << "Exact match" << std::endl;
 
                         m.active_E =
                             (m.count * m.active_E + active_E) / (m.count + 1);
@@ -123,7 +124,7 @@ template <typename Canon> class Catalog {
                 }
             }
 
-            std::cout << "New mech" << std::endl;
+            // std::cout << "New mech" << std::endl;
 
             ++count_mechs;
 
@@ -139,27 +140,27 @@ template <typename Canon> class Catalog {
 
     std::unordered_map<Key_t, Topo> catalog;
 
-    static constexpr auto dirname = "dump";
-
   public:
     Catalog() {
         using nlohmann::json;
-        std::string keys = std::string{dirname} + "/rdf.json";
 
-        if (fileExist(keys)) {
-            json rdfs = json::parse(std::ifstream(keys));
+        std::string fname = "keys.lmc.json";
 
-            for (auto &&elem : rdfs) {
-                Key_t r = elem.get<Key_t>();
+        if (fileExist(fname)) {
 
-                auto fname = std::string{dirname} + '/' + r.to_string();
-                check(fileExist(fname), "missing a topo file");
+            json keys = json::parse(std::ifstream(fname));
 
-                json j = json::parse(std::ifstream(fname));
-                catalog[r] = j.get<Topo>();
+            auto names = keys.get<std::unordered_map<Key_t, std::string>>();
+
+            for (auto &&[key, name] : names) {
+                check(fileExist(name), "missing a topo file");
+
+                json j = json::parse(std::ifstream(name));
+
+                catalog[key] = j.get<Topo>();
             }
         } else {
-            std::cout << "Missing " << keys << std::endl;
+            std::cout << "Missing " << fname << std::endl;
         }
     }
 
@@ -171,22 +172,33 @@ template <typename Canon> class Catalog {
 
     void write() const {
         using nlohmann::json;
-        json keys;
-        std::unordered_set<std::string> names{};
+
+        std::system("mkdir bak");
+        std::system("mv *.lmc.json bak/");
+
+        std::unordered_map<Key_t, std::string> names{};
+
+        std::size_t counter = 0;
 
         for (auto &&[rdf, topo] : catalog) {
             json j = topo;
 
-            std::string name = std::string{dirname} + '/' + rdf.to_string();
-            check(names.count(name) == 0, "need better naming");
+            std::string name = "topo." + std::to_string(topo.count) + "." +
+                               std::to_string(topo.count_mechs) + "." +
+                               std::to_string(counter) + ".lmc.json";
 
             std::ofstream(name) << j.dump(2);
 
-            keys.push_back(rdf);
+            names.insert({rdf, std::move(name)});
 
-            names.insert(std::move(name));
+            counter += 1;
         }
-        std::ofstream(std::string{dirname} + "/rdf.json") << keys.dump(2);
+
+        json keys = names;
+
+        std::ofstream("keys.lmc.json") << keys.dump(2);
+
+        std::system("rm -r bak");
     }
 
     template <typename F, typename C, typename MinImage>
