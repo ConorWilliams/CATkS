@@ -14,9 +14,12 @@
  *
  * Make a compile_time_constants.hpp file
  *
- * Make minimiser default constructable take kinds in function call, take f as template parameter.
+ * Make minimiser default constructable take kinds in function call, take f as
+ *  template parameter.
  *
  * Make dimer take f as template param
+ *
+ * Make Cell have fill & rebuildGhosts only
  *
  */
 

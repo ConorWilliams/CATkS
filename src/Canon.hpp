@@ -28,6 +28,8 @@ struct NautyGraph {
 
     inline auto &kinds() { return k; }
 
+    // Could be improved by storing the hash in the class and only computing
+    // when g/k changes.
     std::array<std::uint64_t, 2> hash() const {
         std::array<std::uint64_t, 2> h;
         MurmurHash3_x86_128(this, sizeof(NautyGraph), 0, h.data());
