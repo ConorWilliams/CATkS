@@ -108,9 +108,28 @@ class NautyCanon {
   private:
     enum : bool { colour = false, plain = true };
 
-    static constexpr double BOND_DISTANCE = 2.55; // 2.47 -- 2.86 angstrom
+    // pre H was working at 2.55 // 2.47 -- 2.86 angstrom (just > first neigh)
+    static constexpr double F_F_BOND = 2.55;
+    static constexpr double H_H_BOND = 2.00; // 0.5^2+0.5^2 vacancy neigh
+    static constexpr double F_H_BOND = 2.65; // 0.75^2 + 0.5^2
 
   public:
+    template <typename Atom_t>
+    inline static bool bonded(Atom_t const &a, Atom_t const &b) {
+
+        static const Eigen::Matrix2d DISTS{
+            {F_F_BOND, F_H_BOND},
+            {F_H_BOND, H_H_BOND},
+        };
+
+        check(a.kind() < 2, "atom type not valid " << a.kind());
+        check(b.kind() < 2, "atom type not valid " << b.kind());
+
+        double sqdist = (a.pos() - b.pos()).squaredNorm();
+
+        return sqdist < DISTS(a.kind(), b.kind()) * DISTS(a.kind(), b.kind());
+    }
+
     using Key_t = NautyGraph;
 
     // NOT thread safe.
@@ -163,10 +182,7 @@ class NautyCanon {
         // Fill in adjecency matrix
         for (std::size_t i = 0; i < atoms.size(); ++i) {
             for (std::size_t j = i + 1; j < atoms.size(); ++j) {
-
-                double sqdist = (atoms[i].pos() - atoms[j].pos()).squaredNorm();
-
-                if (sqdist < BOND_DISTANCE * BOND_DISTANCE) {
+                if (bonded(atoms[i], atoms[j])) {
                     ADDONEEDGE(g.data(), i, j, m);
                 }
             }

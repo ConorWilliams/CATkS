@@ -45,6 +45,7 @@ template <typename F1, typename F2> class Minimise {
 
     // Moves x to a local minimum;
     bool findMin(Vector &x) {
+
         lbfgs.clear();
 
         grad(x, g);
@@ -80,40 +81,41 @@ template <typename F1, typename F2> class Minimise {
             double norm = std::sqrt(dot(p, p));
             a = norm > 0.5 ? 0.5 / norm : 1;
             x = x0 + a * p;
+
             grad(x, g);
-
-            // backtracking line search
-            // for (int i = 1;; ++i) {
-            //     x = x0 + a * p;
-            //     grad(x, g);
-            //
-            //     double fa = f(x);
-            //
-            //     // Wolfie sufficiant decrese condition
-            //     if (fa <= f0 + C1 * a * g0) {
-            //         break;
-            //     } else {
-            //         double quad = a * a * g0 * 0.5 / (a * g0 - fa + f0);
-            //         if (quad <= 0 || quad >= a) {
-            //             a = a / 2;
-            //         } else {
-            //             a = quad;
-            //         }
-            //     }
-            //
-            //     if (i > L_MAX) {
-            //         std::cerr << "fail in minimiser line search" <<
-            //         std::endl;
-            //         // break;
-            //         return false;
-            //     }
-            // }
-
-            // std::cout << x(0) << ' ' << x(1) << ' ' << 1 << ' ' << 0
-            //           << std::endl;
         }
 
         std::cerr << "line search failed to converge" << std::endl;
         return false;
     }
 };
+
+// backtracking line search
+// for (int i = 1;; ++i) {
+//     x = x0 + a * p;
+//     grad(x, g);
+//
+//     double fa = f(x);
+//
+//     // Wolfie sufficiant decrese condition
+//     if (fa <= f0 + C1 * a * g0) {
+//         break;
+//     } else {
+//         double quad = a * a * g0 * 0.5 / (a * g0 - fa + f0);
+//         if (quad <= 0 || quad >= a) {
+//             a = a / 2;
+//         } else {
+//             a = quad;
+//         }
+//     }
+//
+//     if (i > L_MAX) {
+//         std::cerr << "fail in minimiser line search" <<
+//         std::endl;
+//         // break;
+//         return false;
+//     }
+// }
+
+// std::cout << x(0) << ' ' << x(1) << ' ' << 1 << ' ' << 0
+//           << std::endl;

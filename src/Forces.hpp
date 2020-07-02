@@ -15,6 +15,8 @@
 #include "sort.hpp"
 #include "utils.hpp"
 
+#include "Canon.hpp"
+
 class FuncEAM {
   private:
     // Helper class holds atom in LIST array of LCL with index of neighbours
@@ -85,11 +87,13 @@ class FuncEAM {
 
         // computes all rho values
         for (auto &&beta : cellList) {
+            // std::cout << "in\n";
             cellList.forEachNeigh(beta, [&](auto const &alpha, double r, double,
                                             double, double) {
                 beta.rho() +=
                     data.ineterpR(data.tabPhi(alpha.kind(), beta.kind()), r);
             });
+            // std::cout << "out\n";
         }
 
         cellList.clearGhosts(); // deletes ghosts, should not realloc
@@ -157,13 +161,11 @@ class FuncEAM {
 
         for (auto &&atom : cellList) {
 
-            std::size_t count = 0;
+            std::size_t count = atom.kind();
 
             cellList.forEachNeigh(
-                atom, [&](auto const &, double r, double, double, double) {
-                    if (r < 2.55) {
-                        ++count;
-                    }
+                atom, [&](auto const &neigh, double, double, double, double) {
+                    count += NautyCanon::bonded(atom, neigh);
                 });
 
             colours.push_back(count);

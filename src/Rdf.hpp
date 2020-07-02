@@ -13,8 +13,8 @@
 #include "utils.hpp"
 
 inline constexpr double R_TOPO = 6; // angstrom
-inline constexpr std::size_t R_BINS = 64;
-inline constexpr std::size_t MAX_ATOMS = 80;
+inline constexpr std::size_t R_BINS = 256;
+inline constexpr std::size_t MAX_ATOMS = 128;
 
 inline constexpr double R_BIN_WIDTH = 2 * R_TOPO / R_BINS;
 inline constexpr double INV_R_BIN_WIDTH = 1 / R_BIN_WIDTH;
@@ -65,18 +65,26 @@ template <> struct hash<RDFGraph> {
 
 namespace detail {
 
-bool are_close(double a, double b, double tol = 0.5 * R_BIN_WIDTH) {
+bool are_close(double a, double b, double tol = 0.01) {
     double dif = std::abs(a - b);
-    double avg = 0.5 * (a + b);
-    return dif / avg < tol ? true : false;
+    // double avg = 0.5 * (a + b);
+    return dif < tol ? true : false;
 }
 
 template <typename Atom_t> struct Wrap {
     // BOD
-    Atom_t const &atom;
+    Atom_t const *atom;
     std::vector<double> mem;
 
-    Wrap(Atom_t const &atom) : atom{atom}, mem{} {}
+    Wrap(Atom_t const &atom) : atom{&atom}, mem{} {}
+
+    Wrap() = default;
+
+    Wrap(Wrap const &) = default;
+    Wrap(Wrap &&) = default;
+
+    Wrap &operator=(Wrap const &) = default;
+    Wrap &operator=(Wrap &&) = default;
 
     friend inline bool operator==(Wrap const &a, Wrap const &b) {
         check(a.mem.size() == b.mem.size(), "== comparing diff lengths");
@@ -141,7 +149,7 @@ class RDFCanon {
                                         std::vector<Atom_t> &order) {
 
         check(order.size() == 0, "order has atoms already");
-        check(atoms.size() <= MAX_ATOMS, "too many atoms");
+        check(atoms.size() <= MAX_ATOMS, "too many atoms " << atoms.size());
 
         RDFGraph canon{};
 
@@ -151,10 +159,10 @@ class RDFCanon {
         for (auto &&a : wrap) {
             for (auto const &b : wrap) {
                 if (&a != &b) {
-                    double dist = (a.atom.pos() - b.atom.pos()).norm();
+                    double dist = (a.atom->pos() - b.atom->pos()).norm();
                     a.mem.push_back(dist);
 
-                    check(dist < 2 * R_TOPO, "R_topo no aligned");
+                    check(dist < 2 * R_TOPO, "R_topo not the same as box.rcut");
                     canon[dist * INV_R_BIN_WIDTH] += 1;
                 }
             }
@@ -172,10 +180,17 @@ class RDFCanon {
             }
 
             for (auto rem = std::next(it); rem != wrap.end(); ++rem) {
-                rem->mem.push_back((rem->atom.pos() - it->atom.pos()).norm());
+                rem->mem.push_back((rem->atom->pos() - it->atom->pos()).norm());
             }
         }
 
-        return {};
+        transform_into(wrap.begin(), wrap.end(), order,
+                       [](auto const &wrapped) { return *(wrapped.atom); });
+
+        std::transform(
+            wrap.begin(), wrap.end(), canon.kinds().begin(),
+            [](auto const &wrapped) { return wrapped.atom->kind(); });
+
+        return canon;
     }
 };

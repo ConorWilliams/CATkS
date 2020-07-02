@@ -265,7 +265,7 @@ inline constexpr double NUDGE = 0.1;
 inline constexpr double TOL_NEAR = 0.1;
 
 constexpr double G_SPHERE = 4;
-constexpr double G_AMP = 0.325;
+constexpr double G_AMP = 0.2; // 0.325 pure Fe
 
 // init is a minimised (unporturbed) vector of atoms
 // idx is centre of displacemnet

@@ -214,7 +214,7 @@ template <typename Canon> class Catalog {
 
             catalog[cl[i]].count += 1; // default constructs new
 
-            while (catalog[cl[i]].sp_searches < 25 ||
+            while (catalog[cl[i]].sp_searches < 50 ||
                    catalog[cl[i]].sp_searches <
                        std::sqrt(catalog[cl[i]].count)) {
 

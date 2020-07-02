@@ -24,6 +24,20 @@ void dumpXYX(std::string const &file, Vector const &coords, K kinds) {
     }
 }
 
+template <typename K>
+void dumpH(std::string const &file, Vector const &coords, K kinds) {
+    std::ofstream outfile{file, std::ios::app};
+
+    for (std::size_t i = 0; i < kinds.size(); ++i) {
+        if (kinds[i] == 1) {
+            outfile << coords[3 * i + 0] << ' ' << coords[3 * i + 1] << ' '
+                    << coords[3 * i + 2] << ' ';
+        }
+    }
+
+    outfile << "\n";
+}
+
 int FRAME = 0;
 static const std::string head{"/home/cdt1902/dis/CATkS/plt/dump/all_"};
 static const std::string tail{".xyz"};

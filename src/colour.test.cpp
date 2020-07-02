@@ -27,6 +27,8 @@
 #include <iostream>
 #include <limits>
 
+#include "Rdf.hpp"
+
 #include "Canon.hpp"
 #include "Catalog.hpp"
 #include "Dimer.hpp"
@@ -35,8 +37,8 @@
 #include "Topo.hpp"
 #include "utils.hpp"
 
-inline constexpr double ARRHENIUS_PRE = 1e13;
-inline constexpr double KB_T = 8.617333262145 * 1e-5 * 500; // eV K^-1
+inline constexpr double ARRHENIUS_PRE = 5.12e12;
+inline constexpr double KB_T = 8.617333262145 * 1e-5 * 300; // eV K^-1
 
 inline constexpr double INV_KB_T = 1 / KB_T;
 
@@ -85,11 +87,31 @@ struct LocalisedMech {
     double rate;
     std::vector<Eigen::Vector3d> const &ref;
     double delta_E;
+    double active_E;
 };
+
+template <typename Atom_t> void play(std::vector<Atom_t> const &atoms) {
+    Eigen::Matrix3d tensor = Eigen::Matrix3d::Zero();
+
+    for (Atom_t const &a : atoms) {
+        for (Atom_t const &b : atoms) {
+            Eigen::Vector3d rab = a - b;
+
+            tensor.noalias() += Eigen::Matrix3d::Identity() * rab.squaredNorm();
+            tensor.noalias() -= rab * rab.transpose();
+        }
+    }
+
+    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> solver(tensor);
+
+    std::cout << solver.eigenvalues().transpose() << std::endl;
+
+    std::cout << solver.eigenvectors() << std::endl;
+}
 
 int main() {
 
-    Vector init(len * len * len * 3 * 2 - 6);
+    Vector init(len * len * len * 3 * 2 + 3 * 1);
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -100,8 +122,8 @@ int main() {
         for (int j = 0; j < len; ++j) {
             for (int k = 0; k < len; ++k) {
 
-                if ((i == 1 && j == 1 && k == 1) ||
-                    (i == 4 && j == 1 && k == 1)) {
+                if (false /*(i == 1 && j == 1 && k == 1) ||
+                    (i == 4 && j == 1 && k == 1)*/) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
                     init[3 * cell + 1] = (j + 0.5) * LAT;
                     init[3 * cell + 2] = (k + 0.5) * LAT;
@@ -123,72 +145,52 @@ int main() {
         }
     }
 
-    // kinds.back() = H;
+    kinds[init.size() / 3 - 1] = H;
+
+    init[init.size() - 3] = LAT * (1 + 0.50);
+    init[init.size() - 2] = LAT * (1 + 0.25);
+    init[init.size() - 1] = LAT * (1 + 0.00);
+
+    // kinds[init.size() / 3 - 2] = H;
     //
-    // init[init.size() - 3] = LAT;
-    // init[init.size() - 2] = LAT;
-    // init[init.size() - 1] = 0.5 * LAT;
+    // init[init.size() - 6] = LAT * (2 + 0.50);
+    // init[init.size() - 5] = LAT * (2 + 0.25);
+    // init[init.size() - 4] = LAT * (2 + 0.00);
 
-    TabEAM data = parseTabEAM("/home/cdt1902/dis/CATkS/data/PotentialA.fs");
+    using Canon_t = NautyCanon;
 
-    Box box{
+    TabEAM const data =
+        parseTabEAM("/home/cdt1902/dis/CATkS/data/PotentialA.fs");
+
+    Box const force_box{
         data.rCut, 0, len * LAT, 0, len * LAT, 0, len * LAT,
     };
 
-    TopoClassify<NautyCanon> classifyer{box, kinds};
+    Box const topo_box{
+        data.rCut, 0, len * LAT, 0, len * LAT, 0, len * LAT,
+    };
 
-    FuncEAM f{box, kinds, data};
+    TopoClassify<Canon_t> classifyer{topo_box, kinds};
 
-    Catalog<NautyCanon> catalog;
+    FuncEAM f{force_box, kinds, data};
+
+    Catalog<Canon_t> catalog;
 
     // f.sort(init);
 
     Minimise min{f, f, init.size()};
 
+    std::cout << "before" << std::endl;
+
     min.findMin(init);
+
+    std::cout << "after" << std::endl;
 
     double time = 0;
 
     pcg_extras::seed_seq_from<std::random_device> seed_source;
     pcg64 rng(seed_source);
     std::uniform_real_distribution<> uniform_dist(0, 1);
-
-    // //////////////////OLD Reconstruct test////////////////////////////
-    //
-    // classifyer.loadAtoms(init);
-    //
-    // classifyer.verify(init);
-    //
-    // std::cout << "loaded" << std::endl;
-    //
-    // output(init);
-    //
-    // while (true) {
-    //     auto [err, sp, end] = findSaddle(init, 12, f);
-    //
-    //     if (!err) {
-    //         output(end);
-    //
-    //         auto [centre, ref] = classifyer.classifyMech(init, end);
-    //
-    //         std::cout << "\nCentre was " << centre << std::endl;
-    //
-    //         Vector recon = classifyer.reconstruct(init, 12, ref);
-    //
-    //         std::cout << f(end) - f(init) << std::endl;
-    //         std::cout << f(recon) - f(init) << std::endl;
-    //
-    //         output(recon);const T &f
-    //
-    //         min.findMin(recon);
-    //
-    //         output(recon);
-    //
-    //         return 0;
-    //     }
-    // }
-    //
-    // ////////////////////////////////////////////////////
 
     for (int anon = 0; anon < 50; ++anon) {
 
@@ -199,14 +201,17 @@ int main() {
 
         output(init, f.quasiColourAll(init));
 
+        dumpH("h_diffusion.xyz", init, kinds);
+
         classifyer.analyzeTopology(init);
 
         // classifyer.colourPrint();
 
         classifyer.verify();
 
-        catalog.update(init, f, classifyer,
-                       [&box](Eigen::Vector3d dr) { return box.minImage(dr); });
+        catalog.update(init, f, classifyer, [&](Eigen::Vector3d dr) {
+            return topo_box.minImage(dr);
+        });
 
         classifyer.write();
         catalog.write();
@@ -223,8 +228,13 @@ int main() {
 
         for (std::size_t i = 0; i < classifyer.size(); ++i) {
             for (auto &&m : catalog[classifyer[i]]) {
-                possible.push_back(
-                    {i, activeToRate(m.active_E), m.ref, m.delta_E});
+                possible.push_back({
+                    i,
+                    activeToRate(m.active_E),
+                    m.ref,
+                    m.delta_E,
+                    m.active_E,
+                });
             }
         }
 
@@ -251,15 +261,20 @@ int main() {
 
         init = classifyer.reconstruct(choice.atom, choice.ref);
 
+        // output(init, f.quasiColourAll(init));
+
         double recon = f(init) - f_x;
 
         min.findMin(init);
+
+        // output(init, f.quasiColourAll(init));
 
         double relax = f(init) - f_x;
 
         std::cout << "Memory:  " << choice.delta_E << '\n';
         std::cout << "Recon:   " << recon << '\n';
         std::cout << "Relaxed: " << relax << '\n';
+        std::cout << "Barrier: " << choice.active_E << "\n";
 
         check(std::abs(recon - choice.delta_E) < 0.1, "recon err");
 
@@ -268,3 +283,40 @@ int main() {
         // f.sort(init);
     }
 }
+
+// //////////////////OLD Reconstruct test////////////////////////////
+//
+// classifyer.loadAtoms(init);
+//
+// classifyer.verify(init);
+//
+// std::cout << "loaded" << std::endl;
+//
+// output(init);
+//
+// while (true) {
+//     auto [err, sp, end] = findSaddle(init, 12, f);
+//
+//     if (!err) {
+//         output(end);
+//
+//         auto [centre, ref] = classifyer.classifyMech(init, end);
+//
+//         std::cout << "\nCentre was " << centre << std::endl;
+//
+//         Vector recon = classifyer.reconstruct(init, 12, ref);
+//
+//         std::cout << f(end) - f(init) << std::endl;
+//         std::cout << f(recon) - f(init) << std::endl;
+//
+//         output(recon);const T &f
+//
+//         min.findMin(recon);
+//
+//         output(recon);
+//
+//         return 0;
+//     }
+// }
+//
+// ////////////////////////////////////////////////////

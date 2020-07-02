@@ -147,9 +147,9 @@ class Box {
         check(atom[1] >= oy && atom[1] - oy < ly, "y out of +cell");
         check(atom[2] >= oz && atom[2] - oz < lz, "z out of +cell");
 
-        std::size_t i = (atom[0] - ox) * mx / lx;
-        std::size_t j = (atom[1] - oy) * my / ly;
-        std::size_t k = (atom[2] - oz) * mz / lz;
+        std::size_t i = ((atom[0] - ox) * mx) / lx;
+        std::size_t j = ((atom[1] - oy) * my) / ly;
+        std::size_t k = ((atom[2] - oz) * mz) / lz;
 
         check(i + j * mx + k * mx * my < numCells(), "lambda out of range");
 

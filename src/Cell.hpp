@@ -31,15 +31,16 @@ class AtomBase {
 
 template <typename Atom_t> class CellList {
   private:
-    Box const &box;
     std::vector<int> const &kinds;
-
     Eigen::Array<std::size_t, Eigen::Dynamic, 1> head;
+
+  protected:
+    Box const &box;
     std::vector<Atom_t> list;
 
   public:
     CellList(Box const &box, std::vector<int> const &kinds)
-        : box{box}, kinds{kinds}, head(box.numCells()) {
+        : kinds{kinds}, head(box.numCells()), box{box} {
 
         static_assert(std::is_trivially_destructible_v<Atom_t>,
                       "can't clear Atom_t in constant time");
@@ -104,7 +105,7 @@ template <typename Atom_t> class CellList {
 
             for (std::size_t j = 0; j < end; ++j) {
                 Atom_t atom = list[j];
-
+                // TODO : atom->list[j] test
                 if (atom[i] < box.rcut()) {
                     list.push_back(atom);
                     list.back()[i] += box.limits(i).len;
@@ -123,6 +124,9 @@ template <typename Atom_t> class CellList {
     inline void forEachNeigh(Atom_t const &atom, F &&f) const {
 
         std::size_t const lambda = box.lambda(atom);
+
+        check(lambda < box.numCells(), "bad lambda " << lambda);
+
         std::size_t const end = list.size();
         double const cut_sq = box.rcut() * box.rcut();
 
@@ -130,6 +134,8 @@ template <typename Atom_t> class CellList {
 
         // in same cell as Atom2
         do {
+            check(index < list.size(), "bad index " << index);
+
             Atom_t const &neigh = list[index];
 
             if (&atom != &neigh) {
@@ -146,9 +152,17 @@ template <typename Atom_t> class CellList {
 
         // in adjecent cells -- don't need check against self
         for (auto off : box.getAdjOff()) {
-            index = head[lambda + off];
+            check(static_cast<long>(lambda) + off >= 0 &&
+                      lambda + off < box.numCells(),
+                  "bad off  " << lambda << ' ' << off << ' '
+                              << atom.pos().transpose());
+
+            index = head[static_cast<long>(lambda) + off];
+
             // std::cout << "cell_t " << lambda + off << std::endl;
             while (index != end) {
+
+                check(index < list.size(), "bad index " << index);
 
                 Atom_t const &neigh = list[index];
 
