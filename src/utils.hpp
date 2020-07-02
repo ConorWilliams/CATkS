@@ -58,3 +58,6 @@ bool fileExist(const std::string &name) {
         return false;
     }
 }
+
+template <typename T>
+inline void ignore_result(const T & /* unused result */) {}

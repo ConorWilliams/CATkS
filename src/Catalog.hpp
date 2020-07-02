@@ -170,9 +170,6 @@ template <typename Canon> class Catalog {
         return catalog[k].getMechs();
     }
 
-    template <typename T>
-    inline void ignore_result(const T & /* unused result */) {}
-
     void write() const {
         using nlohmann::json;
 
