@@ -39,7 +39,7 @@ void dumpH(std::string const &file, Vector const &coords, K kinds) {
 }
 
 int FRAME = 0;
-static const std::string head{"/home/cdt1902/dis/CATkS/plt/dump/all_"};
+static const std::string head{"dump/"};
 static const std::string tail{".xyz"};
 
 template <typename T> void output(Vector const &x, T const &kinds) {

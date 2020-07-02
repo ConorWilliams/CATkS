@@ -50,7 +50,8 @@ set(JSON_Install OFF CACHE INTERNAL "")
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/external/json")
 add_subdirectory("${PROJECT_SOURCE_DIR}/external/smhasher/src")
-add_subdirectory("${PROJECT_SOURCE_DIR}/external/eigen")
+
+find_package (Eigen3 3.3 REQUIRED NO_MODULE)
 
 #threading
 find_package (Threads)
@@ -64,7 +65,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # add external depandacies include paths
 include_directories(SYSTEM external/smhasher/src
                            external/pcg-cpp/include
-                           external/json/include)
+                           external/json/include
+                           external/eigen)
 
 # all code is in src
 include_directories(src)
