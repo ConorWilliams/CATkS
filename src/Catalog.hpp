@@ -170,11 +170,14 @@ template <typename Canon> class Catalog {
         return catalog[k].getMechs();
     }
 
+    template <typename T>
+    inline void ignore_result(const T & /* unused result */) {}
+
     void write() const {
         using nlohmann::json;
 
-        std::system("mkdir bak");
-        std::system("mv *.lmc.json bak/");
+        ignore_result(std::system("mkdir bak"));
+        ignore_result(std::system("mv *.lmc.json bak/"));
 
         std::unordered_map<Key_t, std::string> names{};
 
@@ -198,7 +201,7 @@ template <typename Canon> class Catalog {
 
         std::ofstream("keys.lmc.json") << keys.dump(2);
 
-        std::system("rm -r bak");
+        ignore_result(std::system("rm -r bak"));
     }
 
     template <typename F, typename C, typename MinImage>
