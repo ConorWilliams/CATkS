@@ -15,7 +15,7 @@
 
 #include "utils.hpp"
 
-static_assert(MAXM == 2, "Nauty is playing up!");
+static_assert(MAXM * 64 == MAXN, "Nauty is playing up!");
 
 struct NautyGraph {
   private:
@@ -157,7 +157,7 @@ class NautyCanon {
         std::size_t n = atoms.size();
         std::size_t m = SETWORDSNEEDED(n);
 
-        CHECK(n <= MAXN && m <= MAXM, "too many atoms" << n << ' ' << m);
+        CHECK(n <= MAXN && m <= MAXM, "too many atoms " << n << ' ' << m);
 
         nauty_check(WORDSIZE, m, n, NAUTYVERSIONID);
 

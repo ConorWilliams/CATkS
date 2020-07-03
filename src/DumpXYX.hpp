@@ -25,13 +25,16 @@ void dumpXYX(std::string const &file, Vector const &coords, K kinds) {
 }
 
 template <typename K>
-void dumpH(std::string const &file, Vector const &coords, K kinds) {
+void dumpH(std::string const &file, double time, Vector const &coords,
+           K kinds) {
     std::ofstream outfile{file, std::ios::app};
+
+    outfile << time;
 
     for (std::size_t i = 0; i < kinds.size(); ++i) {
         if (kinds[i] == 1) {
-            outfile << coords[3 * i + 0] << ' ' << coords[3 * i + 1] << ' '
-                    << coords[3 * i + 2] << ' ';
+            outfile << ' ' << coords[3 * i + 0] << ' ' << coords[3 * i + 1]
+                    << ' ' << coords[3 * i + 2];
         }
     }
 
@@ -39,7 +42,8 @@ void dumpH(std::string const &file, Vector const &coords, K kinds) {
 }
 
 int FRAME = 0;
-static const std::string head{"dump/"};
+
+static const std::string head{"dump/frame_"};
 static const std::string tail{".xyz"};
 
 template <typename T> void output(Vector const &x, T const &kinds) {

@@ -10,6 +10,15 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -pedantic")
+set(CMAKE_CXX_FLAGS_DEBUG "-g -pg")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native")
+
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
 # Update submodules as needed
@@ -44,7 +53,6 @@ if(NOT EXISTS "${PROJECT_SOURCE_DIR}/external/json/CMakeLists.txt")
 endif()
 
 
-
 set(JSON_BuildTests OFF CACHE INTERNAL "")
 set(JSON_Install OFF CACHE INTERNAL "")
 
@@ -66,6 +74,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include_directories(SYSTEM external/smhasher/src
                            external/pcg-cpp/include
                            external/json/include
+                           external/nauty27r1
                            external/eigen)
 
 # all code is in src
@@ -73,38 +82,14 @@ include_directories(src)
 
 #////////////////////naughty///////////////////////
 
-include_directories(external/nauty27r1)
-
 add_library(Nauty SHARED IMPORTED)
 set_target_properties(Nauty PROPERTIES IMPORTED_LOCATION "${PROJECT_SOURCE_DIR}/external/nauty27r1/nauty.a")
 
+# //////////////////////////////////////////////
 
-# add the executables
-# add_executable(bfgs src/L_BFGS.test.cpp)
-# target_compile_options(bfgs PRIVATE -Wall -Wextra -pedantic -Werror -O3)
-# target_link_libraries(bfgs PRIVATE Eigen3::Eigen)
-#
-# add_executable(2d src/2d.test.cpp)
-# target_compile_options(2d PRIVATE -Wall -Wextra -pedantic -Werror -O3)
-# target_link_libraries(2d PRIVATE Eigen3::Eigen)
-#
-# add_executable(quiver plt/quiver/quiver.cpp)
-# target_compile_options(quiver PRIVATE -Wall -Wextra -pedantic -Werror -O3)
-# target_link_libraries(quiver PRIVATE Eigen3::Eigen)
-#
-# add_executable(sort src/sort.test.cpp)
-# target_compile_options(sort PRIVATE -Wall -Wextra -pedantic -O3 -march=native)
-# target_link_libraries(sort PRIVATE Eigen3::Eigen)
 
-# add_executable(force src/force.test.cpp)
-# target_compile_options(force PRIVATE -Wall -Wextra -pedantic -Werror -O3)
-# target_link_libraries(force PRIVATE Eigen3::Eigen)
-#
-# add_executable(xmd src/vmd.test.cpp)
-# target_compile_options(xmd PRIVATE -Wall -Wextra -pedantic -Werror -O3 -march=native )
-# target_link_libraries(xmd PRIVATE Eigen3::Eigen)
 
 add_executable(diffusion src/diffusion.cpp)
 
-target_compile_options(diffusion PRIVATE -Wall -Wextra -pedantic -Werror -O3 -lpthread -march=native )
+target_compile_options(diffusion PRIVATE -Werror)
 target_link_libraries(diffusion PRIVATE Eigen3::Eigen nlohmann_json::nlohmann_json SMHasherSupport Nauty ${CMAKE_THREAD_LIBS_INIT})

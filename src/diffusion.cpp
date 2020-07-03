@@ -1,5 +1,5 @@
-// #define NDEBUG
-// #define EIGEN_NO_DEBUG
+//#define NCHECK
+//#define EIGEN_NO_DEBUG
 
 #define EIGEN_DONT_PARALLELIZE
 
@@ -40,45 +40,13 @@ inline constexpr double KB_T = 8.617333262145 * 1e-5 * 300; // eV K^-1
 
 inline constexpr double INV_KB_T = 1 / KB_T;
 
-double activeToRate(double active_E) {
-
-    CHECK(active_E > 0, "sp energy < init energy");
-
-    return ARRHENIUS_PRE * std::exp(-active_E * INV_KB_T);
-}
-
-// template <typename T, typename K>
-// void outputAllMechs(
-//     std::unordered_map<typename NautyCanon::Key_t, Topology> &catalog,
-//     Vector const &x, K const &cl, T const &f) {
-//
-//     std::unordered_set<typename NautyCanon::Key_t> done{};
-//
-//     std::cout << "writing all mechanisms" << std::endl;
-//
-//     output(x);
-//
-//     for (std::size_t i = 0; i < cl.size(); ++i) {
-//         if (done.count(cl.getRdf(i)) == 0) {
-//             done.insert(cl.getRdf(i));
-//
-//             for (auto &&m : catalog[cl.getRdf(i)].getMechs()) {
-//                 std::cout << FRAME << ' ' << m.active_E << ' ' << m.delta_E
-//                           << std::endl;
-//                 Vector recon = cl.reconstruct(i, m.ref);
-//
-//                 output(recon, f.quasiColourAll(recon));
-//             }
-//         }
-//     }
-// }
+inline constexpr double ACCUMULATED_ERROR_LIMIT = 0.05; // eV
 
 enum : uint8_t { Fe = 0, H = 1 };
+
 constexpr double LAT = 2.855700;
 
 inline constexpr int len = 5;
-
-static const std::string OUTFILE = "/home/cdt1902/dis/CATkS/raw.txt";
 
 struct LocalisedMech {
     std::size_t atom;
@@ -88,26 +56,18 @@ struct LocalisedMech {
     double active_E;
 };
 
-template <typename Atom_t> void play(std::vector<Atom_t> const &atoms) {
-    Eigen::Matrix3d tensor = Eigen::Matrix3d::Zero();
+double activeToRate(double active_E) {
 
-    for (Atom_t const &a : atoms) {
-        for (Atom_t const &b : atoms) {
-            Eigen::Vector3d rab = a - b;
+    CHECK(active_E > 0, "sp energy < init energy");
 
-            tensor.noalias() += Eigen::Matrix3d::Identity() * rab.squaredNorm();
-            tensor.noalias() -= rab * rab.transpose();
-        }
-    }
-
-    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> solver(tensor);
-
-    std::cout << solver.eigenvalues().transpose() << std::endl;
-
-    std::cout << solver.eigenvectors() << std::endl;
+    return ARRHENIUS_PRE * std::exp(active_E * -INV_KB_T);
 }
 
-int main() {
+int main(int argc, char **argv) {
+
+    // CHECK(false, "false");
+
+    VERIFY(argc == 2, "need a EAM data file");
 
     Vector init(len * len * len * 3 * 2 + 3 * 1);
     Vector ax(init.size());
@@ -155,16 +115,21 @@ int main() {
     // init[init.size() - 5] = LAT * (2 + 0.25);
     // init[init.size() - 4] = LAT * (2 + 0.00);
 
+    ////////////////////////////////////////////////////////////
+
     using Canon_t = NautyCanon;
 
-    TabEAM const data =
-        parseTabEAM("/home/cdt1902/dis/CATkS/data/PotentialA.fs");
+    double time = 0;
+    double energy_error = 0;
+    int iter = 0;
 
-    Box const force_box{
+    static const TabEAM data = parseTabEAM(argv[1]);
+
+    static const Box force_box{
         data.rCut, 0, len * LAT, 0, len * LAT, 0, len * LAT,
     };
 
-    Box const topo_box{
+    static const Box topo_box{
         data.rCut, 0, len * LAT, 0, len * LAT, 0, len * LAT,
     };
 
@@ -174,55 +139,63 @@ int main() {
 
     Catalog<Canon_t> catalog;
 
-    // f.sort(init);
-
     Minimise min{f, f, init.size()};
 
-    std::cout << "before" << std::endl;
+    std::cout << "before min" << std::endl;
 
     min.findMin(init);
 
-    std::cout << "after" << std::endl;
-
-    double time = 0;
+    std::cout << "after min" << std::endl;
 
     pcg_extras::seed_seq_from<std::random_device> seed_source;
     pcg64 rng(seed_source);
     std::uniform_real_distribution<> uniform_dist(0, 1);
 
-    for (int anon = 0; anon < 50; ++anon) {
+    std::vector<LocalisedMech> possible{};
 
-        // if (anon == 0) {
-        //     outputAllMechs(catalog, init, f);
-        //     return 0;
-        // }
+    double energy_pre = f(init);
+
+    while (iter < 500) {
 
         output(init, f.quasiColourAll(init));
 
-        dumpH("h_diffusion.xyz", init, kinds);
+        dumpH("h_diffusion.xyz", time, init, kinds);
 
-        classifyer.analyzeTopology(init);
+        ////////////////////////////////////////////////////////////
 
-        // classifyer.colourPrint();
+        if (energy_error > ACCUMULATED_ERROR_LIMIT) {
+            min.findMin(init);
+            energy_pre = f(init);
+            energy_error = 0;
+            classifyer.analyzeTopology(init);
+        } else {
+            classifyer.analyzeTopology(init);
 
-        classifyer.verify();
+            if (catalog.requireSearch(classifyer)) {
+                min.findMin(init);
+                energy_pre = f(init);
+                energy_error = 0;
+                classifyer.analyzeTopology(init);
+            }
+        }
 
-        catalog.update(init, f, classifyer, [&](Eigen::Vector3d dr) {
-            return topo_box.minImage(dr);
-        });
+        int new_topos = classifyer.verify();
 
-        classifyer.write();
-        catalog.write();
+        int new_mechs =
+            catalog.update(init, f, classifyer, [&](Eigen::Vector3d dr) {
+                return topo_box.minImage(dr);
+            });
 
-        //    outputAllMechs(catalog, init, classifyer, f);
+        if (new_topos > 0) {
+            classifyer.write();
+        }
+        if (new_mechs > 0) {
+            catalog.write();
+        }
 
-        // outputAllMechs(catalog, init, f);
+        //////////////////////////////////////////////////////////////
 
-        // if (anon == 0) {
-        //     return 0;
-        // }
-
-        std::vector<LocalisedMech> possible{};
+        possible.clear();
 
         for (std::size_t i = 0; i < classifyer.size(); ++i) {
             for (auto &&m : catalog[classifyer[i]]) {
@@ -253,70 +226,39 @@ int main() {
             std::terminate();
         }();
 
-        time += -std::log(uniform_dist(rng)) / rate_sum;
+        ////////////////////////////////////////////////////
 
-        double f_x = f(init);
+        time += -std::log(uniform_dist(rng)) / rate_sum;
 
         init = classifyer.reconstruct(choice.atom, choice.ref);
 
-        // output(init, f.quasiColourAll(init));
+        const double energy_post = f(init);
 
-        double recon = f(init) - f_x;
+        const double recon_delta_E = energy_post - energy_pre;
 
-        min.findMin(init);
+        energy_error += std::abs(recon_delta_E - choice.delta_E);
 
-        // output(init, f.quasiColourAll(init));
+        std::cout << "\nError:   " << energy_error << '\n';
 
-        double relax = f(init) - f_x;
+        const double rate = choice.rate;
 
         std::cout << "Memory:  " << choice.delta_E << '\n';
-        std::cout << "Recon:   " << recon << '\n';
-        std::cout << "Relaxed: " << relax << '\n';
+        std::cout << "Recon:   " << recon_delta_E << '\n';
         std::cout << "Barrier: " << choice.active_E << "\n";
-        std::cout << "Rate:    " << activeToRate(choice.active_E) << ' '
-                  << activeToRate(choice.active_E) / rate_sum << '\n';
+        std::cout << "Rate:    " << rate << " : " << rate / rate_sum << '\n';
 
-        CHECK(std::abs(recon - choice.delta_E) < 0.1, "recon err");
+        VERIFY(std::abs(recon_delta_E - choice.delta_E) < 0.1, "recon err");
 
-        std::cout << "TIME: " << time << '\n' << std::endl;
+        std::cout << iter++ << " TIME: " << time << "\n\n";
 
-        // f.sort(init);
+        if (iter % 1000 == 0) {
+            classifyer.write();
+            catalog.write();
+        }
+
+        energy_pre = energy_post;
     }
-}
 
-// //////////////////OLD Reconstruct test////////////////////////////
-//
-// classifyer.loadAtoms(init);
-//
-// classifyer.verify(init);
-//
-// std::cout << "loaded" << std::endl;
-//
-// output(init);
-//
-// while (true) {
-//     auto [err, sp, end] = findSaddle(init, 12, f);
-//
-//     if (!err) {
-//         output(end);
-//
-//         auto [centre, ref] = classifyer.classifyMech(init, end);
-//
-//         std::cout << "\nCentre was " << centre << std::endl;
-//
-//         Vector recon = classifyer.reconstruct(init, 12, ref);
-//
-//         std::cout << f(end) - f(init) << std::endl;
-//         std::cout << f(recon) - f(init) << std::endl;
-//
-//         output(recon);const T &f
-//
-//         min.findMin(recon);
-//
-//         output(recon);
-//
-//         return 0;
-//     }
-// }
-//
-// ////////////////////////////////////////////////////
+    classifyer.write();
+    catalog.write();
+}

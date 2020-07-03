@@ -201,8 +201,20 @@ template <typename Canon> class Catalog {
         ignore_result(std::system("rm -r bak"));
     }
 
+    template <typename C> bool requireSearch(C const &cl) {
+
+        for (std::size_t i = 0; i < cl.size(); ++i) {
+            if (catalog.count(cl[i]) == 0 || catalog[cl[i]].sp_searches < 50 ||
+                ipow<3>(catalog[cl[i]].sp_searches) < catalog[cl[i]].count) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     template <typename F, typename C, typename MinImage>
-    void update(Vector const &x, F const &f, C const &cl, MinImage const &mi) {
+    int update(Vector const &x, F const &f, C const &cl, MinImage const &mi) {
 
         using result_t = std::vector<std::tuple<Vector, Vector>>;
 
@@ -215,8 +227,7 @@ template <typename Canon> class Catalog {
             catalog[cl[i]].count += 1; // default constructs new
 
             while (catalog[cl[i]].sp_searches < 50 ||
-                   catalog[cl[i]].sp_searches <
-                       std::sqrt(catalog[cl[i]].count)) {
+                   ipow<3>(catalog[cl[i]].sp_searches) < catalog[cl[i]].count) {
 
                 catalog[cl[i]].sp_searches += sp_trys;
 
@@ -265,5 +276,7 @@ template <typename Canon> class Catalog {
 
         std::cout << new_mechs << '/' << sps
                   << " saddles identified new mechanisims.\n";
+
+        return new_mechs;
     }
 };

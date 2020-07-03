@@ -251,7 +251,7 @@ template <typename Canon> class TopoClassify : protected CellList<Atom> {
         }
     }
 
-    bool verify() {
+    int verify() {
         std::size_t count_new = 0;
 
         for (std::size_t i = 0; i < size(); ++i) {
@@ -308,11 +308,9 @@ template <typename Canon> class TopoClassify : protected CellList<Atom> {
 
                 output(*prev, col);
 
-                CHECK(false, "topology collison");
+                VERIFY(false, "topology collison");
 
-                std::terminate();
-
-                return false;
+                return -1;
             } else {
                 search->second += t;
             }
@@ -322,7 +320,7 @@ template <typename Canon> class TopoClassify : protected CellList<Atom> {
 
         std::cout << count_new << '/' << size() << " are new.\n";
 
-        return true;
+        return count_new;
     }
 
     void write() {

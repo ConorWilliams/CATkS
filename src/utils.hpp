@@ -7,7 +7,7 @@
 #include <iterator>
 #include <utility>
 
-#ifndef NDEBUG
+#ifndef NCHECK
 #define CHECK(condition, message)                                              \
     do {                                                                       \
         if (!(condition)) {                                                    \
@@ -18,6 +18,21 @@
     } while (false)
 #else
 #define CHECK(condition, message)                                              \
+    do {                                                                       \
+    } while (false)
+#endif
+
+#if 1
+#define VERIFY(condition, message)                                             \
+    do {                                                                       \
+        if (!(condition)) {                                                    \
+            std::cerr << "Assertion `" #condition "` failed in " << __FILE__   \
+                      << " line " << __LINE__ << ": " << message << std::endl; \
+            std::terminate();                                                  \
+        }                                                                      \
+    } while (false)
+#else
+#define VERIFY(condition, message)                                             \
     do {                                                                       \
     } while (false)
 #endif
@@ -61,3 +76,20 @@ bool fileExist(const std::string &name) {
 
 template <typename T>
 inline void ignore_result(const T & /* unused result */) {}
+
+#ifdef __GNUG__
+#define CJ_CONST __attribute__((const))
+#else
+#define CJ_CONST
+#endif
+
+template <std::size_t P> CJ_CONST inline constexpr double ipow(double x) {
+    if constexpr (P % 2 == 0) {
+        return ipow<P / 2>(x) * ipow<P / 2>(x);
+    } else {
+        return ipow<P / 2>(x) * ipow<P / 2>(x) * x;
+    }
+}
+
+template <> CJ_CONST inline constexpr double ipow<0>(double) { return 1.0; }
+template <> CJ_CONST inline constexpr double ipow<1>(double x) { return x; }
