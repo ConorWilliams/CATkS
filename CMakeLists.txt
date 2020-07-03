@@ -65,7 +65,7 @@ find_package (Eigen3 3.3 REQUIRED NO_MODULE)
 find_package (Threads)
 
 # bad practice
-set(CMAKE_CXX_COMPILER /home/cdt1902/usr/bin/g++10)
+# set(CMAKE_CXX_COMPILER /home/cdt1902/usr/bin/g++10)
 
 # for clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

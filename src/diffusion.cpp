@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
 
     VERIFY(argc == 2, "need a EAM data file");
 
-    Vector init(len * len * len * 3 * 2 + 3 * 1);
+    Vector init(len * len * len * 3 * 2 + 3 * 2);
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -109,11 +109,11 @@ int main(int argc, char **argv) {
     init[init.size() - 2] = LAT * (1 + 0.25);
     init[init.size() - 1] = LAT * (1 + 0.00);
 
-    // kinds[init.size() / 3 - 2] = H;
-    //
-    // init[init.size() - 6] = LAT * (2 + 0.50);
-    // init[init.size() - 5] = LAT * (2 + 0.25);
-    // init[init.size() - 4] = LAT * (2 + 0.00);
+    kinds[init.size() / 3 - 2] = H;
+
+    init[init.size() - 6] = LAT * (2 + 0.50);
+    init[init.size() - 5] = LAT * (2 + 0.25);
+    init[init.size() - 4] = LAT * (2 + 0.00);
 
     ////////////////////////////////////////////////////////////
 
@@ -171,6 +171,7 @@ int main(int argc, char **argv) {
         } else {
             classifyer.analyzeTopology(init);
 
+            // Want to be in a true minimum if we require sp searches
             if (catalog.requireSearch(classifyer)) {
                 min.findMin(init);
                 energy_pre = f(init);
