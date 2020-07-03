@@ -220,7 +220,7 @@ template <typename Canon> class Catalog {
 
         std::vector<std::future<result_t>> searches;
 
-        constexpr std::size_t sp_trys = 5;
+        constexpr std::size_t sp_trys = 10;
 
         for (std::size_t i = 0; i < cl.size(); ++i) {
 
