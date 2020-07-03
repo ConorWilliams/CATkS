@@ -221,7 +221,7 @@ template <typename F, typename P> class Dimer {
             // std::cout << "G_eff^2: " << dot(g_eff, g_eff) << ' ' << curv
             //           << std::endl;
 
-            if (dot(g_eff, g_eff) < F_TOL * F_TOL) {
+            if ((g_eff * g_eff).maxCoeff() < F_TOL * F_TOL) {
                 return true;
             }
 

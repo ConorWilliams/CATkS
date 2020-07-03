@@ -46,7 +46,7 @@ enum : uint8_t { Fe = 0, H = 1 };
 
 constexpr double LAT = 2.855700;
 
-inline constexpr int len = 5;
+inline constexpr int len = 10;
 
 struct LocalisedMech {
     std::size_t atom;
@@ -58,7 +58,7 @@ struct LocalisedMech {
 
 double activeToRate(double active_E) {
 
-    CHECK(active_E > 0, "sp energy < init energy");
+    CHECK(active_E > 0, "sp energy < init energy " << active_E);
 
     return ARRHENIUS_PRE * std::exp(active_E * -INV_KB_T);
 }
@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
 
     VERIFY(argc == 2, "need a EAM data file");
 
-    Vector init(len * len * len * 3 * 2 + 3 * 2);
+    Vector init(len * len * len * 3 * 2 + 3 * 1);
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -109,11 +109,11 @@ int main(int argc, char **argv) {
     init[init.size() - 2] = LAT * (1 + 0.25);
     init[init.size() - 1] = LAT * (1 + 0.00);
 
-    kinds[init.size() / 3 - 2] = H;
-
-    init[init.size() - 6] = LAT * (2 + 0.50);
-    init[init.size() - 5] = LAT * (2 + 0.25);
-    init[init.size() - 4] = LAT * (2 + 0.00);
+    // kinds[init.size() / 3 - 2] = H;
+    //
+    // init[init.size() - 6] = LAT * (2 + 0.50);
+    // init[init.size() - 5] = LAT * (2 + 0.25);
+    // init[init.size() - 4] = LAT * (2 + 0.00);
 
     ////////////////////////////////////////////////////////////
 
@@ -154,6 +154,8 @@ int main(int argc, char **argv) {
     std::vector<LocalisedMech> possible{};
 
     double energy_pre = f(init);
+
+    // return 0;
 
     while (iter < 500) {
 

@@ -82,8 +82,10 @@ include_directories(src)
 
 #////////////////////naughty///////////////////////
 
-add_library(Nauty SHARED IMPORTED)
+
+add_library(Nauty STATIC IMPORTED)
 set_target_properties(Nauty PROPERTIES IMPORTED_LOCATION "${PROJECT_SOURCE_DIR}/external/nauty27r1/nauty.a")
+
 
 # //////////////////////////////////////////////
 
