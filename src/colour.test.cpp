@@ -275,6 +275,8 @@ int main() {
         std::cout << "Recon:   " << recon << '\n';
         std::cout << "Relaxed: " << relax << '\n';
         std::cout << "Barrier: " << choice.active_E << "\n";
+        std::cout << "Rate:    " << activeToRate(choice.active_E) << ' '
+                  << activeToRate(choice.active_E) / rate_sum << '\n';
 
         check(std::abs(recon - choice.delta_E) < 0.1, "recon err");
 

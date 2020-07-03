@@ -37,15 +37,15 @@ class Box {
         double zmin, double zmax)
         : m_rcut{rcut}, m_limits{{{xmin, xmax}, {ymin, ymax}, {zmin, zmax}}} {
         // sanity
-        check(xmax > xmin, "cannot have x min <= max");
-        check(ymax > ymin, "cannot have y min <= max");
-        check(zmax > zmin, "cannot have z min <= max");
+        CHECK(xmax > xmin, "cannot have x min <= max");
+        CHECK(ymax > ymin, "cannot have y min <= max");
+        CHECK(zmax > zmin, "cannot have z min <= max");
 
-        check(rcut > 0, "rcut is negative");
+        CHECK(rcut > 0, "rcut is negative");
 
-        check(xmax - xmin >= rcut, "box too small");
-        check(ymax - ymin >= rcut, "box too small");
-        check(zmax - zmin >= rcut, "box too small");
+        CHECK(xmax - xmin >= rcut, "box too small");
+        CHECK(ymax - ymin >= rcut, "box too small");
+        CHECK(zmax - zmin >= rcut, "box too small");
 
         // round down (toward zero) truncation, therefore boxes always biger
         // than rcut, plus two (+ 2) for gost cell layer
@@ -60,9 +60,9 @@ class Box {
         double lcy = (ymax - ymin) / (my - 2);
         double lcz = (ymax - ymin) / (mz - 2);
 
-        check(lcx >= rcut, "cells made too small");
-        check(lcy >= rcut, "cells made too small");
-        check(lcz >= rcut, "cells made too small");
+        CHECK(lcx >= rcut, "cells made too small");
+        CHECK(lcy >= rcut, "cells made too small");
+        CHECK(lcz >= rcut, "cells made too small");
 
         ox = -lcx; // o for offset
         oy = -lcy;
@@ -105,9 +105,9 @@ class Box {
         dy = b[1] - a[1];
         dz = b[2] - a[2];
 
-        check(&a != &b, "atoms in norm are the same atom");
+        CHECK(&a != &b, "atoms in norm are the same atom");
 
-        check(!(b[0] == a[0] && b[1] == a[1] && b[2] == a[2]),
+        CHECK(!(b[0] == a[0] && b[1] == a[1] && b[2] == a[2]),
               "two atoms in same position");
 
         return dx * dx + dy * dy + dz * dz;
@@ -143,15 +143,15 @@ class Box {
     // }
 
     template <typename T> inline std::size_t lambda(T const &atom) const {
-        check(atom[0] >= ox && atom[0] - ox < lx, "x out of +cell");
-        check(atom[1] >= oy && atom[1] - oy < ly, "y out of +cell");
-        check(atom[2] >= oz && atom[2] - oz < lz, "z out of +cell");
+        CHECK(atom[0] >= ox && atom[0] - ox < lx, "x out of +cell");
+        CHECK(atom[1] >= oy && atom[1] - oy < ly, "y out of +cell");
+        CHECK(atom[2] >= oz && atom[2] - oz < lz, "z out of +cell");
 
         std::size_t i = ((atom[0] - ox) * mx) / lx;
         std::size_t j = ((atom[1] - oy) * my) / ly;
         std::size_t k = ((atom[2] - oz) * mz) / lz;
 
-        check(i + j * mx + k * mx * my < numCells(), "lambda out of range");
+        CHECK(i + j * mx + k * mx * my < numCells(), "lambda out of range");
 
         return i + j * mx + k * mx * my;
     }

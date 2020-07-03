@@ -122,8 +122,8 @@ class NautyCanon {
             {F_H_BOND, H_H_BOND},
         };
 
-        check(a.kind() < 2, "atom type not valid " << a.kind());
-        check(b.kind() < 2, "atom type not valid " << b.kind());
+        CHECK(a.kind() < 2, "atom type not valid " << a.kind());
+        CHECK(b.kind() < 2, "atom type not valid " << b.kind());
 
         double sqdist = (a.pos() - b.pos()).squaredNorm();
 
@@ -139,7 +139,7 @@ class NautyCanon {
     static inline NautyGraph canonicalize(std::vector<Atom_t> &atoms,
                                           std::vector<Atom_t> &order) {
 
-        check(order.size() == 0, "order has atoms already");
+        CHECK(order.size() == 0, "order has atoms already");
 
         static int lab[MAXN];
         static int ptn[MAXN];
@@ -157,7 +157,7 @@ class NautyCanon {
         std::size_t n = atoms.size();
         std::size_t m = SETWORDSNEEDED(n);
 
-        check(n <= MAXN && m <= MAXM, "too many atoms" << n << ' ' << m);
+        CHECK(n <= MAXN && m <= MAXM, "too many atoms" << n << ' ' << m);
 
         nauty_check(WORDSIZE, m, n, NAUTYVERSIONID);
 

@@ -63,7 +63,7 @@ template <typename Atom_t> class CellList {
     inline void clearGhosts() { list.resize(kinds.size()); }
 
     template <typename T> void fillList(T const &x3n) {
-        check(static_cast<std::size_t>(x3n.size()) == 3 * kinds.size(),
+        CHECK(static_cast<std::size_t>(x3n.size()) == 3 * kinds.size(),
               "wrong number of atoms");
 
         list.clear(); // should be order 1
@@ -74,10 +74,10 @@ template <typename Atom_t> class CellList {
             auto [x, y, z] =
                 box.mapIntoCell(x3n[3 * i + 0], x3n[3 * i + 1], x3n[3 * i + 2]);
 
-            // check in cell
-            check(x >= 0 && x < box.limits(0).len, "x out of box " << x);
-            check(y >= 0 && y < box.limits(1).len, "y out of box " << y);
-            check(z >= 0 && z < box.limits(2).len, "z out of box " << z);
+            // CHECK in cell
+            CHECK(x >= 0 && x < box.limits(0).len, "x out of box " << x);
+            CHECK(y >= 0 && y < box.limits(1).len, "y out of box " << y);
+            CHECK(z >= 0 && z < box.limits(2).len, "z out of box " << z);
 
             list.emplace_back(kinds[i], x, y, z, i);
         }
@@ -125,7 +125,7 @@ template <typename Atom_t> class CellList {
 
         std::size_t const lambda = box.lambda(atom);
 
-        check(lambda < box.numCells(), "bad lambda " << lambda);
+        CHECK(lambda < box.numCells(), "bad lambda " << lambda);
 
         std::size_t const end = list.size();
         double const cut_sq = box.rcut() * box.rcut();
@@ -134,7 +134,7 @@ template <typename Atom_t> class CellList {
 
         // in same cell as Atom2
         do {
-            check(index < list.size(), "bad index " << index);
+            CHECK(index < list.size(), "bad index " << index);
 
             Atom_t const &neigh = list[index];
 
@@ -150,9 +150,9 @@ template <typename Atom_t> class CellList {
 
         } while (index != end);
 
-        // in adjecent cells -- don't need check against self
+        // in adjecent cells -- don't need CHECK against self
         for (auto off : box.getAdjOff()) {
-            check(static_cast<long>(lambda) + off >= 0 &&
+            CHECK(static_cast<long>(lambda) + off >= 0 &&
                       lambda + off < box.numCells(),
                   "bad off  " << lambda << ' ' << off << ' '
                               << atom.pos().transpose());
@@ -162,7 +162,7 @@ template <typename Atom_t> class CellList {
             // std::cout << "cell_t " << lambda + off << std::endl;
             while (index != end) {
 
-                check(index < list.size(), "bad index " << index);
+                CHECK(index < list.size(), "bad index " << index);
 
                 Atom_t const &neigh = list[index];
 

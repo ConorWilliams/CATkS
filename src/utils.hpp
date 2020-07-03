@@ -8,7 +8,7 @@
 #include <utility>
 
 #ifndef NDEBUG
-#define check(condition, message)                                              \
+#define CHECK(condition, message)                                              \
     do {                                                                       \
         if (!(condition)) {                                                    \
             std::cerr << "Assertion `" #condition "` failed in " << __FILE__   \
@@ -17,7 +17,7 @@
         }                                                                      \
     } while (false)
 #else
-#define check(condition, message)                                              \
+#define CHECK(condition, message)                                              \
     do {                                                                       \
     } while (false)
 #endif

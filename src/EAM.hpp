@@ -69,7 +69,7 @@ struct TabEAM {
         std::size_t i = r / deltaR;
         double mu = (r - i * deltaR) / deltaR;
 
-        check(i > 0 && i + 1 < numPntsR, "r out of bounds " << i);
+        CHECK(i > 0 && i + 1 < numPntsR, "r out of bounds " << i);
         return cubicInterpolate(v[i - 1], v[i], v[i + 1],
                                 v[std::min(i + 2, numPntsR - 1)], mu);
     }
@@ -78,7 +78,7 @@ struct TabEAM {
         std::size_t i = p / deltaP;
         double mu = (p - i * deltaP) / deltaP;
 
-        check(i > 0 && i + 1 < numPntsP, "p out of bounds " << i);
+        CHECK(i > 0 && i + 1 < numPntsP, "p out of bounds " << i);
         return cubicInterpolate(v[i - 1], v[i], v[i + 1],
                                 v[std::min(i + 2, numPntsP - 1)], mu);
     }

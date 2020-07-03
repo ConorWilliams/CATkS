@@ -44,11 +44,11 @@ class FuncEAM {
     FuncEAM(Box const &box, std::vector<int> const &kinds, TabEAM const &data)
         : cellList{box, kinds}, data{data}, numAtoms{kinds.size()} {
 
-        check(*std::max_element(kinds.begin(), kinds.end()) <
+        CHECK(*std::max_element(kinds.begin(), kinds.end()) <
                   int(data.numSpecies),
               "found kinds that are not in the EAM species data");
 
-        check(*std::min_element(kinds.begin(), kinds.end()) >= int(0),
+        CHECK(*std::min_element(kinds.begin(), kinds.end()) >= int(0),
               "found kinds that are negative?");
     }
 

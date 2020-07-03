@@ -9,7 +9,7 @@
 
 template <typename K>
 void dumpXYX(std::string const &file, Vector const &coords, K kinds) {
-    check(kinds.size() * 3 == (std::size_t)coords.size(),
+    CHECK(kinds.size() * 3 == (std::size_t)coords.size(),
           " wrong number of atoms/kinds");
 
     std::ofstream outfile{file};

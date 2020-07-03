@@ -23,23 +23,23 @@ Eigen::Matrix3d modifiedGramSchmidt(Eigen::Matrix3d const &in) {
     Eigen::Matrix3d out;
 
     out.col(0) = in.col(0);
-    check(out.col(0).squaredNorm() > 0.01, "linear dependance in basis");
+    CHECK(out.col(0).squaredNorm() > 0.01, "linear dependance in basis");
     out.col(0).normalize();
 
     out.col(1) = in.col(1) - (in.col(1).adjoint() * out.col(0)) * out.col(0);
-    check(out.col(1).squaredNorm() > 0.01, "linear dependance in basis");
+    CHECK(out.col(1).squaredNorm() > 0.01, "linear dependance in basis");
     out.col(1).normalize();
 
     out.col(2) = in.col(2) - (in.col(2).adjoint() * out.col(0)) * out.col(0);
     out.col(2) -= (out.col(2).adjoint() * out.col(1)) * out.col(1);
-    check(out.col(2).squaredNorm() > 0.01, "linear dependance in basis");
+    CHECK(out.col(2).squaredNorm() > 0.01, "linear dependance in basis");
     out.col(2).normalize();
 
     using std::abs;
 
-    check(abs(out.col(0).transpose() * out.col(1)) < 0.01, "gram schmidt fail");
-    check(abs(out.col(1).transpose() * out.col(2)) < 0.01, "gram schmidt fail");
-    check(abs(out.col(2).transpose() * out.col(0)) < 0.01, "gram schmidt fail");
+    CHECK(abs(out.col(0).transpose() * out.col(1)) < 0.01, "gram schmidt fail");
+    CHECK(abs(out.col(1).transpose() * out.col(2)) < 0.01, "gram schmidt fail");
+    CHECK(abs(out.col(2).transpose() * out.col(0)) < 0.01, "gram schmidt fail");
 
     return out;
 }
@@ -49,7 +49,7 @@ template <typename T> Eigen::Matrix3d findBasis(std::vector<T> const &ns) {
     Eigen::Vector3d origin = ns[0].pos();
     Eigen::Matrix3d basis;
 
-    check(ns.size() > 3, "Not enough atoms to define basis");
+    CHECK(ns.size() > 3, "Not enough atoms to define basis");
 
     basis.col(0) = (ns[1].pos() - origin).normalized();
 
@@ -61,7 +61,7 @@ template <typename T> Eigen::Matrix3d findBasis(std::vector<T> const &ns) {
 
             Eigen::Vector3d cross = basis.col(0).cross(e1);
 
-            // check for colinearity
+            // CHECK for colinearity
             if (cross.squaredNorm() > 0.1) {
                 basis.col(1) = e1;
                 basis.col(2) = cross;
@@ -78,7 +78,7 @@ template <typename T> Eigen::Matrix3d findBasis(std::vector<T> const &ns) {
 
         double triple_prod = std::abs(basis.col(2).adjoint() * e2);
 
-        // check for coplanarity with e0, e1
+        // CHECK for coplanarity with e0, e1
         if (triple_prod > 0.1) {
             basis.col(2) = e2;
             // std::cout << "e2 @ 0->" << i << std::endl;
@@ -124,7 +124,7 @@ struct Topo {
     }
 
     Topo &operator+=(Topo const &other) {
-        check(hash == other.hash, "cant add disimilar");
+        CHECK(hash == other.hash, "cant add disimilar");
 
         double total = count + other.count;
 
@@ -179,7 +179,7 @@ template <typename Canon> class TopoClassify : protected CellList<Atom> {
     static constexpr auto fname = "toporef.json";
 
     detail::Topo classifyTopo(std::size_t idx) const {
-        check(idx < size(), "out of bounds");
+        CHECK(idx < size(), "out of bounds");
 
         detail::Topo topo{keys[idx].hash()};
 
@@ -308,7 +308,7 @@ template <typename Canon> class TopoClassify : protected CellList<Atom> {
 
                 output(*prev, col);
 
-                check(false, "topology collison");
+                CHECK(false, "topology collison");
 
                 std::terminate();
 
@@ -375,7 +375,7 @@ template <typename Canon> class TopoClassify : protected CellList<Atom> {
         //             dist_sq = delta.squaredNorm();
         //
         //             if (dist_sq > box.rcut() * box.rcut()) {
-        //                 // check(sq_d < box.rcut() * box.rcut(), "big mech
+        //                 // CHECK(sq_d < box.rcut() * box.rcut(), "big mech
         //                 // found");
         //                 std::cout << "big mech found " << std::sqrt(dist_sq)
         //                           << std::endl;
@@ -408,7 +408,7 @@ template <typename Canon> class TopoClassify : protected CellList<Atom> {
 
         Vector end = *prev;
 
-        check(canon[idx].size() == ref.size(),
+        CHECK(canon[idx].size() == ref.size(),
               "wrong num atoms in reconstruction");
 
         Eigen::Matrix3d transform = findBasis(canon[idx]);

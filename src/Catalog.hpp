@@ -90,7 +90,7 @@ template <typename Canon> class Catalog {
                       std::vector<Eigen::Vector3d> &&ref) {
 
             for (auto &&m : mechs) {
-                check(m.ref.size() == ref.size(), "topoolgy collison");
+                CHECK(m.ref.size() == ref.size(), "topoolgy collison");
 
                 if (std::abs(m.delta_E - delta_E) < DELTA_E_TOL &&
                     std::abs(m.active_E - active_E) < DELTA_E_TOL) {
@@ -153,7 +153,7 @@ template <typename Canon> class Catalog {
             auto names = keys.get<std::unordered_map<Key_t, std::string>>();
 
             for (auto &&[key, name] : names) {
-                check(fileExist(name), "missing a topo file");
+                CHECK(fileExist(name), "missing a topo file");
 
                 json j = json::parse(std::ifstream(name));
 
