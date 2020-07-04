@@ -111,7 +111,7 @@ class NautyCanon {
     // pre H was working at 2.55 // 2.47 -- 2.86 angstrom (just > first neigh)
     static constexpr double F_F_BOND = 2.55;
     static constexpr double H_H_BOND = 2.00; // 0.5^2+0.5^2 vacancy neigh
-    static constexpr double F_H_BOND = 2.65; // 0.75^2 + 0.5^2
+    static constexpr double F_H_BOND = 2.70; // 0.75^2 + 0.5^2 was .65
 
   public:
     template <typename Atom_t>

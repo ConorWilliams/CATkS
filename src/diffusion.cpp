@@ -1,6 +1,6 @@
 //#define NCHECK
-//#define EIGEN_NO_DEBUG
 
+#define EIGEN_NO_DEBUG
 #define EIGEN_DONT_PARALLELIZE
 
 /*
@@ -46,7 +46,7 @@ enum : uint8_t { Fe = 0, H = 1 };
 
 constexpr double LAT = 2.855700;
 
-inline constexpr int len = 10;
+inline constexpr int len = 5;
 
 struct LocalisedMech {
     std::size_t atom;
@@ -67,7 +67,7 @@ int main(int argc, char **argv) {
 
     // CHECK(false, "false");
 
-    VERIFY(argc == 2, "need a EAM data file");
+    VERIFY(argc == 3, "need an EAM data file and H dump file");
 
     Vector init(len * len * len * 3 * 2 + 3 * 1);
     Vector ax(init.size());
@@ -153,45 +153,44 @@ int main(int argc, char **argv) {
 
     std::vector<LocalisedMech> possible{};
 
-    double energy_pre = f(init);
-
-    // return 0;
-
-    while (iter < 500) {
+    while (time < 1e-7) {
 
         output(init, f.quasiColourAll(init));
-
-        dumpH("h_diffusion.xyz", time, init, kinds);
+        dumpH(argv[2], time, init, kinds);
 
         ////////////////////////////////////////////////////////////
 
-        if (energy_error > ACCUMULATED_ERROR_LIMIT) {
-            min.findMin(init);
-            energy_pre = f(init);
-            energy_error = 0;
-            classifyer.analyzeTopology(init);
-        } else {
-            classifyer.analyzeTopology(init);
+        bool minimised = false;
 
-            // Want to be in a true minimum if we require sp searches
-            if (catalog.requireSearch(classifyer)) {
-                min.findMin(init);
-                energy_pre = f(init);
-                energy_error = 0;
-                classifyer.analyzeTopology(init);
-            }
+        if (energy_error > ACCUMULATED_ERROR_LIMIT) {
+            minimised = true;
+            energy_error = 0;
+
+            min.findMin(init);
+        }
+
+        classifyer.analyzeTopology(init);
+
+        std::vector<size_t> idxs = catalog.getSearchIdxs(classifyer);
+
+        if (!minimised && idxs.size() > 0) {
+            minimised = true;
+            min.findMin(init);
+            classifyer.analyzeTopology(init);
         }
 
         int new_topos = classifyer.verify();
 
-        int new_mechs =
-            catalog.update(init, f, classifyer, [&](Eigen::Vector3d dr) {
-                return topo_box.minImage(dr);
-            });
+        VERIFY(idxs.size() ? minimised : true, "balls");
+
+        int new_mechs = catalog.update(
+            init, f, classifyer,
+            [&](Eigen::Vector3d dr) { return topo_box.minImage(dr); }, idxs);
 
         if (new_topos > 0) {
             classifyer.write();
         }
+
         if (new_mechs > 0) {
             catalog.write();
         }
@@ -233,6 +232,8 @@ int main(int argc, char **argv) {
 
         time += -std::log(uniform_dist(rng)) / rate_sum;
 
+        const double energy_pre = f(init);
+
         init = classifyer.reconstruct(choice.atom, choice.ref);
 
         const double energy_post = f(init);
@@ -258,8 +259,6 @@ int main(int argc, char **argv) {
             classifyer.write();
             catalog.write();
         }
-
-        energy_pre = energy_post;
     }
 
     classifyer.write();

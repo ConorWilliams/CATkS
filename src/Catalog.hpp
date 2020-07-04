@@ -13,7 +13,7 @@
 
 #include "utils.hpp"
 
-inline constexpr double DELTA_E_TOL = 0.1;
+inline constexpr double DELTA_E_TOL = 0.1; // TODO : make this 0.01 and test
 inline constexpr double DIST_TOL = 0.2;
 
 namespace nlohmann {
@@ -140,6 +140,8 @@ template <typename Canon> class Catalog {
 
     std::unordered_map<Key_t, Topo> catalog;
 
+    static constexpr std::size_t sp_trys = 10;
+
   public:
     Catalog() {
         using nlohmann::json;
@@ -201,48 +203,19 @@ template <typename Canon> class Catalog {
         ignore_result(std::system("rm -r bak"));
     }
 
-    template <typename C> bool requireSearch(C const &cl) {
-
-        for (std::size_t i = 0; i < cl.size(); ++i) {
-            if (catalog.count(cl[i]) == 0 || catalog[cl[i]].sp_searches < 50 ||
-                ipow<3>(catalog[cl[i]].sp_searches) < catalog[cl[i]].count) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     template <typename F, typename C, typename MinImage>
-    int update(Vector const &x, F const &f, C const &cl, MinImage const &mi) {
+    int update(Vector const &x, F const &f, C const &cl, MinImage const &mi,
+               std::vector<std::size_t> const &idxs) {
 
         using result_t = std::vector<std::tuple<Vector, Vector>>;
 
         std::vector<std::future<result_t>> searches;
 
-        constexpr std::size_t sp_trys = 10;
-
-        for (std::size_t i = 0; i < cl.size(); ++i) {
-
-            catalog[cl[i]].count += 1; // default constructs new
-
-            while (catalog[cl[i]].sp_searches < 50 ||
-                   ipow<3>(catalog[cl[i]].sp_searches) < catalog[cl[i]].count) {
-
-                catalog[cl[i]].sp_searches += sp_trys;
-
-                // std::cout << "@ " << i << '/' << cl.size()
-                //           << " dimer launch ... " << std::flush;
-
-                searches.push_back(
-                    std::async(std::launch::async, [=, &x, &mi]() -> result_t {
-                        return findSaddle(sp_trys, x, i, f, mi);
-                    }));
-
-                // searches.push_back(findSaddle(sp_trys, x, i, f, mi));
-
-                // std::cout << searches.size() << " successful!" << std::endl;
-            }
+        for (auto idx : idxs) {
+            searches.emplace_back(
+                std::async(std::launch::async, [=, &x, &mi]() -> result_t {
+                    return findSaddle(sp_trys, x, idx, f, mi);
+                }));
         }
 
         std::cout << "Launched " << searches.size()
@@ -264,6 +237,8 @@ template <typename Canon> class Catalog {
                 double barrier = f(sp) - f_x;
                 double delta = f(end) - f_x;
 
+                CHECK(barrier > 0, "found a negative energy sp?");
+
                 if (catalog[cl[centre]].pushMech(barrier, delta,
                                                  std::move(ref))) {
                     new_mechs += 1;
@@ -278,5 +253,25 @@ template <typename Canon> class Catalog {
                   << " saddles identified new mechanisims.\n";
 
         return new_mechs;
+    }
+
+    template <typename C> std::vector<std::size_t> getSearchIdxs(C const &cl) {
+
+        std::vector<std::size_t> idxs;
+
+        for (std::size_t i = 0; i < cl.size(); ++i) {
+
+            catalog[cl[i]].count += 1; // default constructs new
+
+            while (catalog[cl[i]].sp_searches < 50 ||
+                   ipow<3>(catalog[cl[i]].sp_searches) < catalog[cl[i]].count) {
+
+                catalog[cl[i]].sp_searches += sp_trys;
+
+                idxs.push_back(i);
+            }
+        }
+
+        return idxs;
     }
 };

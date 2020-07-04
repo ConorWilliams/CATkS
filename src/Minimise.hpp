@@ -54,7 +54,7 @@ template <typename F1, typename F2> class Minimise {
             // std::cout << "Min iter: " << iter << ' ' << std::setprecision(16)
             //           << f(x) << std::endl;
 
-            if ((g * g).maxCoeff() < F_TOL * F_TOL) {
+            if (dot(g, g) < F_TOL * F_TOL) {
                 return true;
             }
 

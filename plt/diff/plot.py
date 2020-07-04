@@ -27,6 +27,10 @@ data = np.loadtxt(
     "/home/cdt1902/dis/CATkS/plt/diff/h_diffusion_5.xyz", dtype=np.float64
 )
 
+data2 = np.loadtxt(
+    "/home/cdt1902/dis/CATkS/plt/diff/h_diffusion_5_t2.xyz", dtype=np.float64
+)
+
 data = data[::, ::]
 
 disp = data[::, 1::] - data[0, 1::]
@@ -40,7 +44,22 @@ sq = np.sum(disp, axis=1)
 x = data[::, 0]
 y = sq
 
+data2 = data2[::, ::]
+
+disp2 = data2[::, 1::] - data2[0, 1::]
+
+disp2 = disp2 * 1e-10
+
+disp2 = disp2 * disp2
+
+sq2 = np.sum(disp2, axis=1)
+
+x2 = data2[::, 0]
+y2 = sq2
+
 plt.loglog(x, y, ".")
+plt.loglog(x2, y2, ".")
+
 
 plt.legend()
 
