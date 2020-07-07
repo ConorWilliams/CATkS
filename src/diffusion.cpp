@@ -27,10 +27,12 @@
 #include <iostream>
 #include <limits>
 
+#include "DumpXYX.hpp"
+
 #include "Canon.hpp"
 #include "Catalog.hpp"
 #include "Dimer.hpp"
-#include "DumpXYX.hpp"
+
 #include "Forces.hpp"
 #include "Topo.hpp"
 #include "utils.hpp"
@@ -46,7 +48,7 @@ enum : uint8_t { Fe = 0, H = 1 };
 
 constexpr double LAT = 2.855700;
 
-inline constexpr int len = 5;
+inline constexpr int len = 12;
 
 struct LocalisedMech {
     std::size_t atom;
@@ -105,9 +107,9 @@ int main(int argc, char **argv) {
 
     kinds[init.size() / 3 - 1] = H;
 
-    init[init.size() - 3] = LAT * (1 + 0.50);
-    init[init.size() - 2] = LAT * (1 + 0.25);
-    init[init.size() - 1] = LAT * (1 + 0.00);
+    init[init.size() - 3] = LAT * (0 + 0.50);
+    init[init.size() - 2] = LAT * (0 + 0.25);
+    init[init.size() - 1] = LAT * (0 + 0.00);
 
     // kinds[init.size() / 3 - 2] = H;
     //
@@ -179,6 +181,8 @@ int main(int argc, char **argv) {
             classifyer.analyzeTopology(init);
         }
 
+        // possibly verify topology didnt change after minimisation
+
         int new_topos = classifyer.verify();
 
         VERIFY(idxs.size() ? minimised : true, "balls");
@@ -188,11 +192,11 @@ int main(int argc, char **argv) {
             [&](Eigen::Vector3d dr) { return topo_box.minImage(dr); }, idxs);
 
         if (new_topos > 0) {
-            classifyer.write();
+            // classifyer.write();
         }
 
         if (new_mechs > 0) {
-            catalog.write();
+            // catalog.write();
         }
 
         //////////////////////////////////////////////////////////////
@@ -220,13 +224,21 @@ int main(int argc, char **argv) {
         LocalisedMech choice = [&]() {
             double sum = 0;
             for (auto &&elem : possible) {
+
                 sum += elem.rate;
                 if (sum > p1 * rate_sum) {
                     return elem;
                 }
             }
+            std::cout << "hit end of choice" << std::endl;
             std::terminate();
         }();
+
+        for (auto &&elem : possible) {
+            std::cout << elem.active_E << ' ' << elem.delta_E << std::endl;
+        }
+
+        return 0;
 
         ////////////////////////////////////////////////////
 
@@ -256,11 +268,11 @@ int main(int argc, char **argv) {
         std::cout << iter++ << " TIME: " << time << "\n\n";
 
         if (iter % 1000 == 0) {
-            classifyer.write();
-            catalog.write();
+            // classifyer.write();
+            // catalog.write();
         }
     }
 
-    classifyer.write();
-    catalog.write();
+    // classifyer.write();
+    // catalog.write();
 }

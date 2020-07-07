@@ -91,7 +91,14 @@ set_target_properties(Nauty PROPERTIES IMPORTED_LOCATION "${PROJECT_SOURCE_DIR}/
 
 
 
-add_executable(diffusion src/diffusion.cpp)
+# add_executable(diffusion src/diffusion.cpp)
+# target_compile_options(diffusion PRIVATE -Werror)
+# target_link_libraries(diffusion PRIVATE Eigen3::Eigen nlohmann_json::nlohmann_json SMHasherSupport Nauty ${CMAKE_THREAD_LIBS_INIT})
+#
 
-target_compile_options(diffusion PRIVATE -Werror)
-target_link_libraries(diffusion PRIVATE Eigen3::Eigen nlohmann_json::nlohmann_json SMHasherSupport Nauty ${CMAKE_THREAD_LIBS_INIT})
+
+
+
+add_executable(debug src/scale.debug.cpp)
+target_compile_options(debug PRIVATE -Werror)
+target_link_libraries(debug PRIVATE Eigen3::Eigen nlohmann_json::nlohmann_json SMHasherSupport Nauty ${CMAKE_THREAD_LIBS_INIT})

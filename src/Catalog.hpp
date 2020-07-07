@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <future>
+#include <iomanip>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -140,7 +141,7 @@ template <typename Canon> class Catalog {
 
     std::unordered_map<Key_t, Topo> catalog;
 
-    static constexpr std::size_t sp_trys = 10;
+    static constexpr std::size_t sp_trys = 1;
 
   public:
     Catalog() {
@@ -213,7 +214,7 @@ template <typename Canon> class Catalog {
 
         for (auto idx : idxs) {
             searches.emplace_back(
-                std::async(std::launch::async, [=, &x, &mi]() -> result_t {
+                std::async(std::launch::deferred, [=, &x, &mi]() -> result_t {
                     return findSaddle(sp_trys, x, idx, f, mi);
                 }));
         }
@@ -234,15 +235,28 @@ template <typename Canon> class Catalog {
 
                 auto [centre, ref] = cl.classifyMech(end);
 
+                std::cout << std::setprecision(15) << "init" << f(x) << '\n';
+                std::cout << "sp  " << f(sp) << '\n';
+                std::cout << "end " << f(end) << '\n';
+
                 double barrier = f(sp) - f_x;
                 double delta = f(end) - f_x;
 
-                CHECK(barrier > 0, "found a negative energy sp?");
+                // CHECK(barrier > 0, "found a negative energy sp?");
 
                 if (catalog[cl[centre]].pushMech(barrier, delta,
                                                  std::move(ref))) {
                     new_mechs += 1;
                 }
+
+                std::cout << barrier << "\n";
+                std::cout << delta << "\n";
+
+                output(x, f.quasiColourAll(x));
+                output(sp, f.quasiColourAll(sp));
+                output(end, f.quasiColourAll(end));
+
+                std::terminate();
             }
         }
 
@@ -263,8 +277,8 @@ template <typename Canon> class Catalog {
 
             catalog[cl[i]].count += 1; // default constructs new
 
-            while (catalog[cl[i]].sp_searches < 50 ||
-                   ipow<3>(catalog[cl[i]].sp_searches) < catalog[cl[i]].count) {
+            while (catalog[cl[i]].sp_searches < 5 /*||
+                   ipow<3>(catalog[cl[i]].sp_searches) < catalog[cl[i]].count*/) {
 
                 catalog[cl[i]].sp_searches += sp_trys;
 

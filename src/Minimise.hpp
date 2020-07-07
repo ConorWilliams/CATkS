@@ -5,6 +5,7 @@
 #include <iostream>
 #include <utility>
 
+#include "DumpXYX.hpp"
 #include "Eigen/Core"
 #include "L_BFGS.hpp"
 #include "utils.hpp"
@@ -50,9 +51,16 @@ template <typename F1, typename F2> class Minimise {
 
         grad(x, g);
 
+        double energy_start = f(x);
+
+        std::cout << "minimiser starts @ " << energy_start << '\n';
+
         for (int iter = 0; iter < I_MAX; ++iter) {
-            // std::cout << "Min iter: " << iter << ' ' << std::setprecision(16)
-            //           << f(x) << std::endl;
+            std::cout << "Min iter: " << iter << ' ' << FRAME << ' '
+                      << f(x) - energy_start << " force " << dot(g, g)
+                      << std::endl;
+
+            output(x);
 
             if (dot(g, g) < F_TOL * F_TOL) {
                 return true;

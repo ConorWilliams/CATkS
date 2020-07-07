@@ -50,6 +50,9 @@ struct TabEAM {
     double deltaR;
     double deltaP;
 
+    double inv_deltaR;
+    double inv_deltaP;
+
     double rCut;
 
     Eigen::ArrayXi number;
@@ -66,8 +69,8 @@ struct TabEAM {
     Eigen::Array<Eigen::ArrayXd, Eigen::Dynamic, Eigen::Dynamic> difV;
 
     template <typename T> inline double ineterpR(T const &v, double r) const {
-        std::size_t i = r / deltaR;
-        double mu = (r - i * deltaR) / deltaR;
+        std::size_t i = r * inv_deltaR;
+        double mu = (r - (double)i * deltaR) * inv_deltaR;
 
         CHECK(i > 0 && i + 1 < numPntsR, "r out of bounds " << i);
         return cubicInterpolate(v[i - 1], v[i], v[i + 1],
@@ -86,7 +89,8 @@ struct TabEAM {
     TabEAM(std::size_t numS, std::size_t numP, std::size_t numR, double delP,
            double delR, double cut)
         : numSpecies(numS), numPntsP(numP), numPntsR(numR), deltaR(delR),
-          deltaP(delP), rCut(cut - deltaR) {
+          deltaP(delP), inv_deltaR(1 / deltaR), inv_deltaP(1 / deltaP),
+          rCut(cut) {
 
         number.resize(numSpecies);
         mass.resize(numSpecies);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <fstream>
+#include <iomanip>
 #include <string>
 #include <utility>
 #include <vector>
@@ -17,9 +18,11 @@ void dumpXYX(std::string const &file, Vector const &coords, K kinds) {
     outfile << kinds.size() << std::endl;
     outfile << "This is C.J.Williams' dumpfile";
 
+    outfile << std::setprecision(15);
+
     for (std::size_t i = 0; i < kinds.size(); ++i) {
         outfile << '\n'
-                << kinds[i] << ' ' << coords[3 * i + 0] << ' '
+                << kinds[i] + 1 << ' ' << coords[3 * i + 0] << ' '
                 << coords[3 * i + 1] << ' ' << coords[3 * i + 2];
     }
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <iomanip>
 #include <type_traits>
 #include <vector>
 
@@ -80,6 +81,8 @@ template <typename Atom_t> class CellList {
             CHECK(z >= 0 && z < box.limits(2).len, "z out of box " << z);
 
             list.emplace_back(kinds[i], x, y, z, i);
+
+            // CHECK(box.lambda(list.back()) == 13, "mapping fail");
         }
     }
 
@@ -125,6 +128,8 @@ template <typename Atom_t> class CellList {
 
         std::size_t const lambda = box.lambda(atom);
 
+        //    std::cout << lambda << std::endl;
+
         CHECK(lambda < box.numCells(), "bad lambda " << lambda);
 
         std::size_t const end = list.size();
@@ -141,7 +146,7 @@ template <typename Atom_t> class CellList {
             if (&atom != &neigh) {
                 double dx, dy, dz;
                 double r_sq = box.normSq(neigh, atom, dx, dy, dz);
-                if (r_sq <= cut_sq) {
+                if (r_sq < cut_sq) {
                     f(neigh, std::sqrt(r_sq), dx, dy, dz);
                 }
             }
@@ -152,10 +157,13 @@ template <typename Atom_t> class CellList {
 
         // in adjecent cells -- don't need CHECK against self
         for (auto off : box.getAdjOff()) {
+
+            std::cerr << std::setprecision(16);
+
             CHECK(static_cast<long>(lambda) + off >= 0 &&
                       lambda + off < box.numCells(),
-                  "bad off  " << lambda << ' ' << off << ' '
-                              << atom.pos().transpose());
+                  "bad off  " << lambda << ' ' << off << '\n'
+                              << atom.pos());
 
             index = head[static_cast<long>(lambda) + off];
 
@@ -170,7 +178,7 @@ template <typename Atom_t> class CellList {
 
                 double r_sq = box.normSq(neigh, atom, dx, dy, dz);
 
-                if (r_sq <= cut_sq) {
+                if (r_sq < cut_sq) {
                     f(neigh, std::sqrt(r_sq), dx, dy, dz);
                 }
 

@@ -218,8 +218,8 @@ template <typename F, typename P> class Dimer {
         int strikes = 0;
 
         for (int iter = 0; iter < IT_MAX; ++iter) {
-            // std::cout << "G_eff^2: " << dot(g_eff, g_eff) << ' ' << curv
-            //           << std::endl;
+            std::cout << "G_eff^2: " << dot(g_0, g_0) << ' ' << curv
+                      << std::endl;
 
             if (dot(g_eff, g_eff) < F_TOL * F_TOL) {
                 return true;
@@ -260,7 +260,7 @@ template <typename F, typename P> class Dimer {
 };
 
 // controls displacement along mm at saddle
-inline constexpr double NUDGE = 0.1;
+inline constexpr double NUDGE = 0.01;
 // tollerence for 3N vectors to be considered the same vector
 inline constexpr double TOL_NEAR = 0.1;
 
@@ -275,6 +275,8 @@ std::vector<std::tuple<Vector, Vector>>
 findSaddle(std::size_t attempts, Vector const &init, std::size_t idx,
            F const &f, MinImage const &mi) {
 
+    CHECK(attempts > 0, "trying nothing");
+
     // Seed with a real random value, if available
     pcg_extras::seed_seq_from<std::random_device> seed_source;
     pcg64 rng(seed_source);
@@ -283,7 +285,7 @@ findSaddle(std::size_t attempts, Vector const &init, std::size_t idx,
     Vector sp{init.size()};
     Vector ax{init.size()};
 
-    Dimer dimer{f, sp, ax, [&]() { /*output(sp, col); */ }};
+    Dimer dimer{f, sp, ax, [&]() { output(sp, f.quasiColourAll(sp)); }};
 
     Minimise min{f, f, init.size()};
 
@@ -326,6 +328,7 @@ findSaddle(std::size_t attempts, Vector const &init, std::size_t idx,
         ax.matrix().normalize();
 
         if (!dimer.findSaddle()) {
+            std::cout << "fail sp search\n";
             // failed SP search
             continue;
         }
@@ -335,6 +338,7 @@ findSaddle(std::size_t attempts, Vector const &init, std::size_t idx,
 
         if (!min.findMin(old) || !min.findMin(end)) {
             // failed minimisation
+            std::cout << "fail minim search\n";
             continue;
         }
 
@@ -349,11 +353,13 @@ findSaddle(std::size_t attempts, Vector const &init, std::size_t idx,
         }
 
         if (distOld > TOL_NEAR) {
+            std::cout << "disconeced sp \n";
             // disconnected SP
             continue;
         }
 
         if (dot(end - old, end - old) < TOL_NEAR) {
+            std::cout << "loop de loop \n";
             // minimasations both converged to init
             continue;
         }

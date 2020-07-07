@@ -11,6 +11,7 @@
 
 #include "Box.hpp"
 #include "Cell.hpp"
+#include "DumpXYX.hpp"
 #include "EAM.hpp"
 #include "sort.hpp"
 #include "utils.hpp"
@@ -59,6 +60,14 @@ class FuncEAM {
         cellList.fillList(x); // initilises rho to zeros
         cellList.makeGhosts();
         cellList.updateHead();
+
+        // Vector to_out{x.size()};
+        //
+        // for (int i = 0; i < x.size(); ++i) {
+        //     to_out[i] = cellList[i / 3][i % 3];
+        // }
+        //
+        // output(to_out);
 
         double sum = 0;
 
