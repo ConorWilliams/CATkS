@@ -21,7 +21,7 @@ template <typename F1, typename F2> class Minimise {
 
     static constexpr double F_TOL = 1e-5;
 
-    static constexpr double S_MAX = 1;
+    static constexpr double S_MAX = 0.5;
 
     F1 const &f;
     F2 const &grad;
@@ -51,16 +51,16 @@ template <typename F1, typename F2> class Minimise {
 
         grad(x, g);
 
-        double energy_start = f(x);
+        // double energy_start = f(x);
 
-        std::cout << "minimiser starts @ " << energy_start << '\n';
+        //    std::cout << "minimiser starts @ " << energy_start << '\n';
 
         for (int iter = 0; iter < I_MAX; ++iter) {
-            std::cout << "Min iter: " << iter << ' ' << FRAME << ' '
-                      << f(x) - energy_start << " force " << dot(g, g)
-                      << std::endl;
+            // std::cout << "Min iter: " << iter << ' ' << FRAME << ' '
+            //           << f(x) - energy_start << " force " << dot(g, g)
+            //           << std::endl;
 
-            output(x);
+            // output(x);
 
             if (dot(g, g) < F_TOL * F_TOL) {
                 return true;
@@ -72,7 +72,7 @@ template <typename F1, typename F2> class Minimise {
 
             double a = 1;
 
-            //    double const f0 = f(x);
+            // double const f0 = f(x);
             double const g0 = dot(g, p);
 
             // force descent direction
@@ -80,15 +80,37 @@ template <typename F1, typename F2> class Minimise {
                 p = -p;
             }
 
-            // for (int l2 = 0; l2 < 9; ++l2) {
-            //     std::cout << p[l2] << ' ';
-            // }
-            // std::cout << std::endl;
-
             // dumb line search;
             double norm = std::sqrt(dot(p, p));
-            a = norm > 0.5 ? 0.5 / norm : 1;
+            a = norm > S_MAX ? S_MAX / norm : 1;
             x = x0 + a * p;
+
+            // backtracking line search
+            // for (int i = 1;; ++i) {
+            //     x = x0 + a * p;
+            //     grad(x, g);
+            //
+            //     double fa = f(x);
+            //
+            //     // Wolfie sufficiant decrese condition
+            //     if (fa <= f0 + C1 * a * g0) {
+            //         break;
+            //     } else {
+            //         double quad = a * a * g0 * 0.5 / (a * g0 - fa + f0);
+            //         if (quad <= 0 || quad >= a) {
+            //             a = a / 2;
+            //         } else {
+            //             a = quad;
+            //         }
+            //     }
+            //
+            //     if (i > L_MAX) {
+            //         std::cerr << "fail in minimiser line search" <<
+            //         std::endl;
+            //         // break;
+            //         return false;
+            //     }
+            // }
 
             grad(x, g);
         }
@@ -97,33 +119,3 @@ template <typename F1, typename F2> class Minimise {
         return false;
     }
 };
-
-// backtracking line search
-// for (int i = 1;; ++i) {
-//     x = x0 + a * p;
-//     grad(x, g);
-//
-//     double fa = f(x);
-//
-//     // Wolfie sufficiant decrese condition
-//     if (fa <= f0 + C1 * a * g0) {
-//         break;
-//     } else {
-//         double quad = a * a * g0 * 0.5 / (a * g0 - fa + f0);
-//         if (quad <= 0 || quad >= a) {
-//             a = a / 2;
-//         } else {
-//             a = quad;
-//         }
-//     }
-//
-//     if (i > L_MAX) {
-//         std::cerr << "fail in minimiser line search" <<
-//         std::endl;
-//         // break;
-//         return false;
-//     }
-// }
-
-// std::cout << x(0) << ' ' << x(1) << ' ' << 1 << ' ' << 0
-//           << std::endl;

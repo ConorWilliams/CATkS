@@ -166,13 +166,15 @@ class Box {
         ret[1] = y - limits(1).len * std::floor(y * limits(1).inv);
         ret[2] = z - limits(2).len * std::floor(z * limits(2).inv);
 
-        // ret[0] -= limits(0).len * std::floor(ret[0] * limits(0).inv);
-        // ret[1] -= limits(1).len * std::floor(ret[1] * limits(1).inv);
-        // ret[2] -= limits(2).len * std::floor(ret[2] * limits(2).inv);
-        // else
-        ret[0] = ret[0] == limits(0).len ? 0.0 : ret[0];
-        ret[1] = ret[1] == limits(1).len ? 0.0 : ret[1];
-        ret[2] = ret[2] == limits(2).len ? 0.0 : ret[2];
+        // Replicate exact math in lambda()
+        std::size_t i = ((ret[0] - ox) * mx) / lx;
+        std::size_t j = ((ret[1] - oy) * my) / ly;
+        std::size_t k = ((ret[2] - oz) * mz) / lz;
+
+        // Fixup floating point math error
+        ret[0] = i == mx - 1 ? 0.0 : ret[0];
+        ret[1] = j == my - 1 ? 0.0 : ret[1];
+        ret[2] = k == mz - 1 ? 0.0 : ret[2];
 
         return ret;
     }

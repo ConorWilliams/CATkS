@@ -27,6 +27,8 @@
 #include <iostream>
 #include <limits>
 
+#include "utils.hpp"
+
 #include "DumpXYX.hpp"
 
 #include "Canon.hpp"
@@ -35,7 +37,6 @@
 
 #include "Forces.hpp"
 #include "Topo.hpp"
-#include "utils.hpp"
 
 inline constexpr double ARRHENIUS_PRE = 5.12e12;
 inline constexpr double KB_T = 8.617333262145 * 1e-5 * 300; // eV K^-1
@@ -48,9 +49,16 @@ enum : uint8_t { Fe = 0, H = 1 };
 
 constexpr double LAT = 2.855700;
 
-inline constexpr int len = 15;
+inline constexpr int len = 5;
 
 #include "Spline.hpp"
+
+double activeToRate(double active_E) {
+
+    CHECK(active_E > 0, "sp energy < init energy " << active_E);
+
+    return ARRHENIUS_PRE * std::exp(active_E * -INV_KB_T);
+}
 
 int main(int argc, char **argv) {
 
@@ -58,7 +66,7 @@ int main(int argc, char **argv) {
 
     VERIFY(argc == 3, "need an EAM data file and H dump file");
 
-    Vector init(len * len * len * 3 * 2 + 3 * -1);
+    Vector init(len * len * len * 3 * 2 + 3 * 1);
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -69,7 +77,7 @@ int main(int argc, char **argv) {
         for (int j = 0; j < len; ++j) {
             for (int k = 0; k < len; ++k) {
 
-                if ((i == 0 && j == 0 && k == 0)/* ||
+                if (false /*(i == 0 && j == 0 && k == 0) ||
                     (i == 4 && j == 1 && k == 1)*/) {
                     init[3 * cell + 0] = (i)*LAT;
                     init[3 * cell + 1] = (j)*LAT;
@@ -94,11 +102,11 @@ int main(int argc, char **argv) {
         }
     }
 
-    // kinds[init.size() / 3 - 1] = H;
-    //
-    // init[init.size() - 3] = LAT * (0 + 0.50);
-    // init[init.size() - 2] = LAT * (0 + 0.25);
-    // init[init.size() - 1] = LAT * (0 + 0.00);
+    kinds[init.size() / 3 - 1] = H;
+
+    init[init.size() - 3] = LAT * (0 + 0.50);
+    init[init.size() - 2] = LAT * (0 + 0.25);
+    init[init.size() - 1] = LAT * (0 + 0.00);
 
     std::cout << "Loading " << argv[1] << '\n';
 
@@ -112,15 +120,15 @@ int main(int argc, char **argv) {
 
     Minimise min{f, f, init.size()};
 
-    std::cout << "before minim " << kinds.size() << std::endl;
+    std::cout << "Before minim " << kinds.size() << std::endl;
 
     min.findMin(init);
 
-    std::cout << "after min" << std::endl;
+    std::cout << "After min" << std::endl;
 
     std::cout << std::setprecision(15);
 
-    std::cout << "total energy" << f(init) << std::endl;
+    std::cout << "Total energy: " << f(init) << std::endl;
 
     while (true) {
         std::vector<std::tuple<Vector, Vector>> search =
@@ -144,7 +152,10 @@ int main(int argc, char **argv) {
 
             std::cout << "barrier  :" << barrier << "\n";
             std::cout << "delta    :" << delta << "\n";
+            std::cout << "rate     :" << activeToRate(barrier) << "\n";
 
+            output(init, f.quasiColourAll(init));
+            output(sp, f.quasiColourAll(sp));
             output(end, f.quasiColourAll(end));
 
             //////force////////////////////////

@@ -167,7 +167,7 @@ class FuncEAM {
 
         for (auto &&atom : cellList) {
 
-            std::size_t count = atom.kind();
+            long count = atom.kind() - 1;
 
             cellList.forEachNeigh(
                 atom, [&](auto const &neigh, double, double, double, double) {

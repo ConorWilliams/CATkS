@@ -20,6 +20,9 @@ class TabEAM {
 
     double rCut;
 
+    std::vector<std::size_t> m_atomic;
+    std::vector<double> m_mass;
+
     // EAM potentials
 
     std::vector<NaturalSpline> m_frho;
@@ -34,8 +37,9 @@ class TabEAM {
 
   public:
     TabEAM(std::size_t numS, double cut)
-        : numS(numS), rCut(cut), m_frho(numS), m_phir(numS * numS),
-          m_vr(numS * (numS + 1) / 2), symIdx(numS * numS) {
+        : numS(numS), rCut(cut), m_atomic(numS), m_mass(numS), m_frho(numS),
+          m_phir(numS * numS), m_vr(numS * (numS + 1) / 2),
+          symIdx(numS * numS) {
 
         for (std::size_t i = 0; i < numS; ++i) {
             for (std::size_t j = 0; j < numS; ++j) {
@@ -47,6 +51,14 @@ class TabEAM {
     }
 
     inline double rcut() const { return rCut; }
+
+    inline double &getMass(std::size_t i) { return m_mass[i]; }
+    inline size_t &getAtomicNum(std::size_t i) { return m_atomic[i]; }
+
+    inline double const &getMass(std::size_t i) const { return m_mass[i]; }
+    inline size_t const &getAtomicNum(std::size_t i) const {
+        return m_atomic[i];
+    }
 
     inline std::size_t numSpecies() const { return numS; }
 
