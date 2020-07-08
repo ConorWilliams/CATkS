@@ -158,7 +158,7 @@ int main(int argc, char **argv) {
 
     while (time < 1e-7) {
 
-        output(init, f.quasiColourAll(init));
+        // output(init, f.quasiColourAll(init));
         dumpH(argv[2], time, init, kinds);
 
         ////////////////////////////////////////////////////////////
