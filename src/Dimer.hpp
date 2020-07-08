@@ -149,7 +149,7 @@ template <typename F, typename P> class Dimer {
         for (std::size_t iter = 1; iter <= IE_MAX; ++iter) {
 
             if (alignAxis() < CURV_TOL) {
-                std::cout << iter << std::endl;
+                // std::cout << iter << std::endl;
                 return true;
             }
 
@@ -237,7 +237,7 @@ inline constexpr double NUDGE = 0.05;
 inline constexpr double TOL_NEAR = 0.1;
 
 constexpr double G_SPHERE = 4;
-constexpr double G_AMP = 0.05; // 0.325 pure Fe
+constexpr double G_AMP = 0.1; // 0.325 pure Fe
 
 // init is a minimised (unporturbed) vector of atoms
 // idx is centre of displacemnet
@@ -258,7 +258,7 @@ findSaddle(std::size_t attempts, Vector const &init, std::size_t idx,
     Vector ax{init.size()};
 
     Dimer dimer{
-        f, init, sp, ax, [&]() { output(sp, f.quasiColourAll(sp)); },
+        f, init, sp, ax, [&]() { /*output(sp, f.quasiColourAll(sp)); */ },
     };
 
     Minimise min{f, f, init.size()};
@@ -302,7 +302,7 @@ findSaddle(std::size_t attempts, Vector const &init, std::size_t idx,
         ax.matrix().normalize();
 
         if (!dimer.findSaddle()) {
-            std::cout << "fail sp search\n";
+            // std::cout << "fail sp search\n";
             // failed SP search
             continue;
         }
@@ -312,7 +312,7 @@ findSaddle(std::size_t attempts, Vector const &init, std::size_t idx,
 
         if (!min.findMin(old) || !min.findMin(end)) {
             // failed minimisation
-            std::cout << "fail minim search\n";
+            // std::cout << "fail minim search\n";
             continue;
         }
 
@@ -327,13 +327,13 @@ findSaddle(std::size_t attempts, Vector const &init, std::size_t idx,
         }
 
         if (distOld > TOL_NEAR) {
-            std::cout << "disconeced sp \n";
+            // std::cout << "disconeced sp \n";
             // disconnected SP
             continue;
         }
 
         if (dot(end - old, end - old) < TOL_NEAR) {
-            std::cout << "loop de loop \n";
+            // std::cout << "loop de loop \n";
             // minimasations both converged to init
             continue;
         }

@@ -38,7 +38,8 @@
 #include "utils.hpp"
 
 inline constexpr double ARRHENIUS_PRE = 5.12e12;
-inline constexpr double KB_T = 8.617333262145 * 1e-5 * 300; // eV K^-1
+inline constexpr double TEMP = 300;                              // k
+inline constexpr double KB_T = 1380649.0 / 16021766340.0 * TEMP; // eV K^-1
 
 inline constexpr double INV_KB_T = 1 / KB_T;
 
@@ -48,7 +49,7 @@ enum : uint8_t { Fe = 0, H = 1 };
 
 constexpr double LAT = 2.855700;
 
-inline constexpr int len = 12;
+inline constexpr int len = 5;
 
 struct LocalisedMech {
     std::size_t atom;
@@ -125,15 +126,15 @@ int main(int argc, char **argv) {
     double energy_error = 0;
     int iter = 0;
 
+    std::cout << "Loading " << argv[1] << '\n';
+
     static const TabEAM data = parseTabEAM(argv[1]);
 
     static const Box force_box{
-        data.rCut, 0, len * LAT, 0, len * LAT, 0, len * LAT,
+        data.rcut(), 0, len * LAT, 0, len * LAT, 0, len * LAT,
     };
 
-    static const Box topo_box{
-        data.rCut, 0, len * LAT, 0, len * LAT, 0, len * LAT,
-    };
+    static const Box topo_box = force_box;
 
     TopoClassify<Canon_t> classifyer{topo_box, kinds};
 
@@ -143,11 +144,11 @@ int main(int argc, char **argv) {
 
     Minimise min{f, f, init.size()};
 
-    std::cout << "before min" << std::endl;
+    std::cout << "Before min" << std::endl;
 
     min.findMin(init);
 
-    std::cout << "after min" << std::endl;
+    std::cout << "After min" << std::endl;
 
     pcg_extras::seed_seq_from<std::random_device> seed_source;
     pcg64 rng(seed_source);
@@ -181,7 +182,7 @@ int main(int argc, char **argv) {
             classifyer.analyzeTopology(init);
         }
 
-        // possibly verify topology didnt change after minimisation
+        // TODO: CHECK topology didnt change after minimisation
 
         int new_topos = classifyer.verify();
 
@@ -192,11 +193,11 @@ int main(int argc, char **argv) {
             [&](Eigen::Vector3d dr) { return topo_box.minImage(dr); }, idxs);
 
         if (new_topos > 0) {
-            // classifyer.write();
+            classifyer.write();
         }
 
         if (new_mechs > 0) {
-            // catalog.write();
+            catalog.write();
         }
 
         //////////////////////////////////////////////////////////////
@@ -234,12 +235,6 @@ int main(int argc, char **argv) {
             std::terminate();
         }();
 
-        for (auto &&elem : possible) {
-            std::cout << elem.active_E << ' ' << elem.delta_E << std::endl;
-        }
-
-        return 0;
-
         ////////////////////////////////////////////////////
 
         time += -std::log(uniform_dist(rng)) / rate_sum;
@@ -268,11 +263,12 @@ int main(int argc, char **argv) {
         std::cout << iter++ << " TIME: " << time << "\n\n";
 
         if (iter % 1000 == 0) {
-            // classifyer.write();
-            // catalog.write();
+            classifyer.write();
+            catalog.write();
+            return 0;
         }
     }
 
-    // classifyer.write();
-    // catalog.write();
+    classifyer.write();
+    catalog.write();
 }

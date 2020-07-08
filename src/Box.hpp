@@ -53,7 +53,7 @@ class Box {
         my = static_cast<std::size_t>((ymax - ymin) / rcut) + 2;
         mz = static_cast<std::size_t>((zmax - zmin) / rcut) + 2;
 
-        std::cout << "shape " << mx << ' ' << my << ' ' << mz << std::endl;
+        std::cout << "Shape " << mx << ' ' << my << ' ' << mz << std::endl;
 
         // dimensions of cells
         double lcx = (xmax - xmin) / (mx - 2);
@@ -165,6 +165,10 @@ class Box {
         ret[0] = x - limits(0).len * std::floor(x * limits(0).inv);
         ret[1] = y - limits(1).len * std::floor(y * limits(1).inv);
         ret[2] = z - limits(2).len * std::floor(z * limits(2).inv);
+
+        ret[0] = ret[0] == limits(0).len ? 0.0 : ret[0];
+        ret[1] = ret[1] == limits(1).len ? 0.0 : ret[1];
+        ret[2] = ret[2] == limits(2).len ? 0.0 : ret[2];
 
         // Replicate exact math in lambda()
         std::size_t i = ((ret[0] - ox) * mx) / lx;

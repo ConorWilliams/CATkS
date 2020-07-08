@@ -39,7 +39,8 @@
 #include "Topo.hpp"
 
 inline constexpr double ARRHENIUS_PRE = 5.12e12;
-inline constexpr double KB_T = 8.617333262145 * 1e-5 * 300; // eV K^-1
+inline constexpr double TEMP = 300;                              // k
+inline constexpr double KB_T = 1380649.0 / 16021766340.0 * TEMP; // eV K^-1
 
 inline constexpr double INV_KB_T = 1 / KB_T;
 
@@ -49,7 +50,7 @@ enum : uint8_t { Fe = 0, H = 1 };
 
 constexpr double LAT = 2.855700;
 
-inline constexpr int len = 5;
+inline constexpr int len = 10;
 
 #include "Spline.hpp"
 
@@ -152,7 +153,7 @@ int main(int argc, char **argv) {
 
             std::cout << "barrier  :" << barrier << "\n";
             std::cout << "delta    :" << delta << "\n";
-            std::cout << "rate     :" << activeToRate(barrier) << "\n";
+            std::cout << "rate     :" << activeToRate(barrier) * 1e-12 << "\n";
 
             output(init, f.quasiColourAll(init));
             output(sp, f.quasiColourAll(sp));
