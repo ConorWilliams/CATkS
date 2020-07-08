@@ -46,7 +46,7 @@ class FuncEAM {
         : cellList{box, kinds}, data{data}, numAtoms{kinds.size()} {
 
         CHECK(*std::max_element(kinds.begin(), kinds.end()) <
-                  int(data.numSpecies),
+                  int(data.numSpecies()),
               "found kinds that are not in the EAM species data");
 
         CHECK(*std::min_element(kinds.begin(), kinds.end()) >= int(0),
@@ -73,16 +73,14 @@ class FuncEAM {
 
         for (auto &&alpha : cellList) {
 
-            cellList.forEachNeigh(alpha, [&](auto const &beta, double r, double,
-                                             double, double) {
-                sum += 0.5 *
-                       data.ineterpR(data.tabV(alpha.kind(), beta.kind()), r);
+            cellList.forEachNeigh(
+                alpha, [&](auto const &beta, double r, double, double, double) {
+                    sum += 0.5 * data.getV(alpha.kind(), beta.kind())(r);
 
-                alpha.rho() +=
-                    data.ineterpR(data.tabPhi(beta.kind(), alpha.kind()), r);
-            });
+                    alpha.rho() += data.getP(beta.kind(), alpha.kind())(r);
+                });
 
-            sum += data.ineterpP(data.tabF.col(alpha.kind()), alpha.rho());
+            sum += data.getF(alpha.kind())(alpha.rho());
         }
         return sum;
     }
@@ -96,18 +94,17 @@ class FuncEAM {
 
         // computes all rho values
         for (auto &&beta : cellList) {
-            // std::cout << "in\n";
-            cellList.forEachNeigh(beta, [&](auto const &alpha, double r, double,
-                                            double, double) {
-                beta.rho() +=
-                    data.ineterpR(data.tabPhi(alpha.kind(), beta.kind()), r);
-            });
-            // std::cout << "out\n";
+            cellList.forEachNeigh(
+                beta, [&](auto const &alpha, double r, double, double, double) {
+                    beta.rho() += data.getP(alpha.kind(), beta.kind())(r);
+                });
         }
 
         cellList.clearGhosts(); // deletes ghosts, should not realloc
         cellList.makeGhosts();  // ghosts now have correct rho values
         cellList.updateHead();
+
+        // std::cout << "out\n";
 
         for (std::size_t i = 0; i < numAtoms; ++i) {
             auto const &gamma = cellList[i];
@@ -116,20 +113,20 @@ class FuncEAM {
             out[3 * i + 1] = 0;
             out[3 * i + 2] = 0;
 
-            double const fpg =
-                data.ineterpP(data.difF.col(gamma.kind()), gamma.rho());
+            double const fpg = data.getF(gamma.kind()).grad(gamma.rho());
 
             // finds R^{\alpha\gamma}
             cellList.forEachNeigh(gamma, [&](auto const &alpha, double r,
                                              double dx, double dy, double dz) {
-                double mag =
-                    (data.ineterpR(data.difV(alpha.kind(), gamma.kind()), r) +
-                     fpg * data.ineterpR(
-                               data.difPhi(alpha.kind(), gamma.kind()), r) +
-                     data.ineterpP(data.difF.col(alpha.kind()), alpha.rho()) *
-                         data.ineterpR(data.difPhi(gamma.kind(), alpha.kind()),
-                                       r)) /
-                    r;
+                double const fpa = data.getF(alpha.kind()).grad(alpha.rho());
+
+                double mag = data.getV(alpha.kind(), gamma.kind()).grad(r);
+
+                mag += fpg * data.getP(alpha.kind(), gamma.kind()).grad(r);
+
+                mag += fpa * data.getP(gamma.kind(), alpha.kind()).grad(r);
+
+                mag /= r;
 
                 out[3 * i + 0] += dx * mag;
                 out[3 * i + 1] += dy * mag;

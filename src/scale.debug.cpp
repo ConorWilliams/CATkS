@@ -48,26 +48,11 @@ enum : uint8_t { Fe = 0, H = 1 };
 
 constexpr double LAT = 2.855700;
 
-inline constexpr int len = 10;
+inline constexpr int len = 15;
 
 #include "Spline.hpp"
 
 int main(int argc, char **argv) {
-
-    NaturalSpline spline{1};
-
-    Vector v{4};
-
-    v[0] = 0;
-    v[1] = 2;
-    v[2] = 2;
-    v[3] = 0;
-
-    spline.computeCoeff(v);
-
-    std::cout << spline(1.5) << std::endl;
-
-    return 0;
 
     // CHECK(false, "false");
 
@@ -115,10 +100,12 @@ int main(int argc, char **argv) {
     // init[init.size() - 2] = LAT * (0 + 0.25);
     // init[init.size() - 1] = LAT * (0 + 0.00);
 
-    static const TabEAM data = parseTabEAM(argv[1]);
+    std::cout << "Loading " << argv[1] << '\n';
 
-    static const Box force_box{
-        data.rCut, 0, len * LAT, 0, len * LAT, 0, len * LAT,
+    static TabEAM const data = parseTabEAM(argv[1]);
+
+    static Box const force_box{
+        data.rcut(), 0, len * LAT, 0, len * LAT, 0, len * LAT,
     };
 
     FuncEAM f{force_box, kinds, data};

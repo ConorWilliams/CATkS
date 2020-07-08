@@ -1,11 +1,12 @@
 #pragma once
 
-#include "Eigen/Dense"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <iterator>
 #include <utility>
+
+#include "Eigen/Dense"
 
 #ifndef NCHECK
 #define CHECK(condition, message)                                              \

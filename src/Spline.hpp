@@ -18,14 +18,15 @@ class NaturalSpline {
     std::size_t n;
 
   public:
-    NaturalSpline(double dx) : dx{dx}, idx{1 / dx} {};
-
-    inline double operator()(double x) {
+    inline std::size_t getIndex(double x) const {
         CHECK(x >= 0, "out of bounds " << x);
+        std::size_t const i = x * idx;
+        CHECK(i <= n, "out of bounds " << x << ' ' << n);
+        return std::min(i, n - 1); // branchless
+    }
 
-        const std::size_t i = x * idx;
-
-        CHECK(i < n, "out of bounds " << x << ' ' << n);
+    inline double operator()(double x) const {
+        std::size_t const i = getIndex(x);
 
         x -= i * dx;
 
@@ -33,21 +34,22 @@ class NaturalSpline {
                x * (splines[i].b + x * (splines[i].c + x * splines[i].d));
     }
 
-    inline double grad(double x) {
-        CHECK(x >= 0, "out of bounds " << x);
-
-        const std::size_t i = x * idx;
-
-        CHECK(i < n, "out of bounds " << x << ' ' << n);
+    inline double grad(double x) const {
+        std::size_t const i = getIndex(x);
 
         x -= i * dx;
 
         return splines[i].b + x * (2 * splines[i].c + 3 * x * splines[i].d);
     }
 
+    // Based on Wikipedia algorithm:
+    // https://en.wikipedia.org/wiki/Spline_(mathematics)
     // y is (n + 1) y_i values evenly spaced on interval 0,dx,...,ndx
-    template <typename T> void computeCoeff(T const &y) {
-        n = y.size() - 1;
+    template <typename T> void computeCoeff(T const &y, double dx) {
+        this->dx = dx;
+        this->idx = 1 / dx;
+        this->n = y.size() - 1;
+
         // 1
         std::vector<double> a(n + 1);
 

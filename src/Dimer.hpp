@@ -285,7 +285,7 @@ findSaddle(std::size_t attempts, Vector const &init, std::size_t idx,
     Vector sp{init.size()};
     Vector ax{init.size()};
 
-    Dimer dimer{f, sp, ax, [&]() { output(sp, f.quasiColourAll(sp)); }};
+    Dimer dimer{f, sp, ax, [&]() { /*output(sp, f.quasiColourAll(sp));*/ }};
 
     Minimise min{f, f, init.size()};
 
