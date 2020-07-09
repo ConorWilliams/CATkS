@@ -16,7 +16,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -pedantic")
-set(CMAKE_CXX_FLAGS_DEBUG "-g -pg")
+set(CMAKE_CXX_FLAGS_DEBUG "-g -pg -march=native -O1")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native")
 
 find_package(Git QUIET)

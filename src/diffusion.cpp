@@ -1,4 +1,4 @@
-//#define NCHECK
+#define NCHECK
 
 #define EIGEN_NO_DEBUG
 #define EIGEN_DONT_PARALLELIZE
@@ -19,7 +19,7 @@
  *
  * Make dimer take f as template param
  *
- * Make Cell have fill & rebuildGhosts only
+ * Make Cell have fill & rebuildGhosts only.
  *
  */
 
@@ -43,13 +43,13 @@ inline constexpr double KB_T = 1380649.0 / 16021766340.0 * TEMP; // eV K^-1
 
 inline constexpr double INV_KB_T = 1 / KB_T;
 
-inline constexpr double ACCUMULATED_ERROR_LIMIT = 0.05; // eV
+inline constexpr double ACCUMULATED_ERROR_LIMIT = 0.025; // eV
 
 enum : uint8_t { Fe = 0, H = 1 };
 
 constexpr double LAT = 2.855700;
 
-inline constexpr int len = 5;
+inline constexpr int len = 6;
 
 struct LocalisedMech {
     std::size_t atom;
@@ -262,7 +262,7 @@ int main(int argc, char **argv) {
 
         std::cout << iter++ << " TIME: " << time << "\n\n";
 
-        if (iter % 1000 == 0) {
+        if (iter % 250 == 0) {
             classifyer.write();
             catalog.write();
             return 0;
