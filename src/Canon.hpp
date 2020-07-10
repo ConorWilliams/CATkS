@@ -111,7 +111,7 @@ class NautyCanon {
     // pre H was working at 2.55 // 2.47 -- 2.86 angstrom (just > first neigh)
     static constexpr double F_F_BOND = 2.55;
     static constexpr double H_H_BOND = 2.00; // 0.5^2+0.5^2 vacancy neigh
-    static constexpr double F_H_BOND = 2.70; // 0.75^2 + 0.5^2 was .65
+    static constexpr double F_H_BOND = 2.70; // 0.75^2 + 0.5^2 was 2.7
 
   public:
     template <typename Atom_t>
@@ -127,7 +127,9 @@ class NautyCanon {
 
         double sqdist = (a.pos() - b.pos()).squaredNorm();
 
-        return sqdist < DISTS(a.kind(), b.kind()) * DISTS(a.kind(), b.kind());
+        double bond_len = DISTS(a.kind(), b.kind());
+
+        return sqdist < bond_len * bond_len;
     }
 
     using Key_t = NautyGraph;

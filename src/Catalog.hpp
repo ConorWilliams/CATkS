@@ -265,8 +265,8 @@ template <typename Canon> class Catalog {
 
             catalog[cl[i]].count += 1; // default constructs new
 
-            while (catalog[cl[i]].sp_searches < 25 ||
-                   ipow<3>(catalog[cl[i]].sp_searches) < catalog[cl[i]].count) {
+            while (catalog[cl[i]].sp_searches < 5 /*||
+                   ipow<3>(catalog[cl[i]].sp_searches) < catalog[cl[i]].count*/) {
 
                 catalog[cl[i]].sp_searches += sp_trys;
 

@@ -16,7 +16,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -pedantic")
-set(CMAKE_CXX_FLAGS_DEBUG "-g -pg -march=native -O1")
+set(CMAKE_CXX_FLAGS_DEBUG "-g -pg -march=native -O2")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native")
 
 find_package(Git QUIET)
@@ -95,5 +95,4 @@ set_target_properties(Nauty PROPERTIES IMPORTED_LOCATION "${PROJECT_SOURCE_DIR}/
 #
 
 add_executable(diffusion src/diffusion.cpp)
-target_compile_options(diffusion PRIVATE -Werror)
 target_link_libraries(diffusion PRIVATE Eigen3::Eigen nlohmann_json::nlohmann_json SMHasherSupport Nauty ${CMAKE_THREAD_LIBS_INIT})

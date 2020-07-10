@@ -1,4 +1,4 @@
-#define NCHECK
+//#define NCHECK
 
 #define EIGEN_NO_DEBUG
 #define EIGEN_DONT_PARALLELIZE
@@ -27,13 +27,14 @@
 #include <iostream>
 #include <limits>
 
-#include "DumpXYX.hpp"
-
 #include "Canon.hpp"
+#include "Canon2.hpp"
 #include "Catalog.hpp"
 #include "Dimer.hpp"
-
+#include "DumpXYX.hpp"
 #include "Forces.hpp"
+#include "Forces2.hpp"
+#include "Sort.hpp"
 #include "Topo.hpp"
 #include "utils.hpp"
 
@@ -49,7 +50,10 @@ enum : uint8_t { Fe = 0, H = 1 };
 
 constexpr double LAT = 2.855700;
 
-inline constexpr int len = 6;
+using Canon_t = NautyCanon;
+using Force_t = FuncEAM;
+
+inline constexpr int len = 5;
 
 struct LocalisedMech {
     std::size_t atom;
@@ -109,18 +113,16 @@ int main(int argc, char **argv) {
     kinds[init.size() / 3 - 1] = H;
 
     init[init.size() - 3] = LAT * (0 + 0.50);
-    init[init.size() - 2] = LAT * (0 + 0.25);
-    init[init.size() - 1] = LAT * (0 + 0.00);
+    init[init.size() - 2] = LAT * (0 + 0.00);
+    init[init.size() - 1] = LAT * (0 + 0.75);
 
     // kinds[init.size() / 3 - 2] = H;
     //
-    // init[init.size() - 6] = LAT * (2 + 0.50);
-    // init[init.size() - 5] = LAT * (2 + 0.25);
-    // init[init.size() - 4] = LAT * (2 + 0.00);
+    // init[init.size() - 6] = LAT * (1 + 0.25);
+    // init[init.size() - 5] = LAT * (0 + 0.50);
+    // init[init.size() - 4] = LAT * (0 + 1.00);
 
     ////////////////////////////////////////////////////////////
-
-    using Canon_t = NautyCanon;
 
     double time = 0;
     double energy_error = 0;
@@ -136,9 +138,11 @@ int main(int argc, char **argv) {
 
     static const Box topo_box = force_box;
 
+    cellSort(init, kinds, force_box);
+
     TopoClassify<Canon_t> classifyer{topo_box, kinds};
 
-    FuncEAM f{force_box, kinds, data};
+    Force_t f{force_box, kinds, data};
 
     Catalog<Canon_t> catalog;
 
@@ -158,12 +162,14 @@ int main(int argc, char **argv) {
 
     while (time < 1e-7) {
 
-        // output(init, f.quasiColourAll(init));
+        output(init, f.quasiColourAll(init));
         dumpH(argv[2], time, init, kinds);
 
         ////////////////////////////////////////////////////////////
 
         bool minimised = false;
+
+        min.findMin(init);
 
         if (energy_error > ACCUMULATED_ERROR_LIMIT) {
             minimised = true;
@@ -262,13 +268,13 @@ int main(int argc, char **argv) {
 
         std::cout << iter++ << " TIME: " << time << "\n\n";
 
-        if (iter % 250 == 0) {
-            classifyer.write();
-            catalog.write();
+        if (iter % 1000 == 0) {
+            // classifyer.write();
+            // catalog.write();
             return 0;
         }
     }
 
-    classifyer.write();
-    catalog.write();
+    // classifyer.write();
+    // catalog.write();
 }

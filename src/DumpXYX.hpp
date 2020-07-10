@@ -22,7 +22,7 @@ void dumpXYX(std::string const &file, Vector const &coords, K kinds) {
 
     for (std::size_t i = 0; i < kinds.size(); ++i) {
         outfile << '\n'
-                << kinds[i] + 1 << ' ' << coords[3 * i + 0] << ' '
+                << kinds[i] << ' ' << coords[3 * i + 0] << ' '
                 << coords[3 * i + 1] << ' ' << coords[3 * i + 2];
     }
 }

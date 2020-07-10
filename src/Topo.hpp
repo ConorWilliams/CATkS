@@ -299,14 +299,28 @@ template <typename Canon> class TopoClassify : protected CellList<Atom> {
 
                 auto bad = col[i];
 
-                // change color of topo collisions
-                std::transform(
-                    col.begin(), col.begin() + i + 1, col.begin(),
-                    [=](std::size_t h) { return h == bad ? 99 : h; });
+                std::vector<std::size_t> other;
+                // change col of collisons
+                for (std::size_t j = 0; j < col.size(); ++j) {
+                    if (col[j] == bad && i != j) {
+                        col[j] = 99;
+                        other.push_back(j);
+                    }
+                }
 
-                col[i] = 100;
+                col[i] = 99;
 
                 output(*prev, col);
+
+                for (std::size_t idx : other) {
+                    // colour near;
+                    std::vector<int> col(prev->size() / 3, 0);
+
+                    for (auto &&atom : canon[idx]) {
+                        col[atom.index()] = 1;
+                    }
+                    output(*prev, col);
+                }
 
                 VERIFY(false, "topology collison");
 

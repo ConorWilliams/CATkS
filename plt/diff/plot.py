@@ -23,64 +23,58 @@ plt.rc(
 )
 
 
-data = np.loadtxt(
-    "/home/cdt1902/dis/CATkS/plt/diff/h_diffusion_5.xyz", dtype=np.float64
+data1 = np.loadtxt(
+    "/home/cdt1902/dis/CATkS/plt/diff/1H_5.xyz", dtype=np.float64
 )
+
 
 data2 = np.loadtxt(
-    "/home/cdt1902/dis/CATkS/plt/diff/h_diffusion_5_t2.xyz", dtype=np.float64
+    "/home/cdt1902/dis/CATkS/plt/diff/1H_7.xyz", dtype=np.float64
 )
 
-data = data[::, ::]
+ignore = 25
 
-disp = data[::, 1::] - data[0, 1::]
+data1 = data1[ignore::, ::]
+t1 = data1[::, 0]
 
-disp = disp * 1e-10
+disp1 = data1[::, 1::] - data1[0, 1::]
+disp1 = disp1 * 1e-10
+disp1 = disp1 * disp1
+x1 = np.sum(disp1, axis=1)
+diff1 = x1 / (6 * t1)
 
-disp = disp * disp
 
-sq = np.sum(disp, axis=1)
-
-x = data[::, 0]
-y = sq
-
-data2 = data2[::, ::]
-
+data2 = data2[ignore::, ::]
+t2 = data2[::, 0]
 disp2 = data2[::, 1::] - data2[0, 1::]
-
 disp2 = disp2 * 1e-10
-
 disp2 = disp2 * disp2
+x2 = np.sum(disp2, axis=1)
+diff2 = x2 / (6 * t2)
 
-sq2 = np.sum(disp2, axis=1)
 
-x2 = data2[::, 0]
-y2 = sq2
-
-plt.loglog(x, y, ".")
-plt.loglog(x2, y2, ".")
+plt.plot(t1, diff1, label=r"$5^3$ unit cells")
+plt.plot(t2, diff2, label=r"$7^3$ unit cells")
 
 
 plt.legend()
 
-plt.xlabel(r"$\Delta E_1$/\si{\eV}")
-plt.ylabel(r"Count")
+plt.xlabel(r"Time/\si{\nano\second}")
+plt.ylabel(r"$\langle x^2 \rangle$/\si{\metre\squared}")
 
+fit = lambda x, a: 6 * a * x
 
-popt, pcov = curve_fit(lambda x, a: a * x, x, y)
+popt, pcov = curve_fit(fit, t2, x2)
 
-print(popt, pcov)
+print(popt)
+print(pcov)
 
+print(popt[0], np.sqrt(pcov)[0, 0])
 
-p, V = np.polyfit(x, y, 1, cov=True)
-
-print("x_0: {} +/- {}".format(p[0], np.sqrt(V[0][0])))
-print("x_1: {} +/- {}".format(p[1], np.sqrt(V[1][1])))
-
-plt.loglog(x, popt[0] * x)
+# plt.loglog(t2, 6 * popt[0] * t2, label=r"best fit")
 
 
 plt.tight_layout()
-# plt.savefig(r"/home/cdt1902/dis/thesis/validation//.pdf")
+plt.savefig(r"/home/cdt1902/dis/thesis/validation/Figs/1H_diff.pdf")
 
 plt.show()

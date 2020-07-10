@@ -17,6 +17,8 @@ class AtomBase {
 
   public:
     AtomBase(int k, double x, double y, double z) : k{k}, r{x, y, z}, n{} {}
+    AtomBase(int k, double x, double y, double z, std::size_t)
+        : k{k}, r{x, y, z}, n{} {}
     AtomBase() = default;
 
     inline std::size_t &next() { return n; }
