@@ -1,4 +1,4 @@
-//#define NCHECK
+#define NCHECK
 
 #define EIGEN_NO_DEBUG
 #define EIGEN_DONT_PARALLELIZE
@@ -44,14 +44,12 @@ inline constexpr double KB_T = 1380649.0 / 16021766340.0 * TEMP; // eV K^-1
 
 inline constexpr double INV_KB_T = 1 / KB_T;
 
-inline constexpr double ACCUMULATED_ERROR_LIMIT = 0.025; // eV
-
 enum : uint8_t { Fe = 0, H = 1 };
 
 constexpr double LAT = 2.855700;
 
-using Canon_t = NautyCanon;
-using Force_t = FuncEAM;
+using Canon_t = NautyCanon2;
+using Force_t = FuncEAM2;
 
 inline constexpr int len = 5;
 
@@ -76,7 +74,7 @@ int main(int argc, char **argv) {
 
     VERIFY(argc == 3, "need an EAM data file and H dump file");
 
-    Vector init(len * len * len * 3 * 2 + 3 * 1);
+    Vector init(len * len * len * 3 * 2 + 3 * 0);
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -87,7 +85,7 @@ int main(int argc, char **argv) {
         for (int j = 0; j < len; ++j) {
             for (int k = 0; k < len; ++k) {
 
-                if (false /*(i == 1 && j == 1 && k == 1) ||
+                if ( (i == 1 && j == 1 && k == 1) /*||
                     (i == 4 && j == 1 && k == 1)*/) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
                     init[3 * cell + 1] = (j + 0.5) * LAT;
@@ -112,20 +110,25 @@ int main(int argc, char **argv) {
 
     kinds[init.size() / 3 - 1] = H;
 
-    init[init.size() - 3] = LAT * (0 + 0.50);
+    init[init.size() - 3] = LAT * (2 + 0.50);
     init[init.size() - 2] = LAT * (0 + 0.00);
     init[init.size() - 1] = LAT * (0 + 0.75);
 
     // kinds[init.size() / 3 - 2] = H;
     //
-    // init[init.size() - 6] = LAT * (1 + 0.25);
+    // init[init.size() - 6] = LAT * (3 + 0.25);
     // init[init.size() - 5] = LAT * (0 + 0.50);
     // init[init.size() - 4] = LAT * (0 + 1.00);
+    //
+    // kinds[init.size() / 3 - 3] = H;
+    //
+    // init[init.size() - 9] = LAT * (1 + 0.25);
+    // init[init.size() - 8] = LAT * (0 + 0.50);
+    // init[init.size() - 7] = LAT * (0 + 1.00);
 
     ////////////////////////////////////////////////////////////
 
     double time = 0;
-    double energy_error = 0;
     int iter = 0;
 
     std::cout << "Loading " << argv[1] << '\n';
@@ -160,39 +163,18 @@ int main(int argc, char **argv) {
 
     std::vector<LocalisedMech> possible{};
 
-    while (time < 1e-7) {
+    while (time < 1e7) {
 
         output(init, f.quasiColourAll(init));
         dumpH(argv[2], time, init, kinds);
 
         ////////////////////////////////////////////////////////////
 
-        bool minimised = false;
-
-        min.findMin(init);
-
-        if (energy_error > ACCUMULATED_ERROR_LIMIT) {
-            minimised = true;
-            energy_error = 0;
-
-            min.findMin(init);
-        }
-
         classifyer.analyzeTopology(init);
 
         std::vector<size_t> idxs = catalog.getSearchIdxs(classifyer);
 
-        if (!minimised && idxs.size() > 0) {
-            minimised = true;
-            min.findMin(init);
-            classifyer.analyzeTopology(init);
-        }
-
-        // TODO: CHECK topology didnt change after minimisation
-
         int new_topos = classifyer.verify();
-
-        VERIFY(idxs.size() ? minimised : true, "balls");
 
         int new_mechs = catalog.update(
             init, f, classifyer,
@@ -211,7 +193,11 @@ int main(int argc, char **argv) {
         possible.clear();
 
         for (std::size_t i = 0; i < classifyer.size(); ++i) {
+
             for (auto &&m : catalog[classifyer[i]]) {
+                if (iter % 100 == 0 && m.delta_E < 0.1) {
+                    continue
+                }
                 possible.push_back({
                     i,
                     activeToRate(m.active_E),
@@ -249,32 +235,32 @@ int main(int argc, char **argv) {
 
         init = classifyer.reconstruct(choice.atom, choice.ref);
 
-        const double energy_post = f(init);
+        const double energy_recon = f(init) - energy_pre;
 
-        const double recon_delta_E = energy_post - energy_pre;
+        min.findMin(init);
 
-        energy_error += std::abs(recon_delta_E - choice.delta_E);
-
-        std::cout << "\nError:   " << energy_error << '\n';
+        const double energy_final = f(init) - energy_pre;
 
         const double rate = choice.rate;
 
         std::cout << "Memory:  " << choice.delta_E << '\n';
-        std::cout << "Recon:   " << recon_delta_E << '\n';
+        std::cout << "Recon:   " << energy_recon << '\n';
+        std::cout << "Final:   " << energy_final << '\n';
         std::cout << "Barrier: " << choice.active_E << "\n";
         std::cout << "Rate:    " << rate << " : " << rate / rate_sum << '\n';
 
-        VERIFY(std::abs(recon_delta_E - choice.delta_E) < 0.1, "recon err");
+        VERIFY(std::abs(energy_recon - choice.delta_E) < 0.1, "recon err");
+        VERIFY(std::abs(energy_final - choice.delta_E) < 0.1, "recon err");
 
         std::cout << iter++ << " TIME: " << time << "\n\n";
 
         if (iter % 1000 == 0) {
-            // classifyer.write();
-            // catalog.write();
+            classifyer.write();
+            catalog.write();
             return 0;
         }
     }
 
-    // classifyer.write();
-    // catalog.write();
+    classifyer.write();
+    catalog.write();
 }

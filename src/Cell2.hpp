@@ -150,34 +150,31 @@ template <typename Atom_t> class CellListSorted {
     template <typename F>
     inline void forEachNeigh(Atom_t const &atom, F &&f) const {
 
-        std::size_t const l = box.lambda(atom);
-
-        CHECK(l < box.numCells(), "bad lambda " << l);
-
+        long const l = box.lambda(atom);
         double const cut_sq = box.rcut() * box.rcut();
 
-        std::for_each(head[l].begin, head[l].end, [&](Atom_t const &neigh) {
-            if (&atom != &neigh) {
-                double dx, dy, dz;
-                double r_sq = box.normSq(neigh, atom, dx, dy, dz);
+        double dx, dy, dz;
+
+        CHECK(l < (long)box.numCells(), "bad lambda " << l);
+
+        // in same cell must check not self
+        for (Atom_t *it = head[l].begin; it != head[l].end; ++it) {
+            if (&atom != it) {
+                double r_sq = box.normSq(*it, atom, dx, dy, dz);
                 if (r_sq < cut_sq) {
-                    f(neigh, std::sqrt(r_sq), dx, dy, dz);
+                    f(*it, std::sqrt(r_sq), dx, dy, dz);
                 }
             }
-        });
+        }
 
         // in adjecent cells -- don't need CHECK against self
-        for (auto off : box.getAdjOff()) {
-
-            std::size_t i = static_cast<long>(l) + off;
-
-            std::for_each(head[i].begin, head[i].end, [&](Atom_t const &neigh) {
-                double dx, dy, dz;
-                double r_sq = box.normSq(neigh, atom, dx, dy, dz);
+        for (auto i : box.getAdjOff()) {
+            for (Atom_t *it = head[l + i].begin; it != head[l + i].end; ++it) {
+                double r_sq = box.normSq(*it, atom, dx, dy, dz);
                 if (r_sq < cut_sq) {
-                    f(neigh, std::sqrt(r_sq), dx, dy, dz);
+                    f(*it, std::sqrt(r_sq), dx, dy, dz);
                 }
-            });
+            }
         }
     }
 };

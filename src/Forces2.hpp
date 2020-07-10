@@ -121,14 +121,14 @@ class FuncEAM2 {
     template <typename T> auto quasiColourAll(T const &x) const {
         cellList.fill(x);
 
-        std::vector<std::size_t> colours;
+        std::vector<std::size_t> colours(x.size() / 3);
 
         for (auto &&atom : cellList) {
 
             long count = atom.kind();
 
             if (count == 1) {
-                colours.push_back(99);
+                colours[atom.index()] = 99;
 
             } else {
 
@@ -137,7 +137,7 @@ class FuncEAM2 {
                     count += NautyCanon::bonded(atom, neigh);
                 });
 
-                colours.push_back(count);
+                colours[atom.index()] = count;
             }
         }
 

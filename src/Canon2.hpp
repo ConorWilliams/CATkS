@@ -9,18 +9,18 @@
 
 #include "Canon.hpp"
 
+// pre H was working at 2.55, 2.7 //
+static constexpr double F_F_BOND = 2.67; // 2.47 -- 2.86 angstrom
+static constexpr double H_H_BOND = 2.00; // 0.5^2+0.5^2 vacancy neigh
+static constexpr double F_H_BOND = 3.00; // 0.75^2 + 0.5^2 was 2.7
+
+static const Eigen::Matrix2d DISTS{
+    {F_F_BOND, F_H_BOND},
+    {F_H_BOND, H_H_BOND},
+};
+
 template <typename Atom_t>
 inline static bool bonded(Atom_t const &a, Atom_t const &b) {
-
-    // pre H was working at 2.55 // 2.47 -- 2.86 angstrom (just > first neigh)
-    static constexpr double F_F_BOND = 2.55;
-    static constexpr double H_H_BOND = 2.00; // 0.5^2+0.5^2 vacancy neigh
-    static constexpr double F_H_BOND = 2.70; // 0.75^2 + 0.5^2 was 2.7
-
-    static const Eigen::Matrix2d DISTS{
-        {F_F_BOND, F_H_BOND},
-        {F_H_BOND, H_H_BOND},
-    };
 
     CHECK(a.kind() < 2, "atom type not valid " << a.kind());
     CHECK(b.kind() < 2, "atom type not valid " << b.kind());
@@ -36,9 +36,14 @@ class NautyCanon2 {
   private:
     enum : bool { colour = false, plain = true };
 
+    static constexpr double GRANULARITY = 5.0;
+
     template <typename Atom_t> struct AtomWrap {
         Atom_t *atom;
         double sum;
+
+        static constexpr int SHIFT = 2;
+        static constexpr int K_MAX = 1 << SHIFT;
 
         AtomWrap(Atom_t &atom) : atom{&atom}, sum{0} {}
 
@@ -48,7 +53,13 @@ class NautyCanon2 {
         inline Atom_t &operator*() { return *atom; }
         inline Atom_t const &operator*() const { return *atom; }
 
-        inline int toInt() const { return sum; };
+        inline int toInt() const {
+            // Convert sum into an int storing kind in lower order bits
+            CHECK(sum * K_MAX < INT_MAX, "overflow gonna getcha");
+            CHECK(atom->kind() >= 0 && atom->kind() < K_MAX, "kind too big");
+
+            return (static_cast<int>(sum) << SHIFT) ^ atom->kind();
+        };
     };
 
   public:
@@ -83,27 +94,26 @@ class NautyCanon2 {
 
         nauty_check(WORDSIZE, m, n, NAUTYVERSIONID);
 
-        //// order by colour
+        //// using coloured graph mode
         options.defaultptn = colour;
 
         std::vector<AtomWrap<Atom_t>> wrap{atoms.begin(), atoms.end()};
 
-        CHECK(wrap.size() == atoms.size(), "incorrect constuctor deduction");
-
         for (auto &&a : wrap) {
             for (auto &&b : wrap) {
-                a.sum += (a->pos() - b->pos()).squaredNorm();
+                if (bonded(*a, *b)) {
+                    a.sum += (a->pos() - b->pos()).squaredNorm();
+                }
             }
-            CHECK(a.sum < INT_MAX, "overflow gonna getcha");
         }
 
         std::sort(wrap.begin(), wrap.end(),
                   [](auto const &a, auto const &b) { return a.sum < b.sum; });
 
-        std::cout << "\nHere" << std::endl;
-        for (auto &&a : wrap) {
-            std::cout << a.sum << ':' << (int)a.sum << '\n';
-        }
+        // std::cout << "\nHere" << std::endl;
+        // for (auto &&a : wrap) {
+        //     std::cout << a.sum << ':' << (int)a.sum << '\n';
+        // }
         // std::terminate();
 
         for (std::size_t i = 0; i < n; ++i) {
@@ -141,7 +151,7 @@ class NautyCanon2 {
         // could use { return atoms[atoms.size() - 1 - i]; }
         // std::reverse(order.begin(), order.end());
 
-        // makeFirstOrigin(order);
+        makeFirstOrigin(order);
 
         return cg;
     }

@@ -226,7 +226,7 @@ template <typename F, typename P> class Dimer {
             swap(g0, ga);
         }
 
-        std::cerr << "failed converge dimer" << std::endl;
+        // std::cerr << "failed converge dimer" << std::endl;
         return false;
     }
 };
