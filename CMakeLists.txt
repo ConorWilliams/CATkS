@@ -3,12 +3,15 @@ cmake_minimum_required(VERSION 3.10)
 # set the project name
 project(CATkS VERSION 0.1
               DESCRIPTION "Continuous Adaptive kinetic (Monte Carlo) Simulator"
-              LANGUAGES CXX)
+            LANGUAGES CXX )
 
 # cxx standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+#CUDA standard
+ # set(CMAKE_CUDA_STANDARD 14)
 
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -18,6 +21,7 @@ endif()
 set(CMAKE_CXX_FLAGS "-Wall -Wextra -pedantic")
 set(CMAKE_CXX_FLAGS_DEBUG "-g -pg -march=native -O2")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native ")
+
 
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
@@ -92,7 +96,7 @@ set_target_properties(Nauty PROPERTIES IMPORTED_LOCATION "${PROJECT_SOURCE_DIR}/
 # add_executable(diffusion src/diffusion.cpp)
 # target_compile_options(diffusion PRIVATE -Werror)
 # target_link_libraries(diffusion PRIVATE Eigen3::Eigen nlohmann_json::nlohmann_json SMHasherSupport Nauty ${CMAKE_THREAD_LIBS_INIT})
-#
+
 
 add_executable(diffusion src/diffusion.cpp)
 target_link_libraries(diffusion PRIVATE Eigen3::Eigen nlohmann_json::nlohmann_json SMHasherSupport Nauty ${CMAKE_THREAD_LIBS_INIT})

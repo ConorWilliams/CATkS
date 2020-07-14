@@ -149,7 +149,7 @@ class NautyCanon2 {
 
         // Reverse such that higher coordination near centre
         // could use { return atoms[atoms.size() - 1 - i]; }
-        // std::reverse(order.begin(), order.end());
+        std::reverse(order.begin(), order.end());
 
         makeFirstOrigin(order);
 

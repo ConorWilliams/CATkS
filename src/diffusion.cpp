@@ -1,4 +1,4 @@
-#define NCHECK
+//#define NCHECK
 
 #define EIGEN_NO_DEBUG
 #define EIGEN_DONT_PARALLELIZE
@@ -51,7 +51,7 @@ constexpr double LAT = 2.855700;
 using Canon_t = NautyCanon2;
 using Force_t = FuncEAM2;
 
-inline constexpr int len = 5;
+inline constexpr int len = 7;
 
 struct LocalisedMech {
     std::size_t atom;
@@ -68,13 +68,26 @@ double activeToRate(double active_E) {
     return ARRHENIUS_PRE * std::exp(active_E * -INV_KB_T);
 }
 
+// template <typename T, std::size_t Rank> class Drray {
+//   private:
+//     T *m_data;
+//     std::size_t m_stride[Rank];
+//
+//   public:
+//     template <typename... Args> Drray(Args... dims) : m_stride{dims...} {
+//         for (std::size_t i = 1; i < Rank; i++) {
+//             m_stride[i] += m_stride[i - 1];
+//         }
+//     }
+// };
+
 int main(int argc, char **argv) {
 
     // CHECK(false, "false");
 
     VERIFY(argc == 3, "need an EAM data file and H dump file");
 
-    Vector init(len * len * len * 3 * 2 + 3 * 0);
+    Vector init(len * len * len * 3 * 2 + 3 * 2);
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -85,7 +98,7 @@ int main(int argc, char **argv) {
         for (int j = 0; j < len; ++j) {
             for (int k = 0; k < len; ++k) {
 
-                if ( (i == 1 && j == 1 && k == 1) /*||
+                if ( false/*(i == 1 && j == 1 && k == 1) ||
                     (i == 4 && j == 1 && k == 1)*/) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
                     init[3 * cell + 1] = (j + 0.5) * LAT;
@@ -114,11 +127,11 @@ int main(int argc, char **argv) {
     init[init.size() - 2] = LAT * (0 + 0.00);
     init[init.size() - 1] = LAT * (0 + 0.75);
 
-    // kinds[init.size() / 3 - 2] = H;
-    //
-    // init[init.size() - 6] = LAT * (3 + 0.25);
-    // init[init.size() - 5] = LAT * (0 + 0.50);
-    // init[init.size() - 4] = LAT * (0 + 1.00);
+    kinds[init.size() / 3 - 2] = H;
+
+    init[init.size() - 6] = LAT * (3 + 0.25);
+    init[init.size() - 5] = LAT * (2 + 0.50);
+    init[init.size() - 4] = LAT * (0 + 1.00);
     //
     // kinds[init.size() / 3 - 3] = H;
     //
@@ -129,7 +142,7 @@ int main(int argc, char **argv) {
     ////////////////////////////////////////////////////////////
 
     double time = 0;
-    int iter = 0;
+    int iter = 1;
 
     std::cout << "Loading " << argv[1] << '\n';
 
@@ -193,11 +206,10 @@ int main(int argc, char **argv) {
         possible.clear();
 
         for (std::size_t i = 0; i < classifyer.size(); ++i) {
-
             for (auto &&m : catalog[classifyer[i]]) {
-                if (iter % 100 == 0 && m.delta_E < 0.1) {
-                    continue
-                }
+                // if (iter % 100 == 0 && m.active_E < 0.1) {
+                //    std::cout << "bias" << std::endl;
+                //} else {
                 possible.push_back({
                     i,
                     activeToRate(m.active_E),
@@ -205,6 +217,7 @@ int main(int argc, char **argv) {
                     m.delta_E,
                     m.active_E,
                 });
+                //}
             }
         }
 
@@ -254,7 +267,7 @@ int main(int argc, char **argv) {
 
         std::cout << iter++ << " TIME: " << time << "\n\n";
 
-        if (iter % 1000 == 0) {
+        if (iter % 10000 == 0) {
             classifyer.write();
             catalog.write();
             return 0;
