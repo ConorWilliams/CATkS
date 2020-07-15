@@ -128,31 +128,4 @@ class FuncEAM {
             });
         }
     }
-
-    template <typename T> auto quasiColourAll(T const &x) const {
-        cellList.fillList(x);
-        cellList.makeGhosts();
-        cellList.updateHead();
-
-        std::vector<std::size_t> colours;
-
-        for (auto &&atom : cellList) {
-
-            long count = atom.kind();
-
-            if (count == 1) {
-                colours.push_back(99);
-                continue;
-            }
-
-            cellList.forEachNeigh(
-                atom, [&](auto const &neigh, double, double, double, double) {
-                    count += NautyCanon::bonded(atom, neigh);
-                });
-
-            colours.push_back(count);
-        }
-
-        return colours;
-    }
 };

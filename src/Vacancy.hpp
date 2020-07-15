@@ -77,7 +77,7 @@ class FindVacancy : public CellListSorted<AtomSortBase> {
             col.push_back(order);
         }
 
-        for (std::size_t i = 0; i < N; ++i) {
+        for (std::size_t i = 0; i < (N == 1 ? 1 : 2); ++i) {
             refineKmeans();
         }
 

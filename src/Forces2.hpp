@@ -15,7 +15,7 @@
 #include "EAM.hpp"
 #include "utils.hpp"
 
-#include "Canon.hpp"
+#include "Canon2.hpp"
 #include "Cell2.hpp"
 
 class FuncEAM2 {
@@ -127,15 +127,13 @@ class FuncEAM2 {
 
             long count = atom.kind();
 
-            if (count == 1) {
+            if (atom.kind() == 1) {
                 colours[atom.index()] = 99;
 
             } else {
-
-                cellList.forEachNeigh(atom, [&](auto const &neigh, double,
-                                                double, double, double) {
-                    count += NautyCanon::bonded(atom, neigh);
-                });
+                cellList.forEachNeigh(
+                    atom, [&](auto const &neigh, double, double, double,
+                              double) { count += bonded(atom, neigh); });
 
                 colours[atom.index()] = count;
             }
