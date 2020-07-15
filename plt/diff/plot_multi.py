@@ -24,7 +24,7 @@ plt.rc(
 
 
 data1 = np.loadtxt(
-    "/home/cdt1902/dis/CATkS/plt/diff/2H_7.xyz", dtype=np.float64
+    "/home/cdt1902/dis/CATkS/plt/diff/test7_2.xyz", dtype=np.float64
 )
 
 
@@ -44,9 +44,9 @@ x2 = np.sum(disp1[::, 3:], axis=1)
 diff1 = x1 / (6 * t1)
 
 
-plt.plot(t1, x1 / t1, label=r"$7^3$ first")
-plt.plot(t1, x2 / t1, label=r"$7^3$ second")
-plt.plot(t1, (x1 + x2) / 2 / t1, label=r"$7^3$ mean")
+plt.plot(t1, x1, label=r"$7^3$ first")
+plt.plot(t1, x2, label=r"$7^3$ second")
+plt.plot(t1, (x1 + x2) / 2, label=r"$7^3$ mean")
 
 
 plt.xlabel(r"Time/\si{\nano\second}")

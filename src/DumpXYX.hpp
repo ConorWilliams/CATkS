@@ -8,9 +8,9 @@
 
 #include "utils.hpp"
 
-template <typename K>
-void dumpXYX(std::string const &file, Vector const &coords, K kinds) {
-    CHECK(kinds.size() * 3 == (std::size_t)coords.size(),
+template <typename T, typename K>
+void dumpXYX(std::string const &file, T const &coords, K const &kinds) {
+    CHECK((std::size_t)kinds.size() * 3 == (std::size_t)coords.size(),
           " wrong number of atoms/kinds");
 
     std::ofstream outfile{file};
@@ -27,9 +27,9 @@ void dumpXYX(std::string const &file, Vector const &coords, K kinds) {
     }
 }
 
-template <typename K>
-void dumpH(std::string const &file, double time, Vector const &coords,
-           K kinds) {
+template <typename T, typename K>
+void dumpH(std::string const &file, double time, T const &coords,
+           K const &kinds) {
     std::ofstream outfile{file, std::ios::app};
 
     outfile << time;
@@ -49,7 +49,7 @@ int FRAME = 0;
 static const std::string head{"dump/frame_"};
 static const std::string tail{".xyz"};
 
-template <typename T> void output(Vector const &x, T const &kinds) {
+template <typename T, typename K> void output(T const &x, K const &kinds) {
     dumpXYX(head + std::to_string(FRAME++) + tail, x, kinds);
 }
 
