@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 # set the project name
 project(CATkS VERSION 0.1
               DESCRIPTION "Continuous Adaptive kinetic (Monte Carlo) Simulator"
-            LANGUAGES CXX )
+              LANGUAGES CXX )
 
 # cxx standard
 set(CMAKE_CXX_STANDARD 17)
@@ -50,8 +50,6 @@ add_subdirectory("${PROJECT_SOURCE_DIR}/external/json")
 find_package (Eigen3 3.3 REQUIRED NO_MODULE)
 
 include_directories(SYSTEM external/eigen)
-
-
 
 #////////////////////naughty///////////////////////
 

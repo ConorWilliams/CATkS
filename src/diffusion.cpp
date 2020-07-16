@@ -1,4 +1,4 @@
-//#define NCHECK
+#define NCHECK
 
 #define EIGEN_NO_DEBUG
 #define EIGEN_DONT_PARALLELIZE
@@ -125,9 +125,9 @@ int main(int argc, char **argv) {
 
     kinds[init.size() / 3 - 1] = H;
 
-    init[init.size() - 3] = LAT * (2 + 0.50);
-    init[init.size() - 2] = LAT * (0 + 0.00);
-    init[init.size() - 1] = LAT * (0 + 0.75);
+    init[init.size() - 3] = LAT * (1 + 0.50);
+    init[init.size() - 2] = LAT * (2 + 0.00);
+    init[init.size() - 1] = LAT * (1 + 0.75);
 
     kinds[init.size() / 3 - 2] = H;
 
@@ -137,9 +137,9 @@ int main(int argc, char **argv) {
 
     kinds[init.size() / 3 - 3] = H;
 
-    init[init.size() - 9] = LAT * (1 + 0.25);
-    init[init.size() - 8] = LAT * (0 + 0.50);
-    init[init.size() - 7] = LAT * (0 + 1.00);
+    init[init.size() - 9] = LAT * (4 + 0.50);
+    init[init.size() - 8] = LAT * (1 + 0.25);
+    init[init.size() - 7] = LAT * (4 + 1.00);
 
     ////////////////////////////////////////////////////////////
 
@@ -183,7 +183,7 @@ int main(int argc, char **argv) {
 
     std::vector<LocalisedMech> possible{};
 
-    while (time < 1e7) {
+    while (time < 1e-7) {
 
         // v.getVac(init);
         output(init, f.quasiColourAll(init));
