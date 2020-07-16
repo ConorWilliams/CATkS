@@ -74,7 +74,7 @@ class FindVacancy : public CellListSorted<AtomSortBase> {
 
         // std::cout << "SIZE " << under.size() << '\n';
 
-        for (std::size_t i = 0; i < 2; ++i) {
+        for (std::size_t i = 0; i < (N == 1 ? 1 : 2); ++i) {
             refineKmeans();
         }
     }

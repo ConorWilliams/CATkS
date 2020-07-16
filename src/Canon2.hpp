@@ -50,7 +50,7 @@ class NautyCanon2 {
         double sum;
 
         static constexpr int SHIFT = 1;
-        static constexpr double GRANULARITY = 0.1;
+        static constexpr double GRANULARITY = 0.2;
 
         AtomWrap(Atom_t &atom) : atom{&atom}, sum{0} {}
 
