@@ -36,14 +36,21 @@ class NautyCanon2 {
   private:
     enum : bool { colour = false, plain = true };
 
-    static constexpr double GRANULARITY = 5.0;
-
     template <typename Atom_t> struct AtomWrap {
+      private:
+        inline int sum2Int() const {
+            // Convert sum into an int storing kind in lower order bits
+            CHECK(sum < GRANULARITY * INT_MAX, "overflow gonna getcha");
+
+            return static_cast<int>(sum / GRANULARITY);
+        };
+
+      public:
         Atom_t *atom;
         double sum;
 
-        static constexpr int SHIFT = 2;
-        static constexpr int K_MAX = 1 << SHIFT;
+        static constexpr int SHIFT = 1;
+        static constexpr double GRANULARITY = 0.1;
 
         AtomWrap(Atom_t &atom) : atom{&atom}, sum{0} {}
 
@@ -53,13 +60,28 @@ class NautyCanon2 {
         inline Atom_t &operator*() { return *atom; }
         inline Atom_t const &operator*() const { return *atom; }
 
-        inline int toInt() const {
-            // Convert sum into an int storing kind in lower order bits
-            CHECK(sum * K_MAX < INT_MAX, "overflow gonna getcha");
-            CHECK(atom->kind() >= 0 && atom->kind() < K_MAX, "kind too big");
+        inline bool operator<(AtomWrap const &other) {
+            if (atom->kind() == other->kind()) {
+                return sum2Int() > other.sum2Int();
+            } else {
+                return atom->kind() < other->kind();
+            }
+        }
 
-            return (static_cast<int>(sum) << SHIFT) ^ atom->kind();
-        };
+        inline bool operator==(AtomWrap const &other) {
+            return atom->kind() == other->kind() &&
+                   sum2Int() == other.sum2Int();
+        }
+
+        inline bool operator!=(AtomWrap const &other) {
+            return !(*this == other);
+        }
+
+        inline int colour() {
+            CHECK(sum2Int() < (INT_MAX >> SHIFT), "overflow");
+            CHECK(atom->kind() < (1 << SHIFT), "kind too large");
+            return (sum2Int() << SHIFT) ^ atom->kind();
+        }
     };
 
   public:
@@ -102,13 +124,12 @@ class NautyCanon2 {
         for (auto &&a : wrap) {
             for (auto &&b : wrap) {
                 if (bonded(*a, *b)) {
-                    a.sum += (a->pos() - b->pos()).squaredNorm();
+                    a.sum += (a->pos() - b->pos()).norm();
                 }
             }
         }
 
-        std::sort(wrap.begin(), wrap.end(),
-                  [](auto const &a, auto const &b) { return a.sum < b.sum; });
+        std::sort(wrap.begin(), wrap.end());
 
         // std::cout << "\nHere" << std::endl;
         // for (auto &&a : wrap) {
@@ -118,7 +139,7 @@ class NautyCanon2 {
 
         for (std::size_t i = 0; i < n; ++i) {
             lab[i] = i;
-            if (i + 1 == n || wrap[i + 1].toInt() != wrap[i].toInt()) {
+            if (i + 1 == n || wrap[i + 1] != wrap[i]) {
                 ptn[i] = 0;
             } else {
                 ptn[i] = 1;
@@ -145,7 +166,7 @@ class NautyCanon2 {
 
         // fill colour data
         std::transform(lab, lab + atoms.size(), cg.kinds().begin(),
-                       [&](int i) { return wrap[i].toInt(); });
+                       [&](int i) { return wrap[i].colour(); });
 
         // Reverse such that higher coordination near centre
         // could use { return atoms[atoms.size() - 1 - i]; }
