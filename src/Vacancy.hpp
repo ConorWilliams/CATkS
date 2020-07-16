@@ -7,7 +7,7 @@
 #include "DumpXYX.hpp"
 
 template <std::size_t N>
-class FindVacancy : protected CellListSorted<AtomSortBase> {
+class FindVacancy : public CellListSorted<AtomSortBase> {
   private:
     struct Kmean {
         Eigen::Vector3d pos = Eigen::Vector3d::Zero();
@@ -45,6 +45,8 @@ class FindVacancy : protected CellListSorted<AtomSortBase> {
                 mean.sum = Eigen::Vector3d::Zero();
                 mean.size = 0;
             }
+
+            // std::cout << "mean " << mean.pos.transpose() << '\n';
         }
     }
 
@@ -70,7 +72,9 @@ class FindVacancy : protected CellListSorted<AtomSortBase> {
             }
         }
 
-        for (std::size_t i = 0; i < (N == 1 ? 1 : 2); ++i) {
+        // std::cout << "SIZE " << under.size() << '\n';
+
+        for (std::size_t i = 0; i < 2; ++i) {
             refineKmeans();
         }
     }
@@ -83,7 +87,7 @@ class FindVacancy : protected CellListSorted<AtomSortBase> {
         xs.block(0, 0, x.size(), 1) = x;
 
         for (std::size_t i = 0; i < means.size(); ++i) {
-            xs.block(x.size() + i, 0, 3, 1) = means[i].pos;
+            xs.block(x.size() + 3 * i, 0, 3, 1) = means[i].pos;
             col.push_back(1);
         }
 

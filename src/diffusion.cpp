@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
 
     VERIFY(argc == 3, "need an EAM data file and H dump file");
 
-    Vector init(len * len * len * 3 * 2 + 3 * -1);
+    Vector init(len * len * len * 3 * 2 + 3 * -2);
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -99,8 +99,8 @@ int main(int argc, char **argv) {
         for (int j = 0; j < len; ++j) {
             for (int k = 0; k < len; ++k) {
 
-                if ((i == 1 && j == 1 && k == 1)/* ||
-                    (i == 4 && j == 1 && k == 1) ||
+                if ((i == 1 && j == 1 && k == 1) ||
+                    (i == 4 && j == 1 && k == 1) /*||
                     (i == 2 && j == 2 && k == 2)*/) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
                     init[3 * cell + 1] = (j + 0.5) * LAT;
@@ -162,7 +162,7 @@ int main(int argc, char **argv) {
 
     Force_t f{force_box, kinds, data};
 
-    FindVacancy<1> v{force_box, kinds};
+    FindVacancy<2> v{force_box, kinds};
     for (int _ = 0; _ < 3; ++_) {
         v.find(init);
     }
