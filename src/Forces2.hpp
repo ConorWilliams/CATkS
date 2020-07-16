@@ -121,11 +121,11 @@ class FuncEAM2 {
     template <typename T> auto quasiColourAll(T const &x) const {
         cellList.fill(x);
 
-        std::vector<std::size_t> colours(x.size() / 3);
+        std::vector<int> colours(x.size() / 3);
 
         for (auto &&atom : cellList) {
 
-            long count = atom.kind();
+            int count = atom.kind();
 
             if (atom.kind() == 1) {
                 colours[atom.index()] = 99;

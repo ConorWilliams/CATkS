@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
 
     VERIFY(argc == 3, "need an EAM data file and H dump file");
 
-    Vector init(len * len * len * 3 * 2 + 3 * 3);
+    Vector init(len * len * len * 3 * 2 + 3 * -1);
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
         for (int j = 0; j < len; ++j) {
             for (int k = 0; k < len; ++k) {
 
-                if (false/*(i == 1 && j == 1 && k == 1) ||
+                if ((i == 1 && j == 1 && k == 1)/* ||
                     (i == 4 && j == 1 && k == 1) ||
                     (i == 2 && j == 2 && k == 2)*/) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
@@ -123,23 +123,23 @@ int main(int argc, char **argv) {
         }
     }
 
-    kinds[init.size() / 3 - 1] = H;
-
-    init[init.size() - 3] = LAT * (1 + 0.50);
-    init[init.size() - 2] = LAT * (2 + 0.00);
-    init[init.size() - 1] = LAT * (1 + 0.75);
-
-    kinds[init.size() / 3 - 2] = H;
-
-    init[init.size() - 6] = LAT * (1 + 0.25);
-    init[init.size() - 5] = LAT * (1 + 0.50);
-    init[init.size() - 4] = LAT * (0 + 1.00);
-
-    kinds[init.size() / 3 - 3] = H;
-
-    init[init.size() - 9] = LAT * (4 + 0.50);
-    init[init.size() - 8] = LAT * (1 + 0.25);
-    init[init.size() - 7] = LAT * (4 + 1.00);
+    // kinds[init.size() / 3 - 1] = H;
+    //
+    // init[init.size() - 3] = LAT * (1 + 0.50);
+    // init[init.size() - 2] = LAT * (2 + 0.00);
+    // init[init.size() - 1] = LAT * (1 + 0.75);
+    //
+    // kinds[init.size() / 3 - 2] = H;
+    //
+    // init[init.size() - 6] = LAT * (1 + 0.25);
+    // init[init.size() - 5] = LAT * (1 + 0.50);
+    // init[init.size() - 4] = LAT * (0 + 1.00);
+    //
+    // kinds[init.size() / 3 - 3] = H;
+    //
+    // init[init.size() - 9] = LAT * (4 + 0.50);
+    // init[init.size() - 8] = LAT * (1 + 0.25);
+    // init[init.size() - 7] = LAT * (4 + 1.00);
 
     ////////////////////////////////////////////////////////////
 
@@ -162,10 +162,10 @@ int main(int argc, char **argv) {
 
     Force_t f{force_box, kinds, data};
 
-    // FindVacancy<2> v{force_box, kinds};
-    // for (int _ = 0; _ < 3; ++_) {
-    //     v.getVac(init);
-    // }
+    FindVacancy<1> v{force_box, kinds};
+    for (int _ = 0; _ < 3; ++_) {
+        v.find(init);
+    }
 
     Catalog<Canon_t> catalog;
 
@@ -183,11 +183,12 @@ int main(int argc, char **argv) {
 
     std::vector<LocalisedMech> possible{};
 
-    while (time < 1e-7) {
+    while (iter < 10'000'000) {
 
-        // v.getVac(init);
-        output(init, f.quasiColourAll(init));
-        dumpH(argv[2], time, init, kinds);
+        // v.output(init, f.quasiColourAll(init));
+        v.dump(argv[2], time, init);
+        // output(init, f.quasiColourAll(init));
+        // dumpH(argv[2], time, init, kinds);
 
         ////////////////////////////////////////////////////////////
 

@@ -7,7 +7,7 @@
 #include "DumpXYX.hpp"
 
 template <std::size_t N>
-class FindVacancy : public CellListSorted<AtomSortBase> {
+class FindVacancy : protected CellListSorted<AtomSortBase> {
   private:
     struct Kmean {
         Eigen::Vector3d pos = Eigen::Vector3d::Zero();
@@ -51,12 +51,9 @@ class FindVacancy : public CellListSorted<AtomSortBase> {
   public:
     using CellListSorted::CellListSorted;
 
-    std::vector<std::size_t> getVac(Vector const &x) {
+    void find(Vector const &x) {
         fill(x);
         under.clear();
-
-        std::vector<std::size_t> col;
-        std::vector<double> x_c;
 
         for (auto &&atom : *this) {
             std::size_t order = 0;
@@ -71,26 +68,42 @@ class FindVacancy : public CellListSorted<AtomSortBase> {
             if (order < 8) {
                 under.push_back(atom.pos());
             }
-            x_c.push_back(atom.pos()[0]);
-            x_c.push_back(atom.pos()[1]);
-            x_c.push_back(atom.pos()[2]);
-            col.push_back(order);
         }
 
         for (std::size_t i = 0; i < (N == 1 ? 1 : 2); ++i) {
             refineKmeans();
         }
+    }
 
-        for (Kmean const &mean : means) {
-            x_c.push_back(mean.pos[0]);
-            x_c.push_back(mean.pos[1]);
-            x_c.push_back(mean.pos[2]);
+    void output(Vector const &x, std::vector<int> const &kinds) {
+        find(x);
+        std::vector<int> col = kinds;
+        Vector xs{x.size() + 3 * means.size()};
+
+        xs.block(0, 0, x.size(), 1) = x;
+
+        for (std::size_t i = 0; i < means.size(); ++i) {
+            xs.block(x.size() + i, 0, 3, 1) = means[i].pos;
             col.push_back(1);
-            std::cout << mean.pos.transpose() << " : " << mean.size << '\n';
         }
 
-        output(x_c, col);
+        ::output(xs, col);
+    }
 
-        return col;
+    void dump(std::string const &file, double time, Vector const &x) {
+
+        find(x);
+
+        std::ofstream outfile{file, std::ios::app};
+
+        outfile << time;
+
+        for (auto &&m : means) {
+            outfile << ' ' << m.pos[0];
+            outfile << ' ' << m.pos[1];
+            outfile << ' ' << m.pos[2];
+        }
+
+        outfile << "\n";
     }
 };
