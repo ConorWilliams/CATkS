@@ -17,7 +17,7 @@
 #include "DumpXYX.hpp"
 #include "utils.hpp"
 
-inline constexpr double MOVE_TOL = 0.1; // angstrom
+// inline constexpr double MOVE_TOL = 0.1; // angstrom
 
 Eigen::Matrix3d modifiedGramSchmidt(Eigen::Matrix3d const &in) {
     Eigen::Matrix3d out;

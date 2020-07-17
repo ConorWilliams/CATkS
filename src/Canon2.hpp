@@ -7,9 +7,104 @@
 #include <numeric>
 #include <vector>
 
-#include "Canon.hpp"
+#define MAXN 128
 
+#include "MurmurHash3.h"
 #include "nautinv.h"
+#include "nauty.h"
+#include "nlohmann/json.hpp"
+
+#include "Catalog.hpp"
+#include "utils.hpp"
+
+static_assert(MAXM * 64 == MAXN, "Nauty is playing up!");
+
+struct NautyGraph {
+  private:
+    std::array<graph, MAXN * MAXM> g{};
+    std::array<int, MAXN> k;
+
+  public:
+    inline graph const *data() const { return g.data(); }
+    inline graph *data() { return g.data(); }
+
+    inline auto &kinds() { return k; }
+
+    // Could be improved by storing the hash in the class and only computing
+    // when g/k changes.
+    std::array<std::uint64_t, 2> hash() const {
+        std::array<std::uint64_t, 2> h;
+        MurmurHash3_x86_128(this, sizeof(NautyGraph), 0, h.data());
+        return h;
+    }
+
+    std::string to_string() const {
+        std::string str = "rdf.";
+
+        auto h = hash();
+
+        str += std::to_string(h[0]) + std::to_string(h[1]);
+
+        for (auto &&elem : g) {
+            str += std::to_string(elem);
+        }
+        for (auto &&elem : k) {
+            str += std::to_string(elem);
+        }
+
+        return str.substr(0, 255);
+    }
+
+    friend inline bool operator==(NautyGraph const &a, NautyGraph const &b) {
+        return a.g == b.g && a.k == b.k;
+    }
+
+    friend void to_json(nlohmann::json &j, NautyGraph const &graph) {
+        j = nlohmann::json{
+            {"g", graph.g},
+            {"k", graph.k},
+        };
+    }
+
+    friend void from_json(nlohmann::json const &j, NautyGraph &graph) {
+        j.at("g").get_to(graph.g);
+        j.at("k").get_to(graph.k);
+    }
+};
+
+// specialising for std::unordered
+namespace std {
+template <> struct hash<NautyGraph> {
+    std::size_t operator()(NautyGraph const &x) const {
+        auto h = x.hash();
+        return h[0] ^ h[1];
+    }
+};
+} // namespace std
+
+// Find cental atom and move it to front, this is because the cental
+// atom is best suited as the origin of the soon to be defined local
+// coordinate system during findBasis() whic uses order[0] as origin.
+template <typename Atom_t> void makeFirstOrigin(std::vector<Atom_t> &ordered) {
+
+    Eigen::Vector3d sum = std::accumulate(
+        ordered.begin(), ordered.end(), Eigen::Vector3d{0, 0, 0},
+        [](auto s, Atom_t const &atom) -> Eigen::Vector3d {
+            return s + atom.pos();
+        });
+
+    sum /= ordered.size();
+
+    auto centre = std::min_element(ordered.begin(), ordered.end(),
+                                   [&](Atom_t const &a, Atom_t const &b) {
+                                       return (a.pos() - sum).squaredNorm() <
+                                              (b.pos() - sum).squaredNorm();
+                                   });
+
+    std::iter_swap(ordered.begin(), centre);
+
+    return;
+}
 
 // pre H was working at 2.55, 2.7 //
 static constexpr double F_F_BOND = 2.67; // 2.47 -- 2.86 angstrom
@@ -34,57 +129,54 @@ inline static bool bonded(Atom_t const &a, Atom_t const &b) {
     return sqdist < bond_len * bond_len;
 }
 
+template <typename Atom_t> struct AtomWrap {
+  private:
+    inline int sum2Int() const {
+        // Convert sum into an int storing kind in lower order bits
+        CHECK(sum < GRANULARITY * INT_MAX, "overflow gonna getcha");
+
+        return static_cast<int>(sum / GRANULARITY);
+    };
+
+  public:
+    Atom_t *atom;
+    double sum;
+
+    static constexpr int SHIFT = 1; // kind in {0,1} therfore need 1-bit
+    static constexpr double GRANULARITY = 0.1; // approx DIST_TOL / sqrt(3)
+
+    AtomWrap(Atom_t &atom) : atom{&atom}, sum{0} {}
+
+    inline Atom_t *operator->() { return atom; }
+    inline Atom_t const *operator->() const { return atom; }
+
+    inline Atom_t &operator*() { return *atom; }
+    inline Atom_t const &operator*() const { return *atom; }
+
+    inline bool operator<(AtomWrap const &other) {
+        if (atom->kind() == other->kind()) {
+            return sum2Int() > other.sum2Int();
+        } else {
+            return atom->kind() < other->kind();
+        }
+    }
+
+    inline bool operator==(AtomWrap const &other) {
+        return atom->kind() == other->kind() && sum2Int() == other.sum2Int();
+    }
+
+    inline bool operator!=(AtomWrap const &other) { return !(*this == other); }
+
+    inline int colour() {
+        CHECK(sum2Int() < (INT_MAX >> SHIFT), "overflow");
+        CHECK(atom->kind() < (1 << SHIFT), "kind too large");
+        return (sum2Int() << SHIFT) ^ atom->kind();
+    }
+};
+
 class NautyCanon2 {
   private:
     enum : bool { colour = false, plain = true };
-
-    template <typename Atom_t> struct AtomWrap {
-      private:
-        inline int sum2Int() const {
-            // Convert sum into an int storing kind in lower order bits
-            CHECK(sum < GRANULARITY * INT_MAX, "overflow gonna getcha");
-
-            return static_cast<int>(sum / GRANULARITY);
-        };
-
-      public:
-        Atom_t *atom;
-        double sum;
-
-        static constexpr int SHIFT = 1;
-        static constexpr double GRANULARITY = 0.1;
-
-        AtomWrap(Atom_t &atom) : atom{&atom}, sum{0} {}
-
-        inline Atom_t *operator->() { return atom; }
-        inline Atom_t const *operator->() const { return atom; }
-
-        inline Atom_t &operator*() { return *atom; }
-        inline Atom_t const &operator*() const { return *atom; }
-
-        inline bool operator<(AtomWrap const &other) {
-            if (atom->kind() == other->kind()) {
-                return sum2Int() > other.sum2Int();
-            } else {
-                return atom->kind() < other->kind();
-            }
-        }
-
-        inline bool operator==(AtomWrap const &other) {
-            return atom->kind() == other->kind() &&
-                   sum2Int() == other.sum2Int();
-        }
-
-        inline bool operator!=(AtomWrap const &other) {
-            return !(*this == other);
-        }
-
-        inline int colour() {
-            CHECK(sum2Int() < (INT_MAX >> SHIFT), "overflow");
-            CHECK(atom->kind() < (1 << SHIFT), "kind too large");
-            return (sum2Int() << SHIFT) ^ atom->kind();
-        }
-    };
 
   public:
     using Key_t = NautyGraph;
@@ -121,7 +213,7 @@ class NautyCanon2 {
 
         std::vector<AtomWrap<Atom_t>> wrap{atoms.begin(), atoms.end()};
 
-        constexpr std::size_t MIN_NEIGH = 4;
+        constexpr std::size_t MIN_NEIGH = 4; // >3 for triangulation
         constexpr /**/ std::size_t BINS = 24;
         constexpr /*     */ double RMAX = 2 * 6; // diametre 2*RCUT
 
@@ -135,6 +227,7 @@ class NautyCanon2 {
             const double bond = (RMAX / BINS) * [&]() -> std::size_t {
                 std::size_t count = 0;
                 for (std::size_t i = 0; i < rdf.size(); ++i) {
+                    // Greater than as self != neighbour
                     if (count > MIN_NEIGH) {
                         return i;
                     }

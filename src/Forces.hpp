@@ -15,8 +15,6 @@
 #include "EAM.hpp"
 #include "utils.hpp"
 
-#include "Canon.hpp"
-
 class FuncEAM {
   private:
     // Helper class holds atom in LIST array of LCL with index of neighbours
