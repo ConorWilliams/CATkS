@@ -6,11 +6,14 @@
 #include <future>
 #include <iomanip>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 #include "nlohmann/json.hpp"
+
+#include "threadpool.hpp"
 
 #include "utils.hpp"
 
@@ -139,12 +142,14 @@ template <typename Canon> class Catalog {
 
     using Key_t = typename Canon::Key_t;
 
+    thread_pool pool;
+
     std::unordered_map<Key_t, Topo> catalog;
 
     static constexpr std::size_t sp_trys = 10;
 
   public:
-    Catalog() {
+    Catalog() : pool{std::thread::hardware_concurrency()} {
         using nlohmann::json;
 
         std::string fname = "keys.lmc.json";
@@ -210,45 +215,41 @@ template <typename Canon> class Catalog {
 
         using result_t = std::vector<std::tuple<Vector, Vector>>;
 
-        std::vector<std::future<result_t>> searches;
-
-        for (auto idx : idxs) {
-            searches.emplace_back(
-                std::async(std::launch::async, [=, &x, &mi]() -> result_t {
-                    return findSaddle(sp_trys, x, idx, f, mi);
-                }));
-        }
-
-        std::cout << "Launched " << searches.size()
-                  << " threads = " << searches.size() * sp_trys
-                  << " sp searches.\n";
+        std::cout << "Launching " << idxs.size() * sp_trys << " sp searches.\n";
 
         double f_x = f(x);
 
         std::size_t sps = 0;
         std::size_t new_mechs = 0;
 
-        for (auto &&vec : searches) {
+        std::vector<std::future<result_t>> futures;
+
+        for (auto &&idx : idxs) {
+            futures.emplace_back(pool.execute(
+                [=, &x, &mi]() { return findSaddle(sp_trys, x, idx, f, mi); }));
+        }
+
+        for (auto &&vec : futures) {
             for (auto &&[sp, end] : vec.get()) {
 
-                sps += 1;
+                ++sps;
 
                 auto [centre, ref] = cl.classifyMech(end);
 
                 double barrier = f(sp) - f_x;
                 double delta = f(end) - f_x;
 
-                // CHECK(barrier > 0, "found a negative energy sp?");
+                CHECK(barrier > 0, "found a negative energy sp?");
 
                 if (catalog[cl[centre]].pushMech(barrier, delta,
                                                  std::move(ref))) {
                     new_mechs += 1;
-                    // std::cout << barrier << std::endl;
                 }
             }
         }
+        //}
 
-        std::cout << sps << '/' << searches.size() * sp_trys
+        std::cout << sps << '/' << idxs.size() * sp_trys
                   << " searches found saddles.\n";
 
         std::cout << new_mechs << '/' << sps

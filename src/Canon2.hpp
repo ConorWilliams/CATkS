@@ -9,6 +9,8 @@
 
 #include "Canon.hpp"
 
+#include "nautinv.h"
+
 // pre H was working at 2.55, 2.7 //
 static constexpr double F_F_BOND = 2.67; // 2.47 -- 2.86 angstrom
 static constexpr double H_H_BOND = 3.00; // 0.25 0.5 0.75 vacancy neigh
@@ -101,8 +103,7 @@ class NautyCanon2 {
         static int orbits[MAXN];
 
         static statsblk stats;
-
-        static DEFAULTOPTIONS_GRAPH(options);
+        static DEFAULTOPTIONS_DIGRAPH(options);
 
         options.getcanon = true;
 
@@ -113,7 +114,6 @@ class NautyCanon2 {
         std::size_t m = SETWORDSNEEDED(n);
 
         CHECK(n <= MAXN && m <= MAXM, "too many atoms " << n << ' ' << m);
-
         nauty_check(WORDSIZE, m, n, NAUTYVERSIONID);
 
         //// using coloured graph mode
@@ -121,25 +121,46 @@ class NautyCanon2 {
 
         std::vector<AtomWrap<Atom_t>> wrap{atoms.begin(), atoms.end()};
 
-        for (auto &&a : wrap) {
-            for (auto &&b : wrap) {
-                if (bonded(*a, *b)) {
-                    a.sum += (a->pos() - b->pos()).norm();
+        constexpr std::size_t MIN_NEIGH = 4;
+        constexpr /**/ std::size_t BINS = 24;
+        constexpr /*     */ double RMAX = 2 * 6; // diametre 2*RCUT
+
+        for (std::size_t i = 0; i < n; ++i) {
+            std::array<std::size_t, BINS> rdf{};
+
+            for (std::size_t j = 0; j < n; ++j) {
+                ++rdf[(wrap[i]->pos() - wrap[j]->pos()).norm() * 2];
+            }
+
+            const double bond = (RMAX / BINS) * [&]() -> std::size_t {
+                std::size_t count = 0;
+                for (std::size_t i = 0; i < rdf.size(); ++i) {
+                    if (count > MIN_NEIGH) {
+                        return i;
+                    }
+                    count += rdf[i];
+                }
+                return -1;
+            }();
+
+            for (std::size_t j = 0; j < n; ++j) {
+                if (i != j) {
+                    double dist = (wrap[i]->pos() - wrap[j]->pos()).norm();
+                    if (dist < bond) {
+                        wrap[i].sum += dist;
+                        ADDONEARC(g.data(), i, j, m);
+                    }
                 }
             }
         }
 
-        std::sort(wrap.begin(), wrap.end());
+        std::iota(lab, lab + n, 0); // TODO : only needs to be done once
 
-        // std::cout << "\nHere" << std::endl;
-        // for (auto &&a : wrap) {
-        //     std::cout << a.sum << ':' << (int)a.sum << '\n';
-        // }
-        // std::terminate();
+        std::sort(lab, lab + n,
+                  [&](int a, int b) { return wrap[a] < wrap[b]; });
 
         for (std::size_t i = 0; i < n; ++i) {
-            lab[i] = i;
-            if (i + 1 == n || wrap[i + 1] != wrap[i]) {
+            if (i + 1 == n || wrap[lab[i + 1]] != wrap[lab[i]]) {
                 ptn[i] = 0;
             } else {
                 ptn[i] = 1;
@@ -147,30 +168,14 @@ class NautyCanon2 {
         }
         ////
 
-        // Fill in adjecency matrix
-        for (std::size_t i = 0; i < wrap.size(); ++i) {
-            for (std::size_t j = i + 1; j < wrap.size(); ++j) {
-                if (bonded(*wrap[i], *wrap[j])) {
-                    ADDONEEDGE(g.data(), i, j, m);
-                }
-            }
-        }
-
         // Off-load to nauty!
         densenauty(g.data(), lab, ptn, orbits, &options, &stats, m, n,
                    cg.data());
 
-        // Put atoms in nauty order
-        transform_into(lab, lab + atoms.size(), order,
-                       [&](int i) { return *wrap[i]; });
-
-        // fill colour data
-        std::transform(lab, lab + atoms.size(), cg.kinds().begin(),
-                       [&](int i) { return wrap[i].colour(); });
-
-        // Reverse such that higher coordination near centre
-        // could use { return atoms[atoms.size() - 1 - i]; }
-        std::reverse(order.begin(), order.end());
+        for (std::size_t i = 0; i < n; ++i) {
+            order.push_back(*wrap[lab[n - 1 - i]]); // reverses order
+            cg.kinds()[i] = wrap[lab[i]].colour();
+        }
 
         makeFirstOrigin(order);
 

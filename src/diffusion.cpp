@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
 
     VERIFY(argc == 3, "need an EAM data file and H dump file");
 
-    Vector init(len * len * len * 3 * 2 + 3 * -2);
+    Vector init(len * len * len * 3 * 2 + 3 * -3);
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -100,8 +100,8 @@ int main(int argc, char **argv) {
             for (int k = 0; k < len; ++k) {
 
                 if ((i == 1 && j == 1 && k == 1) ||
-                    (i == 4 && j == 1 && k == 1) /*||
-                    (i == 2 && j == 2 && k == 2) */) {
+                    (i == 4 && j == 1 && k == 1) ||
+                    (i == 2 && j == 2 && k == 2) /**/) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
                     init[3 * cell + 1] = (j + 0.5) * LAT;
                     init[3 * cell + 2] = (k + 0.5) * LAT;
@@ -127,7 +127,7 @@ int main(int argc, char **argv) {
     // init[init.size() - 3] = LAT * (1 + 0.50);
     // init[init.size() - 2] = LAT * (1 + 0.25);
     // init[init.size() - 1] = LAT * (1 + 1.00);
-    //
+
     // kinds[init.size() / 3 - 2] = H;
     // init[init.size() - 6] = LAT * (1 + 0.25);
     // init[init.size() - 5] = LAT * (2 + 0.00);
@@ -164,7 +164,7 @@ int main(int argc, char **argv) {
 
     Force_t f{force_box, kinds, data};
 
-    FindVacancy<2> v{force_box, kinds};
+    FindVacancy<3> v{force_box, kinds};
     for (int _ = 0; _ < 3; ++_) {
         v.find(init);
     }
@@ -187,7 +187,7 @@ int main(int argc, char **argv) {
 
     while (iter < 10'000'000) {
 
-        //    v.output(init, f.quasiColourAll(init));
+        // v.output(init, f.quasiColourAll(init));
         v.dump(argv[2], time, init);
         // output(init, f.quasiColourAll(init));
         // dumpH(argv[2], time, init, kinds);
