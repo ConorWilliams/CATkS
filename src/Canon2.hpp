@@ -157,7 +157,7 @@ template <typename Atom_t> struct AtomWrap {
         if (atom->kind() == other->kind()) {
             return sum2Int() > other.sum2Int();
         } else {
-            return atom->kind() < other->kind();
+            return atom->kind() > other->kind();
         }
     }
 
@@ -213,7 +213,7 @@ class NautyCanon2 {
 
         std::vector<AtomWrap<Atom_t>> wrap{atoms.begin(), atoms.end()};
 
-        constexpr std::size_t MIN_NEIGH = 4; // >3 for triangulation
+        constexpr std::size_t MIN_NEIGH = 6; // >3 for triangulation
         constexpr /**/ std::size_t BINS = 24;
         constexpr /*     */ double RMAX = 2 * 6; // diametre 2*RCUT
 
