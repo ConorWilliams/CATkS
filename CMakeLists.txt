@@ -5,6 +5,9 @@ project(CATkS VERSION 0.1
               DESCRIPTION "Continuous Adaptive kinetic (Monte Carlo) Simulator"
               LANGUAGES CXX )
 
+# for clangd
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # cxx standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -22,8 +25,7 @@ set(CMAKE_CXX_FLAGS "-Wall -Wextra -pedantic")
 set(CMAKE_CXX_FLAGS_DEBUG "-g -pg -march=native -O2")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native ")
 
-# for clangd
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 
 find_package (Threads)
 

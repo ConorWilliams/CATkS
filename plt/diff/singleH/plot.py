@@ -23,7 +23,7 @@ plt.rc(
 )
 
 
-data1 = np.loadtxt("1H_5.xyz", dtype=np.float64)
+data1 = np.loadtxt("../old/h_diffusion_5_t3.xyz", dtype=np.float64)
 data2 = np.loadtxt("1H_7.xyz", dtype=np.float64)
 data3 = np.loadtxt("1H_10.xyz", dtype=np.float64)
 data4 = np.loadtxt("1H_15.xyz", dtype=np.float64)
@@ -68,31 +68,47 @@ x2 = savgol_filter(x2, 9, 2)
 x3 = savgol_filter(x3, 9, 2)
 x4 = savgol_filter(x4, 9, 2)
 
+
 plotter = plt.loglog
 
-plotter(t1, x1, label=r"$5^3$ unit cells")
-plotter(t2, x2, label=r"$7^3$ unit cells")
-plotter(t3, x3, label=r"$10^3$ unit cells")
-plotter(t4, x4, label=r"$15^3$ unit cells")
+plotter(t1, x1, "-", label=r"$5^3$ unit cells")
+plotter(t2, x2, "-", label=r"$7^3$ unit cells")
+plotter(t3, x3, "-", label=r"$10^3$ unit cells")
+plotter(t4, x4, "-", label=r"$15^3$ unit cells")
 
 plt.legend()
 
-plt.xlabel(r"Time/\si{\nano\second}")
+plt.xlabel(r"Time/\si{\second}")
 plt.ylabel(r"$\langle x^2 \rangle$/\si{\metre\squared}")
+
+plt.xlim([3e-12, 1e-7])
+plt.ylim([1e-20, 1e-14])
+
 
 fit = lambda x, a: 6 * a * x
 
+plotter(t3, 6 * 7.49 * 1e-9 * t3, "k--", label=r"Experimental")
+
 popt, pcov = curve_fit(fit, t1, x1)
-plotter(t1, 6 * popt[0] * t1, label=f"$5^3$ D {popt[0]}")
-
+print(popt[0], np.sqrt(pcov[0]))
 popt, pcov = curve_fit(fit, t2, x2)
-plotter(t2, 6 * popt[0] * t2, label=f"$7^3$ D {popt[0]}")
-
+print(popt[0], np.sqrt(pcov[0]))
 popt, pcov = curve_fit(fit, t3, x3)
-plotter(t3, 6 * popt[0] * t3, label=f"$10^3$ D {popt[0]}")
-
+print(popt[0], np.sqrt(pcov[0]))
 popt, pcov = curve_fit(fit, t4, x4)
-plotter(t4, 6 * popt[0] * t4, label=f"$15^3$ D {popt[0]}")
+print(popt[0], np.sqrt(pcov[0]))
+
+# popt, pcov = curve_fit(fit, t1, x1)
+# plotter(t1, 6 * popt[0] * t1, label=f"$5^3$ D {popt[0]}")
+
+# popt, pcov = curve_fit(fit, t2, x2)
+# plotter(t2, 6 * popt[0] * t2, label=f"$7^3$ D {popt[0]}")
+
+# popt, pcov = curve_fit(fit, t3, x3)
+# plotter(t3, 6 * popt[0] * t3, label=f"$10^3$ D {popt[0]}")
+#
+# popt, pcov = curve_fit(fit, t4, x4)
+# plotter(t4, 6 * popt[0] * t4, label=f"$15^3$ D {popt[0]}")
 
 plt.legend()
 

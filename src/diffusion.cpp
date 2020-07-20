@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
 
     VERIFY(argc == 3, "need an EAM data file and H dump file");
 
-    Vector init(len * len * len * 3 * 2 + 3 * 3);
+    Vector init(len * len * len * 3 * 2 + 3 * 1);
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -127,15 +127,15 @@ int main(int argc, char **argv) {
     init[init.size() - 2] = LAT * (1 + 0.25);
     init[init.size() - 1] = LAT * (1 + 1.00);
 
-    kinds[init.size() / 3 - 2] = H;
-    init[init.size() - 6] = LAT * (1 + 0.25);
-    init[init.size() - 5] = LAT * (2 + 0.00);
-    init[init.size() - 4] = LAT * (1 + 0.50);
-
-    kinds[init.size() / 3 - 3] = H;
-    init[init.size() - 9] = LAT * (4 + 0.50);
-    init[init.size() - 8] = LAT * (1 + 0.25);
-    init[init.size() - 7] = LAT * (4 + 1.00);
+    // kinds[init.size() / 3 - 2] = H;
+    // init[init.size() - 6] = LAT * (1 + 0.25);
+    // init[init.size() - 5] = LAT * (2 + 0.00);
+    // init[init.size() - 4] = LAT * (1 + 0.50);
+    //
+    // kinds[init.size() / 3 - 3] = H;
+    // init[init.size() - 9] = LAT * (4 + 0.50);
+    // init[init.size() - 8] = LAT * (1 + 0.25);
+    // init[init.size() - 7] = LAT * (4 + 1.00);
 
     // kinds[init.size() / 3 - 4] = H;
     // init[init.size() - 12] = LAT * (4 + 0.50);

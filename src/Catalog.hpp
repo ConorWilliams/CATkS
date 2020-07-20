@@ -142,33 +142,49 @@ template <typename Canon> class Catalog {
 
     using Key_t = typename Canon::Key_t;
 
-    thread_pool pool;
+    ThreadPool pool;
 
     std::unordered_map<Key_t, Topo> catalog;
 
     static constexpr std::size_t sp_trys = 10;
 
+    std::future<void> async_write;
+
   public:
     Catalog() : pool{std::thread::hardware_concurrency()} {
         using nlohmann::json;
 
-        std::string fname = "keys.lmc.json";
+        // std::string fname = "keys.lmc.json";
+        //
+        // if (fileExist(fname)) {
+        //
+        //     json keys = json::parse(std::ifstream(fname));
+        //
+        //     auto names = keys.get<std::unordered_map<Key_t, std::string>>();
+        //
+        //     for (auto &&[key, name] : names) {
+        //         std::cout << "parsing: " << name << "\n";
+        //         CHECK(fileExist(name), "missing a topo file");
+        //
+        //         json j = json::parse(std::ifstream(name));
+        //
+        //         catalog[key] = j.get<Topo>();
+        //     }
+        // } else {
+        //     std::cout << "Missing " << fname << std::endl;
+        // }
+
+        std::string const fname = "catalog.json";
 
         if (fileExist(fname)) {
+            std::cout << "Parsing: " << fname << std::endl;
 
-            json keys = json::parse(std::ifstream(fname));
+            json j = json::parse(std::ifstream(fname));
 
-            auto names = keys.get<std::unordered_map<Key_t, std::string>>();
+            j.get_to(catalog);
 
-            for (auto &&[key, name] : names) {
-                CHECK(fileExist(name), "missing a topo file");
-
-                json j = json::parse(std::ifstream(name));
-
-                catalog[key] = j.get<Topo>();
-            }
         } else {
-            std::cout << "Missing " << fname << std::endl;
+            std::cout << "Missing: " << fname << std::endl;
         }
     }
 
@@ -178,35 +194,20 @@ template <typename Canon> class Catalog {
         return catalog[k].getMechs();
     }
 
-    void write() const {
+    void write() {
         using nlohmann::json;
 
-        ignore_result(std::system("mkdir bak"));
-        ignore_result(std::system("mv *.lmc.json bak/"));
-
-        std::unordered_map<Key_t, std::string> names{};
-
-        std::size_t counter = 0;
-
-        for (auto &&[rdf, topo] : catalog) {
-            json j = topo;
-
-            std::string name = "topo." + std::to_string(topo.count) + "." +
-                               std::to_string(topo.count_mechs) + "." +
-                               std::to_string(counter) + ".lmc.json";
-
-            std::ofstream(name) << j.dump(2);
-
-            names.insert({rdf, std::move(name)});
-
-            counter += 1;
+        if (async_write.valid()) {
+            async_write.wait();
         }
 
-        json keys = names;
+        async_write = std::async([j = json(catalog)]() {
+            ignore_result(std::system("mv catalog.json catalog.json.bak"));
 
-        std::ofstream("keys.lmc.json") << keys.dump(2);
+            std::ofstream("catalog.json") << j << std::endl;
 
-        ignore_result(std::system("rm -r bak"));
+            ignore_result(std::system("rm catalog.json.bak"));
+        });
     }
 
     template <typename F, typename C, typename MinImage>
@@ -249,11 +250,13 @@ template <typename Canon> class Catalog {
         }
         //}
 
-        std::cout << sps << '/' << idxs.size() * sp_trys
-                  << " searches found saddles.\n";
+        if (idxs.size() > 0) {
+            std::cout << sps << '/' << idxs.size() * sp_trys
+                      << " searches found saddles.\n";
 
-        std::cout << new_mechs << '/' << sps
-                  << " saddles identified new mechanisims.\n";
+            std::cout << new_mechs << '/' << sps
+                      << " saddles identified new mechanisims.\n";
+        }
 
         return new_mechs;
     }

@@ -206,11 +206,12 @@ template <typename Canon> class TopoClassify : protected CellList<Atom> {
                       "can't clear graphs in constant time");
 
         if (fileExist(fname)) {
+            std::cout << "Parsing: " << fname << std::endl;
             using nlohmann::json;
             json j = json::parse(std::ifstream(fname));
             catalog = j.get<std::unordered_map<Key_t, detail::Topo>>();
         } else {
-            std::cout << "Missing " << fname << std::endl;
+            std::cout << "Missing: " << fname << std::endl;
         }
     }
 

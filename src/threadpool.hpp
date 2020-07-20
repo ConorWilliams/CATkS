@@ -1,4 +1,4 @@
-// All the code in this file is adapted from Stack Overflow question:
+// The code in this file is adapted from Stack Overflow question:
 // https://codereview.stackexchange.com/q/221626
 
 // Licensed under CC BY-SA 4.0.
@@ -14,49 +14,48 @@
 #pragma once
 
 #include <condition_variable>
-#include <future> //packaged_task
+#include <future> // packaged_task
 #include <mutex>
 #include <queue>
 #include <thread>
-#include <type_traits> //invoke_result
+#include <tuple>       // apply
+#include <type_traits> // invoke_result
 #include <vector>
 
-class _task_container_base {
+class ThreadPool {
   public:
-    virtual ~_task_container_base(){};
-    virtual void operator()() = 0;
-};
+    ThreadPool(size_t thread_count);
+    ~ThreadPool();
 
-template <typename F> class _task_container : public _task_container_base {
-  public:
-    _task_container(F &&func) : _f(std::forward<F>(func)) {}
-    void operator()() override { _f(); }
-
-  private:
-    F _f;
-};
-
-template <typename F> _task_container(F &&)->_task_container<F>;
-
-class thread_pool {
-  public:
-    thread_pool(size_t thread_count);
-    ~thread_pool();
-
-    thread_pool(const thread_pool &) = delete;
-    thread_pool &operator=(const thread_pool &) = delete;
+    ThreadPool(const ThreadPool &) = delete;
+    ThreadPool &operator=(const ThreadPool &) = delete;
 
     template <typename F, typename... Args> auto execute(F &&, Args &&...);
 
   private:
+    class TaskWrapBase {
+      public:
+        virtual ~TaskWrapBase(){};
+        virtual void operator()() = 0;
+    };
+
+    template <typename F> class TaskWrap : public TaskWrapBase {
+      public:
+        TaskWrap(F &&func) : _f(std::forward<F>(func)) {}
+        void operator()() override { _f(); }
+
+      private:
+        F _f;
+    };
+
     std::vector<std::thread> _threads;
-    std::queue<std::unique_ptr<_task_container_base>> _tasks;
+    std::queue<std::unique_ptr<TaskWrapBase>> _tasks;
     std::mutex _task_mutex;
     std::condition_variable _task_cv;
     bool _stop_threads = false;
 };
 
-thread_pool::thread_pool(size_t thread_count) {
+ThreadPool::ThreadPool(size_t thread_count) {
     for (size_t i = 0; i < thread_count; ++i) {
         _threads.emplace_back(std::thread([&]() {
             std::unique_lock<std::mutex> queue_lock(_task_mutex,
@@ -85,7 +84,7 @@ thread_pool::thread_pool(size_t thread_count) {
     }
 }
 
-thread_pool::~thread_pool() {
+ThreadPool::~ThreadPool() {
     _stop_threads = true;
     _task_cv.notify_all();
 
@@ -95,10 +94,12 @@ thread_pool::~thread_pool() {
 }
 
 template <typename F, typename... Args>
-auto thread_pool::execute(F &&function, Args &&... args) {
+auto ThreadPool::execute(F &&function, Args &&... args) {
     std::unique_lock<std::mutex> queue_lock(_task_mutex, std::defer_lock);
 
-    std::packaged_task<std::invoke_result_t<F, Args...>()> task_pkg(
+    using pkg_t = std::packaged_task<std::invoke_result_t<F, Args...>()>;
+
+    pkg_t task_pkg(
         [f = std::forward<F>(function),
          largs = std::make_tuple(std::forward<Args>(args)...)]() mutable {
             return std::apply(std::forward<F>(f), std::move(largs));
@@ -108,7 +109,7 @@ auto thread_pool::execute(F &&function, Args &&... args) {
 
     queue_lock.lock();
 
-    _tasks.emplace(new _task_container(std::move(task_pkg)));
+    _tasks.emplace(std::make_unique<TaskWrap<pkg_t>>(std::move(task_pkg)));
 
     queue_lock.unlock();
 
