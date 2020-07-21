@@ -68,26 +68,13 @@ double activeToRate(double active_E) {
     return ARRHENIUS_PRE * std::exp(active_E * -INV_KB_T);
 }
 
-// template <typename T, std::size_t Rank> class Drray {
-//   private:
-//     T *m_data;
-//     std::size_t m_stride[Rank];
-//
-//   public:
-//     template <typename... Args> Drray(Args... dims) : m_stride{dims...} {
-//         for (std::size_t i = 1; i < Rank; i++) {
-//             m_stride[i] += m_stride[i - 1];
-//         }
-//     }
-// };
-
 int main(int argc, char **argv) {
 
     // CHECK(false, "false");
 
     VERIFY(argc == 3, "need an EAM data file and H dump file");
 
-    Vector init(len * len * len * 3 * 2 + 3 * 4);
+    Vector init(len * len * len * 3 * 2 + 3 * 3);
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -137,10 +124,10 @@ int main(int argc, char **argv) {
     init[init.size() - 8] = LAT * (1 + 0.25);
     init[init.size() - 7] = LAT * (4 + 1.00);
 
-    kinds[init.size() / 3 - 4] = H;
-    init[init.size() - 12] = LAT * (4 + 0.50);
-    init[init.size() - 11] = LAT * (4 + 0.25);
-    init[init.size() - 10] = LAT * (4 + 1.00);
+    // kinds[init.size() / 3 - 4] = H;
+    // init[init.size() - 12] = LAT * (4 + 0.50);
+    // init[init.size() - 11] = LAT * (4 + 0.25);
+    // init[init.size() - 10] = LAT * (4 + 1.00);
 
     ////////////////////////////////////////////////////////////
 
@@ -190,7 +177,7 @@ int main(int argc, char **argv) {
 
         // v.output(init, f.quasiColourAll(init));
         // v.dump(argv[2], time, init);
-        // output(init, f.quasiColourAll(init));
+        output(init, f.quasiColourAll(init));
         dumpH(argv[2], time, init, kinds);
 
         ////////////////////////////////////////////////////////////

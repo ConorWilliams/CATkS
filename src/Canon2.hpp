@@ -30,29 +30,12 @@ struct NautyGraph {
 
     inline auto &kinds() { return k; }
 
-    // Could be improved by storing the hash in the class and only computing
-    // when g/k changes.
+    // TODO: Could be improved by storing the hash in the class and only
+    // computing when g/k changes.
     std::array<std::uint64_t, 2> hash() const {
         std::array<std::uint64_t, 2> h;
         MurmurHash3_x86_128(this, sizeof(NautyGraph), 0, h.data());
         return h;
-    }
-
-    std::string to_string() const {
-        std::string str = "rdf.";
-
-        auto h = hash();
-
-        str += std::to_string(h[0]) + std::to_string(h[1]);
-
-        for (auto &&elem : g) {
-            str += std::to_string(elem);
-        }
-        for (auto &&elem : k) {
-            str += std::to_string(elem);
-        }
-
-        return str.substr(0, 255);
     }
 
     friend inline bool operator==(NautyGraph const &a, NautyGraph const &b) {
@@ -135,7 +118,7 @@ template <typename Atom_t> struct AtomWrap {
         // Convert sum into an int storing kind in lower order bits
         CHECK(sum < GRANULARITY * INT_MAX, "overflow gonna getcha");
 
-        return static_cast<int>(sum / GRANULARITY);
+        return static_cast<int>(sum * GRANULARITY);
     };
 
   public:
@@ -143,7 +126,7 @@ template <typename Atom_t> struct AtomWrap {
     double sum;
 
     static constexpr int SHIFT = 1; // kind in {0,1} therfore need 1-bit
-    static constexpr double GRANULARITY = 0.1; // approx DIST_TOL / sqrt(3)
+    static constexpr double GRANULARITY = 1 / DIST_TOL; // was 1 / 0.1
 
     AtomWrap(Atom_t &atom) : atom{&atom}, sum{0} {}
 
@@ -168,7 +151,7 @@ template <typename Atom_t> struct AtomWrap {
     inline bool operator!=(AtomWrap const &other) { return !(*this == other); }
 
     inline int colour() {
-        CHECK(sum2Int() < (INT_MAX >> SHIFT), "overflow");
+        CHECK(sum2Int() < (INT_MAX >> SHIFT), "overflow in colour()");
         CHECK(atom->kind() < (1 << SHIFT), "kind too large");
         return (sum2Int() << SHIFT) ^ atom->kind();
     }
@@ -213,9 +196,9 @@ class NautyCanon2 {
 
         std::vector<AtomWrap<Atom_t>> wrap{atoms.begin(), atoms.end()};
 
-        constexpr std::size_t MIN_NEIGH = 6; // >3 for triangulation
+        constexpr std::size_t MIN_NEIGH = 4; // >3 for triangulation
         constexpr /**/ std::size_t BINS = 24;
-        constexpr /*     */ double RMAX = 2 * 6; // diametre 2*RCUT
+        constexpr /*     */ double RMAX = 2 * 6; // diametre = 2 * RCUT
 
         for (std::size_t i = 0; i < n; ++i) {
             std::array<std::size_t, BINS> rdf{};
@@ -240,7 +223,7 @@ class NautyCanon2 {
                 if (i != j) {
                     double dist = (wrap[i]->pos() - wrap[j]->pos()).norm();
                     if (dist < bond) {
-                        wrap[i].sum += dist;
+                        wrap[j].sum += dist;
                         ADDONEARC(g.data(), i, j, m);
                     }
                 }

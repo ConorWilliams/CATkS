@@ -14,7 +14,6 @@
 #include "nlohmann/json.hpp"
 
 #include "threadpool.hpp"
-
 #include "utils.hpp"
 
 inline constexpr double DELTA_E_TOL = 0.1; // TODO : make this 0.01 and test
@@ -201,12 +200,9 @@ template <typename Canon> class Catalog {
             async_write.wait();
         }
 
-        async_write = std::async([j = json(catalog)]() {
+        async_write = pool.execute([j = json(catalog)]() {
             ignore_result(std::system("mv catalog.json catalog.json.bak"));
-
             std::ofstream("catalog.json") << j << std::endl;
-
-            ignore_result(std::system("rm catalog.json.bak"));
         });
     }
 
