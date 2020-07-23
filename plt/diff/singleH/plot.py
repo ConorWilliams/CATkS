@@ -22,8 +22,10 @@ plt.rc(
                  \usepackage{bm}""",
 )
 
+plt.figure(figsize=(7, 3.5))
 
-data1 = np.loadtxt("../old/h_diffusion_5_t3.xyz", dtype=np.float64)
+
+data1 = np.loadtxt("old/h_diffusion_5_t3.xyz", dtype=np.float64)
 data2 = np.loadtxt("1H_7.xyz", dtype=np.float64)
 data3 = np.loadtxt("1H_10.xyz", dtype=np.float64)
 data4 = np.loadtxt("1H_15.xyz", dtype=np.float64)

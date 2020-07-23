@@ -18,6 +18,7 @@ class AtomSortBase {
   public:
     AtomSortBase(int k, double x, double y, double z, std::size_t idx)
         : k{k}, r{x, y, z}, idx{idx} {}
+
     AtomSortBase() = default;
 
     inline std::size_t &index() { return idx; }

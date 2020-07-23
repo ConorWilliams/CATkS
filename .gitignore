@@ -5,6 +5,7 @@ build/*
 plt/dump/*
 *compile_commands.json
 *.idx
+*.pdf
 
 # Prerequisites
 *.d

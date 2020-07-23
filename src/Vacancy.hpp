@@ -110,4 +110,30 @@ class FindVacancy : public CellListSorted<AtomSortBase> {
 
         outfile << "\n";
     }
+
+    void dump(std::string const &file, double time, double delta_E,
+              Vector const &x, std::vector<int> const &kinds) {
+
+        find(x);
+
+        std::ofstream outfile{file, std::ios::app};
+
+        outfile << time << ' ' << delta_E;
+
+        for (auto &&m : means) {
+            outfile << ' ' << m.pos[0];
+            outfile << ' ' << m.pos[1];
+            outfile << ' ' << m.pos[2];
+        }
+
+        for (std::size_t i = 0; i < kinds.size(); ++i) {
+            if (kinds[i] == 1) {
+                for (std::size_t j = 0; j < 3; ++j) {
+                    outfile << ' ' << x[3 * i + j];
+                }
+            }
+        }
+
+        outfile << "\n";
+    }
 };

@@ -14,7 +14,7 @@
 #include "nauty.h"
 #include "nlohmann/json.hpp"
 
-#include "Catalog.hpp"
+#include "Catalog2.hpp"
 #include "utils.hpp"
 
 static_assert(MAXM * 64 == MAXN, "Nauty is playing up!");

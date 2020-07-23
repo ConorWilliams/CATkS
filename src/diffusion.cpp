@@ -1,4 +1,4 @@
-#define NCHECK
+//#define NCHECK
 
 #define EIGEN_NO_DEBUG
 #define EIGEN_DONT_PARALLELIZE
@@ -28,13 +28,13 @@
 #include <limits>
 
 #include "Canon2.hpp"
-#include "Catalog.hpp"
+#include "Catalog2.hpp"
+#include "Cbuff.hpp"
 #include "Dimer.hpp"
 #include "DumpXYX.hpp"
 #include "Forces.hpp"
 #include "Forces2.hpp"
 #include "Sort.hpp"
-#include "Topo.hpp"
 #include "Vacancy.hpp"
 #include "utils.hpp"
 
@@ -53,14 +53,6 @@ using Force_t = FuncEAM2;
 
 inline constexpr int len = 7;
 
-struct LocalisedMech {
-    std::size_t atom;
-    double rate;
-    std::vector<Eigen::Vector3d> const &ref;
-    double delta_E;
-    double active_E;
-};
-
 double activeToRate(double active_E) {
 
     CHECK(active_E > 0, "sp energy < init energy " << active_E);
@@ -68,13 +60,32 @@ double activeToRate(double active_E) {
     return ARRHENIUS_PRE * std::exp(active_E * -INV_KB_T);
 }
 
+struct Transition {
+    std::size_t atom_idx;
+    std::size_t topo_hash;
+    std::size_t mech_id;
+
+    Mechanism *mech;
+    double rate;
+
+    Transition(std::size_t atom_idx, std::size_t topo_hash, std::size_t mech_id,
+               Mechanism &mech)
+        : atom_idx{atom_idx}, topo_hash{topo_hash},
+          mech_id(mech_id), mech{&mech}, rate{activeToRate(mech.active_E)} {}
+
+    inline bool operator==(Transition const &other) const {
+        return atom_idx == other.atom_idx && topo_hash == other.topo_hash &&
+               mech_id == other.mech_id;
+    }
+};
+
 int main(int argc, char **argv) {
 
     // CHECK(false, "false");
 
     VERIFY(argc == 3, "need an EAM data file and H dump file");
 
-    Vector init(len * len * len * 3 * 2 + 3 * 3);
+    Vector init(len * len * len * 3 * 2 + 3 * 0);
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -85,7 +96,7 @@ int main(int argc, char **argv) {
         for (int j = 0; j < len; ++j) {
             for (int k = 0; k < len; ++k) {
 
-                if (false/*(i == 1 && j == 1 && k == 1) ||
+                if ((i == 1 && j == 1 && k == 1) /*||
                     (i == 2 && j == 1 && k == 1) ||
                     (i == 2 && j == 2 && k == 2) */) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
@@ -110,19 +121,19 @@ int main(int argc, char **argv) {
     }
 
     kinds[init.size() / 3 - 1] = H;
-    init[init.size() - 3] = LAT * (1 + 0.50);
-    init[init.size() - 2] = LAT * (1 + 0.25);
-    init[init.size() - 1] = LAT * (1 + 1.00);
+    init[init.size() - 3] = LAT * (1 + 0.5);
+    init[init.size() - 2] = LAT * (1);
+    init[init.size() - 1] = LAT * (1);
 
-    kinds[init.size() / 3 - 2] = H;
-    init[init.size() - 6] = LAT * (1 + 0.25);
-    init[init.size() - 5] = LAT * (2 + 0.00);
-    init[init.size() - 4] = LAT * (1 + 0.50);
-
-    kinds[init.size() / 3 - 3] = H;
-    init[init.size() - 9] = LAT * (4 + 0.50);
-    init[init.size() - 8] = LAT * (1 + 0.25);
-    init[init.size() - 7] = LAT * (4 + 1.00);
+    // kinds[init.size() / 3 - 2] = H;
+    // init[init.size() - 6] = LAT * (1 + 0.25);
+    // init[init.size() - 5] = LAT * (2 + 0.00);
+    // init[init.size() - 4] = LAT * (1 + 0.50);
+    //
+    // kinds[init.size() / 3 - 3] = H;
+    // init[init.size() - 9] = LAT * (4 + 0.50);
+    // init[init.size() - 8] = LAT * (1 + 0.25);
+    // init[init.size() - 7] = LAT * (4 + 1.00);
 
     // kinds[init.size() / 3 - 4] = H;
     // init[init.size() - 12] = LAT * (4 + 0.50);
@@ -142,22 +153,18 @@ int main(int argc, char **argv) {
         data.rcut(), 0, len * LAT, 0, len * LAT, 0, len * LAT,
     };
 
-    static const Box topo_box{
-        data.rcut(), 0, len * LAT, 0, len * LAT, 0, len * LAT,
-    };
+    static const Box topo_box = force_box;
 
     cellSort(init, kinds, force_box);
 
-    TopoClassify<Canon_t> classifyer{topo_box, kinds};
+    Catalog<Canon_t> catalog{topo_box, kinds};
 
     Force_t f{force_box, kinds, data};
 
-    // FindVacancy<2> v{force_box, kinds};
-    // for (int _ = 0; _ < 3; ++_) {
-    //     v.find(init);
-    // }
-
-    Catalog<Canon_t> catalog;
+    FindVacancy<1> v{force_box, kinds};
+    for (int _ = 0; _ < 3; ++_) {
+        v.find(init);
+    }
 
     Minimise min{f, f, init.size()};
 
@@ -171,30 +178,23 @@ int main(int argc, char **argv) {
     pcg64 rng(seed_source);
     std::uniform_real_distribution<> uniform_dist(0, 1);
 
-    std::vector<LocalisedMech> possible{};
+    std::vector<Transition> possible{};
+
+    Cbuff<Transition> kernal(5);
+
+    v.dump(argv[2], 0, 0, init, kinds);
 
     while (iter < 10'000'000) {
 
-        // v.output(init, f.quasiColourAll(init));
-        // v.dump(argv[2], time, init);
-        output(init, f.quasiColourAll(init));
-        dumpH(argv[2], time, init, kinds);
+        v.output(init, f.quasiColourAll(init));
+
+        // output(init, f.quasiColourAll(init));
+        // dumpH(argv[2], time, init, kinds);
 
         ////////////////////////////////////////////////////////////
 
-        classifyer.analyzeTopology(init);
-
-        std::vector<size_t> idxs = catalog.getSearchIdxs(classifyer);
-
-        int new_topos = classifyer.verify();
-
         int new_mechs = catalog.update(
-            init, f, classifyer,
-            [&](Eigen::Vector3d dr) { return topo_box.minImage(dr); }, idxs);
-
-        if (new_topos > 0) {
-            classifyer.write();
-        }
+            init, f, [&](Eigen::Vector3d dr) { return topo_box.minImage(dr); });
 
         if (new_mechs > 0) {
             catalog.write();
@@ -204,29 +204,30 @@ int main(int argc, char **argv) {
 
         possible.clear();
 
-        for (std::size_t i = 0; i < classifyer.size(); ++i) {
-            for (auto &&m : catalog[classifyer[i]]) {
-                // if (iter % 100 == 0 && m.active_E < 0.1) {
-                //    std::cout << "bias" << std::endl;
-                //} else {
-                possible.push_back({
-                    i,
-                    activeToRate(m.active_E),
-                    m.ref,
-                    m.delta_E,
-                    m.active_E,
-                });
-                //}
+        for (std::size_t i = 0; i < catalog.size(); ++i) {
+            auto [key, topo] = catalog[i];
+
+            auto hash = std::hash<typename Canon_t::Key_t>{}(key);
+
+            std::size_t mech_id = 0;
+
+            for (auto &&mech : topo.mechs) {
+
+                Transition tmp{i, hash, mech_id++, mech};
+
+                if (!kernal.contains(tmp)) {
+                    possible.emplace_back(std::move(tmp));
+                }
             }
         }
 
         double rate_sum = std::accumulate(
             possible.begin(), possible.end(), 0.0,
-            [](double sum, LocalisedMech const &m) { return sum + m.rate; });
+            [](double sum, Transition const &m) { return sum + m.rate; });
 
         double p1 = uniform_dist(rng);
 
-        LocalisedMech choice = [&]() {
+        Transition choice = [&]() {
             double sum = 0;
             for (auto &&elem : possible) {
 
@@ -245,7 +246,7 @@ int main(int argc, char **argv) {
 
         const double energy_pre = f(init);
 
-        init = classifyer.reconstruct(choice.atom, choice.ref);
+        catalog.reconstruct(choice.atom_idx, init, *choice.mech);
 
         const double energy_recon = f(init) - energy_pre;
 
@@ -255,23 +256,27 @@ int main(int argc, char **argv) {
 
         const double rate = choice.rate;
 
-        std::cout << "Memory:  " << choice.delta_E << '\n';
+        std::cout << "Memory:  " << choice.mech->delta_E << '\n';
         std::cout << "Recon:   " << energy_recon << '\n';
         std::cout << "Final:   " << energy_final << '\n';
-        std::cout << "Barrier: " << choice.active_E << "\n";
+        std::cout << "Barrier: " << choice.mech->active_E << "\n";
         std::cout << "Rate:    " << rate << " : " << rate / rate_sum << '\n';
 
-        VERIFY(std::abs(energy_recon - choice.delta_E) < 0.1, "recon err");
-        VERIFY(std::abs(energy_final - choice.delta_E) < 0.1, "recon err");
+        VERIFY(std::abs(energy_recon - choice.mech->delta_E) < 0.1,
+               "recon err");
+        VERIFY(std::abs(energy_final - choice.mech->delta_E) < 0.1,
+               "recon err");
 
         std::cout << iter++ << " TIME: " << time << "\n\n";
 
+        kernal.push_back(std::move(choice));
+
         if (iter % 10000 == 0) {
-            classifyer.write();
             catalog.write();
         }
+
+        v.dump(argv[2], time, energy_final, init, kinds);
     }
 
-    classifyer.write();
     catalog.write();
 }

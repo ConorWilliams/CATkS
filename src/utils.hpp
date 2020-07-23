@@ -66,7 +66,7 @@ auto transform_into(InputIt first, InputIt last, UnaryOperation &&unary_op) {
         std::forward<UnaryOperation>(unary_op));
 }
 
-bool fileExist(const std::string &name) {
+bool fileExist(std::string const &name) {
     if (FILE *file = fopen(name.c_str(), "r")) {
         fclose(file);
         return true;
