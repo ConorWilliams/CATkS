@@ -32,22 +32,26 @@ template <typename T> bool Cbuff<T>::contains(T const &value) const {
 }
 
 template <typename T> void Cbuff<T>::push_back(T const &value) {
-    pos = (pos + 1) % max_size;
+    if (max_size != 0) {
+        pos = (pos + 1) % max_size;
 
-    if (buff.size() < max_size) {
-        buff.push_back(value);
-    } else {
-        buff[pos] = value;
+        if (buff.size() < max_size) {
+            buff.push_back(value);
+        } else {
+            buff[pos] = value;
+        }
     }
 }
 
 template <typename T> void Cbuff<T>::push_back(T &&value) {
-    pos = (pos + 1) % max_size;
+    if (max_size != 0) {
+        pos = (pos + 1) % max_size;
 
-    if (buff.size() < max_size) {
-        buff.push_back(std::move(value));
-    } else {
-        buff[pos] = std::move(value);
+        if (buff.size() < max_size) {
+            buff.push_back(std::move(value));
+        } else {
+            buff[pos] = std::move(value);
+        }
     }
 }
 

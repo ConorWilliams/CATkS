@@ -4,6 +4,7 @@
 #include <cmath>
 #include <iostream>
 #include <iterator>
+#include <stdexcept>
 #include <utility>
 
 #include "Eigen/Dense"
@@ -14,7 +15,7 @@
         if (!(condition)) {                                                    \
             std::cerr << "Assertion `" #condition "` failed in " << __FILE__   \
                       << " line " << __LINE__ << ": " << message << std::endl; \
-            std::terminate();                                                  \
+            throw std::runtime_error(#message);                                \
         }                                                                      \
     } while (false)
 #else
@@ -29,7 +30,7 @@
         if (!(condition)) {                                                    \
             std::cerr << "Assertion `" #condition "` failed in " << __FILE__   \
                       << " line " << __LINE__ << ": " << message << std::endl; \
-            std::terminate();                                                  \
+            throw std::runtime_error(#message);                                \
         }                                                                      \
     } while (false)
 #else

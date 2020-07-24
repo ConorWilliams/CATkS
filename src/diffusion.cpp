@@ -1,5 +1,4 @@
-//#define NCHECK
-
+#define NCHECK
 #define EIGEN_NO_DEBUG
 #define EIGEN_DONT_PARALLELIZE
 
@@ -121,15 +120,15 @@ int main(int argc, char **argv) {
     }
 
     kinds[init.size() / 3 - 1] = H;
-    init[init.size() - 3] = LAT * (1 + 0.5);
-    init[init.size() - 2] = LAT * (1);
-    init[init.size() - 1] = LAT * (1);
+    init[init.size() - 3] = LAT * (1 + 0.50);
+    init[init.size() - 2] = LAT * (1 + 0.25);
+    init[init.size() - 1] = LAT * (1 + 0.00);
 
     // kinds[init.size() / 3 - 2] = H;
     // init[init.size() - 6] = LAT * (1 + 0.25);
     // init[init.size() - 5] = LAT * (2 + 0.00);
     // init[init.size() - 4] = LAT * (1 + 0.50);
-    //
+    // //
     // kinds[init.size() / 3 - 3] = H;
     // init[init.size() - 9] = LAT * (4 + 0.50);
     // init[init.size() - 8] = LAT * (1 + 0.25);
@@ -186,9 +185,9 @@ int main(int argc, char **argv) {
 
     while (iter < 10'000'000) {
 
-        v.output(init, f.quasiColourAll(init));
+        // v.output(init, f.quasiColourAll(init));
 
-        // output(init, f.quasiColourAll(init));
+        output(init, f.quasiColourAll(init));
         // dumpH(argv[2], time, init, kinds);
 
         ////////////////////////////////////////////////////////////
@@ -205,7 +204,7 @@ int main(int argc, char **argv) {
         possible.clear();
 
         for (std::size_t i = 0; i < catalog.size(); ++i) {
-            auto [key, topo] = catalog[i];
+            auto &&[key, topo] = catalog[i];
 
             auto hash = std::hash<typename Canon_t::Key_t>{}(key);
 
@@ -253,21 +252,20 @@ int main(int argc, char **argv) {
         min.findMin(init);
 
         const double energy_final = f(init) - energy_pre;
-
         const double rate = choice.rate;
 
+        std::cout << "Barrier: " << choice.mech->active_E << '\n';
         std::cout << "Memory:  " << choice.mech->delta_E << '\n';
         std::cout << "Recon:   " << energy_recon << '\n';
-        std::cout << "Final:   " << energy_final << '\n';
-        std::cout << "Barrier: " << choice.mech->active_E << "\n";
+        std::cout << "Relaxed: " << energy_final << '\n';
         std::cout << "Rate:    " << rate << " : " << rate / rate_sum << '\n';
 
-        VERIFY(std::abs(energy_recon - choice.mech->delta_E) < 0.1,
-               "recon err");
-        VERIFY(std::abs(energy_final - choice.mech->delta_E) < 0.1,
-               "recon err");
+        double diff = std::abs(energy_final - choice.mech->delta_E);
+        double frac = std::abs(diff / choice.mech->delta_E);
 
-        std::cout << iter++ << " TIME: " << time << "\n\n";
+        VERIFY(frac < 0.01 || diff < 0.005, "Reconstruction error!");
+
+        std::cout << "ITER: " << iter++ << "; TIME: " << time << "\n\n";
 
         kernal.push_back(std::move(choice));
 

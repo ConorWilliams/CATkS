@@ -222,7 +222,7 @@ template <typename Canon> class Catalog {
     static_assert(std::is_trivially_destructible_v<Key_t>, "");
 
     static constexpr std::size_t SPS_PER_THREAD = 5;
-    static constexpr std::size_t MIN_SPS = 10;
+    static constexpr std::size_t MIN_SPS = 25;
     static constexpr char FNAME[] = "catalog.json";
 
     ThreadPool pool;
@@ -265,13 +265,15 @@ template <typename Canon> class Catalog {
             async_write.wait();
         }
 
+        // Garentee back up incase of exit()
+        ignore_result(std::system("mv catalog.json catalog.json.bak"));
+
         async_write = pool.execute([j = nlohmann::json(catalog)]() {
-            ignore_result(std::system("mv catalog.json catalog.json.bak"));
             std::ofstream("catalog.json") << j << std::endl;
         });
     }
 
-    // Launches SP searches for every new topology in x , processes the results
+    // Launches SP searches for every new topology in x, processes the resulting
     // mechanisms and merges them into the catalog.
     template <typename F, typename MinImage>
     int update(Vector const &x, F const &f, MinImage const &mi) {
@@ -359,19 +361,23 @@ template <typename Canon> class Catalog {
         static std::vector<Atom> canon;
 
         std::size_t new_topo = 0;
+        std::size_t reclassify = 0;
 
         for (auto &&atom : cell_list) {
 
             neigh.clear();
-            // as forEach.. does not include centre
+            // as forEachNeigh(atom, ...) does not include atom
             neigh.push_back(atom);
 
             cell_list.forEachNeigh(
                 atom, [&](auto const &n, auto &&...) { neigh.push_back(n); });
 
-            auto idx = atom.index();
+            std::size_t idx = atom.index();
 
-            new_topo += merge(idx, neigh, canon);
+            auto &&[novel, lvl] = merge(idx, neigh, canon);
+
+            new_topo += novel;
+            reclassify += lvl;
 
             orders[idx].clear();
             for (auto &&atom : canon) {
@@ -379,18 +385,24 @@ template <typename Canon> class Catalog {
             }
         }
 
+        std::cout << "Collision frequency @ " << 100.0 * reclassify / size()
+                  << "%\n";
         std::cout << new_topo << '/' << size() << " topologies are new.\n";
     }
 
-    // Refines topolgial classification until unique position in catalog
-    bool merge(std::size_t idx, std::vector<Atom> &neigh,
-               std::vector<Atom> &canon) {
+    // Refines topolgial classification until unique position in catalog.
+    // return.first true if new topology, return.second is classifcation level
+    // required.
+    std::pair<bool, std::size_t>
+    merge(std::size_t idx, std::vector<Atom> &neigh, std::vector<Atom> &canon) {
 
         static Topology topo;
 
-        for (std::size_t level = 3;; ++level) {
+        for (std::size_t lvl = 0;; ++lvl) {
             canon.clear();
-            keys[idx] = Canon::canonicalize(neigh, canon);
+
+            keys[idx] = Canon::canonicalize(neigh, canon, lvl);
+
             transforms[idx] = findBasis(canon).transpose();
 
             topo.ref.data.clear();
@@ -403,21 +415,21 @@ template <typename Canon> class Catalog {
 
             if (inserted) {
                 // New topology
-                return true;
+                return {true, lvl};
             } else if (it->second.ref == topo.ref) {
                 // Existing topology
                 it->second.ref += topo.ref;
-                return false;
-            } else {
-                // Topology collison
-                std::cout << "topo collison" << std::endl;
+                return {false, lvl};
+            } else if (lvl > neigh.size()) {
+                // topo collision
+                std::cout << "topo overflow @ lvl: " << lvl << std::endl;
                 std::terminate();
             }
         }
     }
 
-    // Returns the index of the central atom for the mechanisim as
-    // well as the reference data to reconstruct mechanisim.
+    // Returns the index of the central atom for the mechanisim and the
+    // reference data to reconstruct mechanisim.
     std::pair<std::size_t, Mechanism> makeMech(double barrier, double delta,
                                                Vector const &beg,
                                                Vector const &end) const {

@@ -161,15 +161,22 @@ class NautyCanon2 {
   private:
     enum : bool { colour = false, plain = true };
 
+    static constexpr std::size_t MIN_NEIGH = 3;
+    static constexpr /**/ std::size_t BINS = 24;
+    static constexpr /*     */ double RMAX = 2 * 6; // diametre = 2 * RCUT
+
   public:
     using Key_t = NautyGraph;
 
     // NOT thread safe.
     // Writes canonically ordered atoms to order and returns the canonically
     // ordered graph represented as a dense adjecency matrix.
+    // Level is an increasing integer (starting from 0) that determines
+    // classification power
     template <typename Atom_t>
     static inline NautyGraph canonicalize(std::vector<Atom_t> &atoms,
-                                          std::vector<Atom_t> &order) {
+                                          std::vector<Atom_t> &order,
+                                          std::size_t lvl) {
 
         CHECK(order.size() == 0, "order has atoms already");
 
@@ -181,6 +188,7 @@ class NautyCanon2 {
         static DEFAULTOPTIONS_DIGRAPH(options);
 
         options.getcanon = true;
+        options.defaultptn = colour;
 
         NautyGraph g{};
         NautyGraph cg{};
@@ -191,27 +199,22 @@ class NautyCanon2 {
         CHECK(n <= MAXN && m <= MAXM, "too many atoms " << n << ' ' << m);
         nauty_check(WORDSIZE, m, n, NAUTYVERSIONID);
 
-        //// using coloured graph mode
-        options.defaultptn = colour;
-
         std::vector<AtomWrap<Atom_t>> wrap{atoms.begin(), atoms.end()};
-
-        constexpr std::size_t MIN_NEIGH = 4; // >3 for triangulation
-        constexpr /**/ std::size_t BINS = 24;
-        constexpr /*     */ double RMAX = 2 * 6; // diametre = 2 * RCUT
 
         for (std::size_t i = 0; i < n; ++i) {
             std::array<std::size_t, BINS> rdf{};
 
+            // Get number of atoms at each radius
             for (std::size_t j = 0; j < n; ++j) {
-                ++rdf[(wrap[i]->pos() - wrap[j]->pos()).norm() * 2];
+                ++rdf[(wrap[i]->pos() - wrap[j]->pos()).norm() * (BINS / RMAX)];
             }
 
-            const double bond = (RMAX / BINS) * [&]() -> std::size_t {
+            // Find minimum radius that has (lvl + MIN_NEIGH) atoms
+            const double r_edge = (RMAX / BINS) * [&]() -> std::size_t {
                 std::size_t count = 0;
                 for (std::size_t i = 0; i < rdf.size(); ++i) {
                     // Greater than as self != neighbour
-                    if (count > MIN_NEIGH) {
+                    if (count > lvl + MIN_NEIGH) {
                         return i;
                     }
                     count += rdf[i];
@@ -219,10 +222,11 @@ class NautyCanon2 {
                 return -1;
             }();
 
+            // Add edges to digraph and colour neigbour atoms
             for (std::size_t j = 0; j < n; ++j) {
                 if (i != j) {
                     double dist = (wrap[i]->pos() - wrap[j]->pos()).norm();
-                    if (dist < bond) {
+                    if (dist < r_edge) {
                         wrap[j].sum += dist;
                         ADDONEARC(g.data(), i, j, m);
                     }
@@ -230,7 +234,9 @@ class NautyCanon2 {
             }
         }
 
-        std::iota(lab, lab + n, 0); // TODO : only needs to be done once
+        // lab + prn used by nauty to comunicate colours with nauty
+
+        std::iota(lab, lab + n, 0);
 
         std::sort(lab, lab + n,
                   [&](int a, int b) { return wrap[a] < wrap[b]; });
@@ -242,7 +248,6 @@ class NautyCanon2 {
                 ptn[i] = 1;
             }
         }
-        ////
 
         // Off-load to nauty!
         densenauty(g.data(), lab, ptn, orbits, &options, &stats, m, n,
