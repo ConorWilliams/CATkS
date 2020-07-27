@@ -222,7 +222,7 @@ template <typename Canon> class Catalog {
     static_assert(std::is_trivially_destructible_v<Key_t>, "");
 
     static constexpr std::size_t SPS_PER_THREAD = 5;
-    static constexpr std::size_t MIN_SPS = 25;
+    static constexpr std::size_t MIN_SPS = 4 * SPS_PER_THREAD;
     static constexpr char FNAME[] = "catalog.json";
 
     ThreadPool pool;

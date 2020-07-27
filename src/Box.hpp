@@ -156,7 +156,7 @@ class Box {
         return i + j * mx + k * mx * my;
     }
 
-    // maps point any were into range 0->(max-min)
+    // Maps point any were into range 0->(max-min)
     inline std::array<double, 3> mapIntoCell(double x, double y,
                                              double z) const {
 
@@ -166,6 +166,7 @@ class Box {
         ret[1] = y - limits(1).len * std::floor(y * limits(1).inv);
         ret[2] = z - limits(2).len * std::floor(z * limits(2).inv);
 
+        // Fixup floating point math error
         ret[0] = ret[0] == limits(0).len ? 0.0 : ret[0];
         ret[1] = ret[1] == limits(1).len ? 0.0 : ret[1];
         ret[2] = ret[2] == limits(2).len ? 0.0 : ret[2];
@@ -175,11 +176,19 @@ class Box {
         std::size_t j = ((ret[1] - oy) * my) / ly;
         std::size_t k = ((ret[2] - oz) * mz) / lz;
 
-        // Fixup floating point math error
+        // Fixup integer-fp math error
         ret[0] = i == mx - 1 ? 0.0 : ret[0];
         ret[1] = j == my - 1 ? 0.0 : ret[1];
         ret[2] = k == mz - 1 ? 0.0 : ret[2];
 
         return ret;
+    }
+
+    void remap(Vector &x) const {
+        for (int i = 0; i < x.size() / 3; i += 3) {
+            x[i + 0] -= limits(0).len * std::floor(x[i + 0] * limits(0).inv);
+            x[i + 1] -= limits(1).len * std::floor(x[i + 1] * limits(1).inv);
+            x[i + 2] -= limits(2).len * std::floor(x[i + 2] * limits(2).inv);
+        }
     }
 };

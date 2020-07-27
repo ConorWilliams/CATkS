@@ -6,6 +6,7 @@ plt/dump/*
 *compile_commands.json
 *.idx
 *.pdf
+*.xyz
 
 # Prerequisites
 *.d

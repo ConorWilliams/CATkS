@@ -31,7 +31,6 @@
 #include "Cbuff.hpp"
 #include "Dimer.hpp"
 #include "DumpXYX.hpp"
-#include "Forces.hpp"
 #include "Forces2.hpp"
 #include "Sort.hpp"
 #include "Vacancy.hpp"
@@ -52,31 +51,48 @@ using Force_t = FuncEAM2;
 
 inline constexpr int len = 7;
 
-double activeToRate(double active_E) {
+double toRate(double active_E) {
 
     CHECK(active_E > 0, "sp energy < init energy " << active_E);
 
     return ARRHENIUS_PRE * std::exp(active_E * -INV_KB_T);
 }
 
-struct Transition {
+struct LocalMech {
     std::size_t atom_idx;
     std::size_t topo_hash;
-    std::size_t mech_id;
+    std::size_t mech_idx;
 
-    Mechanism *mech;
     double rate;
 
-    Transition(std::size_t atom_idx, std::size_t topo_hash, std::size_t mech_id,
-               Mechanism &mech)
+    LocalMech(std::size_t atom_idx, std::size_t topo_hash, std::size_t mech_idx,
+              double rate)
         : atom_idx{atom_idx}, topo_hash{topo_hash},
-          mech_id(mech_id), mech{&mech}, rate{activeToRate(mech.active_E)} {}
+          mech_idx(mech_idx), rate{rate} {}
 
-    inline bool operator==(Transition const &other) const {
+    inline bool operator==(LocalMech const &other) const {
         return atom_idx == other.atom_idx && topo_hash == other.topo_hash &&
-               mech_id == other.mech_id;
+               mech_idx == other.mech_idx;
     }
 };
+
+struct GlobalMech {
+    std::array<std::uint64_t, 2> state_hash;
+    LocalMech tran;
+
+    inline bool operator==(GlobalMech const &other) const {
+        return state_hash == other.state_hash && tran == other.tran;
+    }
+};
+
+std::array<std::uint64_t, 2> hash_state(Vector const &x) {
+    std::vector<int> tmp = transform_into(
+        x.begin(), x.end(), [](double x) -> int { return x * (1 / DIST_TOL); });
+
+    std::array<std::uint64_t, 2> hash;
+    MurmurHash3_x86_128(tmp.data(), sizeof(int) * tmp.size(), 0, hash.data());
+    return hash;
+}
 
 int main(int argc, char **argv) {
 
@@ -84,7 +100,7 @@ int main(int argc, char **argv) {
 
     VERIFY(argc == 3, "need an EAM data file and H dump file");
 
-    Vector init(len * len * len * 3 * 2 + 3 * 0);
+    Vector init(len * len * len * 3 * 2 + 3 * (1 - 1));
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -95,7 +111,7 @@ int main(int argc, char **argv) {
         for (int j = 0; j < len; ++j) {
             for (int k = 0; k < len; ++k) {
 
-                if ((i == 1 && j == 1 && k == 1) /*||
+                if ((i == 1 && j == 1 && k == 1) /* ||
                     (i == 2 && j == 1 && k == 1) ||
                     (i == 2 && j == 2 && k == 2) */) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
@@ -125,10 +141,10 @@ int main(int argc, char **argv) {
     init[init.size() - 1] = LAT * (1 + 0.00);
 
     // kinds[init.size() / 3 - 2] = H;
-    // init[init.size() - 6] = LAT * (1 + 0.25);
-    // init[init.size() - 5] = LAT * (2 + 0.00);
-    // init[init.size() - 4] = LAT * (1 + 0.50);
-    // //
+    // init[init.size() - 6] = LAT * (0 + 0.50);
+    // init[init.size() - 5] = LAT * (1 + 0.25);
+    // init[init.size() - 4] = LAT * (1 + 0.00);
+    //
     // kinds[init.size() / 3 - 3] = H;
     // init[init.size() - 9] = LAT * (4 + 0.50);
     // init[init.size() - 8] = LAT * (1 + 0.25);
@@ -138,6 +154,8 @@ int main(int argc, char **argv) {
     // init[init.size() - 12] = LAT * (4 + 0.50);
     // init[init.size() - 11] = LAT * (4 + 0.25);
     // init[init.size() - 10] = LAT * (4 + 1.00);
+
+    init += LAT * 0.25 * std::sqrt(3); // atoms not at edge
 
     ////////////////////////////////////////////////////////////
 
@@ -161,6 +179,7 @@ int main(int argc, char **argv) {
     Force_t f{force_box, kinds, data};
 
     FindVacancy<1> v{force_box, kinds};
+
     for (int _ = 0; _ < 3; ++_) {
         v.find(init);
     }
@@ -177,17 +196,20 @@ int main(int argc, char **argv) {
     pcg64 rng(seed_source);
     std::uniform_real_distribution<> uniform_dist(0, 1);
 
-    std::vector<Transition> possible{};
+    std::vector<LocalMech> possible{};
 
-    Cbuff<Transition> kernal(5);
+    Cbuff<GlobalMech> kernal(32);
 
     v.dump(argv[2], 0, 0, init, kinds);
 
     while (iter < 10'000'000) {
+        force_box.remap(init);
+
+        auto init_hash = hash_state(init);
 
         // v.output(init, f.quasiColourAll(init));
 
-        output(init, f.quasiColourAll(init));
+        // output(init, f.quasiColourAll(init));
         // dumpH(argv[2], time, init, kinds);
 
         ////////////////////////////////////////////////////////////
@@ -208,13 +230,10 @@ int main(int argc, char **argv) {
 
             auto hash = std::hash<typename Canon_t::Key_t>{}(key);
 
-            std::size_t mech_id = 0;
+            for (std::size_t j = 0; j < topo.mechs.size(); ++j) {
+                LocalMech tmp{i, hash, j, toRate(topo.mechs[j].active_E)};
 
-            for (auto &&mech : topo.mechs) {
-
-                Transition tmp{i, hash, mech_id++, mech};
-
-                if (!kernal.contains(tmp)) {
+                if (!kernal.contains({init_hash, tmp})) {
                     possible.emplace_back(std::move(tmp));
                 }
             }
@@ -222,11 +241,11 @@ int main(int argc, char **argv) {
 
         double rate_sum = std::accumulate(
             possible.begin(), possible.end(), 0.0,
-            [](double sum, Transition const &m) { return sum + m.rate; });
+            [](double sum, LocalMech const &m) { return sum + m.rate; });
 
         double p1 = uniform_dist(rng);
 
-        Transition choice = [&]() {
+        LocalMech choice = [&]() {
             double sum = 0;
             for (auto &&elem : possible) {
 
@@ -239,13 +258,17 @@ int main(int argc, char **argv) {
             std::terminate();
         }();
 
+        kernal.push_back({init_hash, choice});
+
         ////////////////////////////////////////////////////
 
         time += -std::log(uniform_dist(rng)) / rate_sum;
 
         const double energy_pre = f(init);
 
-        catalog.reconstruct(choice.atom_idx, init, *choice.mech);
+        auto [k, t] = catalog[choice.atom_idx];
+
+        catalog.reconstruct(choice.atom_idx, init, t.mechs[choice.mech_idx]);
 
         const double energy_recon = f(init) - energy_pre;
 
@@ -254,20 +277,18 @@ int main(int argc, char **argv) {
         const double energy_final = f(init) - energy_pre;
         const double rate = choice.rate;
 
-        std::cout << "Barrier: " << choice.mech->active_E << '\n';
-        std::cout << "Memory:  " << choice.mech->delta_E << '\n';
-        std::cout << "Recon:   " << energy_recon << '\n';
+        std::cout << "Memory:  " << t.mechs[choice.mech_idx].delta_E << '\n';
         std::cout << "Relaxed: " << energy_final << '\n';
+        std::cout << "Recon:   " << energy_recon << '\n';
+        std::cout << "Barrier: " << t.mechs[choice.mech_idx].active_E << '\n';
         std::cout << "Rate:    " << rate << " : " << rate / rate_sum << '\n';
 
-        double diff = std::abs(energy_final - choice.mech->delta_E);
-        double frac = std::abs(diff / choice.mech->delta_E);
+        double diff = std::abs(energy_final - t.mechs[choice.mech_idx].delta_E);
+        double frac = std::abs(diff / t.mechs[choice.mech_idx].delta_E);
 
-        VERIFY(frac < 0.01 || diff < 0.005, "Reconstruction error!");
+        VERIFY(frac < 0.20 || diff < 0.01, "Reconstruction error!");
 
         std::cout << "ITER: " << iter++ << "; TIME: " << time << "\n\n";
-
-        kernal.push_back(std::move(choice));
 
         if (iter % 10000 == 0) {
             catalog.write();

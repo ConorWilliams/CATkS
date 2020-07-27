@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <iomanip>
 
 #include "Canon2.hpp"
 #include "Cell2.hpp"
@@ -60,15 +61,16 @@ class FindVacancy : public CellListSorted<AtomSortBase> {
         for (auto &&atom : *this) {
             std::size_t order = 0;
             if (atom.kind() == 0) {
-                forEachNeigh(atom, [&](auto const &neigh, double, double,
+                forEachNeigh(atom, [&](auto const &neigh, double r, double,
                                        double, double) {
-                    if (neigh.kind() == 0 && bonded(atom, neigh)) {
+                    if (neigh.kind() == 0 && r < F_F_BOND) {
                         ++order;
                     }
                 });
-            }
-            if (order < 8) {
-                under.push_back(atom.pos());
+
+                if (order < 8) {
+                    under.push_back(atom.pos());
+                }
             }
         }
 
@@ -117,6 +119,8 @@ class FindVacancy : public CellListSorted<AtomSortBase> {
         find(x);
 
         std::ofstream outfile{file, std::ios::app};
+
+        outfile << std::fixed << std::setprecision(15);
 
         outfile << time << ' ' << delta_E;
 
