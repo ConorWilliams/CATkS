@@ -111,7 +111,7 @@ int main(int argc, char **argv) {
         for (int j = 0; j < len; ++j) {
             for (int k = 0; k < len; ++k) {
 
-                if ((i == 1 && j == 1 && k == 1) /* ||
+                if ((i == 1 && j == 1 && k == 1) /*||
                     (i == 2 && j == 1 && k == 1) ||
                     (i == 2 && j == 2 && k == 2) */) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
@@ -198,7 +198,7 @@ int main(int argc, char **argv) {
 
     std::vector<LocalMech> possible{};
 
-    Cbuff<GlobalMech> kernal(32);
+    Cbuff<GlobalMech> kernal(24);
 
     v.dump(argv[2], 0, 0, init, kinds);
 
@@ -294,7 +294,7 @@ int main(int argc, char **argv) {
             catalog.write();
         }
 
-        v.dump(argv[2], time, energy_final, init, kinds);
+        v.dump(argv[2], time, t.mechs[choice.mech_idx].active_E, init, kinds);
     }
 
     catalog.write();

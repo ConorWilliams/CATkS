@@ -47,6 +47,10 @@ def process(data):
 
 plt.figure(figsize=(7, 3.5))
 
+print("load mono")
+
+data1 = np.loadtxt("monovac.xyz", dtype=np.float64)
+
 print("load di")
 divac = np.loadtxt("divac.xyz", dtype=np.float64)
 
@@ -56,7 +60,7 @@ inv = 1 / supercell
 
 
 def minimage(data):
-    return data - supercell * np.floor(data * inv + 0.5)
+    data -= supercell * np.floor(data * inv + 0.5)
 
 
 print("math")
@@ -64,40 +68,43 @@ print("math")
 
 ignore = 3
 
+t1 = data1[ignore::, 0]
+
+
+disp1 = process(data1[::, 1::])
+disp1 -= disp1[0, :]
+
+disp1 = disp1[ignore:, :]
+
+disp1 = disp1 * 1e-10
+disp1 = disp1 * disp1
+x1 = np.sum(disp1, axis=1)
+diff1 = x1 / (6 * t1)
+
 # ///////////////////////////////
 
 t2 = divac[ignore::, 0]
 
-x_tmp = divac[::, 1::]
-delta = x_tmp[:, :3] - x_tmp[:, 3:]
-delta -= supercell * np.floor(0.5 + delta / supercell)
-delta *= delta
-delta = delta[ignore:, :]
-delta = np.sum(delta, axis=1)
-delta = np.sqrt(delta)
-
-
 x2 = process(divac[::, 1::])
-
 x2 -= x2[0, :]
 x2 = x2[ignore:, :]
 x2 = x2 * 1e-10
 x2 *= x2
 
+x2_d1 = minimage(x2[:, :3] - x2[:, 3:])
 
-x2_1 = np.sum(x2[:, :3], axis=1)
-x2_2 = np.sum(x2[:, 3:], axis=1)
+x2_1 = np.sum(x2[:, :2], axis=1)
+x2_2 = np.sum(x2[:, 2:], axis=1)
 
 x2 = (x2_1 + x2_2) * 0.5
 
 plotter = plt.loglog
 
-plotter(t2, x2_1, "-", label=r"Divacancy ($2$V)")
-plotter(t2, x2_2, "-", label=r"Divacancy ($2$V)")
-plotter(t2, delta, label=r"del")
+plotter(t1, x1, "-", label=r"Monovacancy ($1$V)")
+plotter(t2, x2, "-", label=r"Divacancy ($2$V)")
 
 
-plt.legend()
+# plt.legend()
 
 plt.xlabel(r"Time/\si{\second}")
 plt.ylabel(r"$\langle x^2 \rangle$/\si{\metre\squared}")
@@ -106,19 +113,25 @@ plt.ylabel(r"$\langle x^2 \rangle$/\si{\metre\squared}")
 fit = lambda x, a: 6 * a * x
 
 
-popt, pcov = curve_fit(fit, t2, x2_1)
-print(popt[0])
-plotter(t2, 6 * popt[0] * t2, label=r"$D = 1.22 \times 10^{-16}$")
+popt, pcov = curve_fit(fit, t1, x1)
+print(popt[0], np.sqrt(pcov[0]))
 
-popt, pcov = curve_fit(fit, t2, x2_2)
-print(popt[0])
-plotter(t2, 6 * popt[0] * t2, label=r"$D = 1.22 \times 10^{-16}$")
+popt, pcov = curve_fit(fit, t2, x2)
+print(popt[0], np.sqrt(pcov[0]))
+
+
+popt, pcov = curve_fit(fit, t1, x1)
+plotter(t1, 6 * popt[0] * t1, label=r"$D = 1.22 \times 10^{-16}$")
 
 
 plt.legend()
 
 
 plt.tight_layout()
-plt.savefig(r"/home/cdt1902/dis/thesis/results/Figs/divac.pdf")
+plt.savefig(r"/home/cdt1902/dis/thesis/results/Figs/monovac.pdf")
 
 plt.show()
+
+plt.clear()
+
+plt.plot(t2, x2_d1)

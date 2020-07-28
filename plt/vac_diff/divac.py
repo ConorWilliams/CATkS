@@ -56,7 +56,7 @@ inv = 1 / supercell
 
 
 def minimage(data):
-    return data - supercell * np.floor(data * inv + 0.5)
+    return data - supercell * np.floor((data / supercell) + 0.5)
 
 
 print("math")
@@ -66,59 +66,12 @@ ignore = 3
 
 # ///////////////////////////////
 
-t2 = divac[ignore::, 0]
-
-x_tmp = divac[::, 1::]
-delta = x_tmp[:, :3] - x_tmp[:, 3:]
-delta -= supercell * np.floor(0.5 + delta / supercell)
-delta *= delta
-delta = delta[ignore:, :]
-delta = np.sum(delta, axis=1)
-delta = np.sqrt(delta)
+t2 = divac[:, 0]
+x2_d = minimage(divac[:, 1:4] - divac[:, 4:])
+x2_d *= x2_d
+x2_d = np.sqrt(x2_d.sum(axis=1))
 
 
-x2 = process(divac[::, 1::])
-
-x2 -= x2[0, :]
-x2 = x2[ignore:, :]
-x2 = x2 * 1e-10
-x2 *= x2
-
-
-x2_1 = np.sum(x2[:, :3], axis=1)
-x2_2 = np.sum(x2[:, 3:], axis=1)
-
-x2 = (x2_1 + x2_2) * 0.5
-
-plotter = plt.loglog
-
-plotter(t2, x2_1, "-", label=r"Divacancy ($2$V)")
-plotter(t2, x2_2, "-", label=r"Divacancy ($2$V)")
-plotter(t2, delta, label=r"del")
-
-
-plt.legend()
-
-plt.xlabel(r"Time/\si{\second}")
-plt.ylabel(r"$\langle x^2 \rangle$/\si{\metre\squared}")
-
-
-fit = lambda x, a: 6 * a * x
-
-
-popt, pcov = curve_fit(fit, t2, x2_1)
-print(popt[0])
-plotter(t2, 6 * popt[0] * t2, label=r"$D = 1.22 \times 10^{-16}$")
-
-popt, pcov = curve_fit(fit, t2, x2_2)
-print(popt[0])
-plotter(t2, 6 * popt[0] * t2, label=r"$D = 1.22 \times 10^{-16}$")
-
-
-plt.legend()
-
-
-plt.tight_layout()
-plt.savefig(r"/home/cdt1902/dis/thesis/results/Figs/divac.pdf")
+plt.semilogx(t2, x2_d)
 
 plt.show()
