@@ -100,7 +100,7 @@ int main(int argc, char **argv) {
 
     VERIFY(argc == 3, "need an EAM data file and H dump file");
 
-    Vector init(len * len * len * 3 * 2 + 3 * (1 - 1));
+    Vector init(len * len * len * 3 * 2 + 3 * (-2));
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -111,8 +111,8 @@ int main(int argc, char **argv) {
         for (int j = 0; j < len; ++j) {
             for (int k = 0; k < len; ++k) {
 
-                if ((i == 1 && j == 1 && k == 1) /*||
-                    (i == 2 && j == 1 && k == 1) ||
+                if ((i == 1 && j == 1 && k == 1) ||
+                    (i == 2 && j == 1 && k == 1) /*||
                     (i == 2 && j == 2 && k == 2) */) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
                     init[3 * cell + 1] = (j + 0.5) * LAT;
@@ -135,10 +135,10 @@ int main(int argc, char **argv) {
         }
     }
 
-    kinds[init.size() / 3 - 1] = H;
-    init[init.size() - 3] = LAT * (1 + 0.50);
-    init[init.size() - 2] = LAT * (1 + 0.25);
-    init[init.size() - 1] = LAT * (1 + 0.00);
+    // kinds[init.size() / 3 - 1] = H;
+    // init[init.size() - 3] = LAT * (1 + 0.50);
+    // init[init.size() - 2] = LAT * (1 + 0.25);
+    // init[init.size() - 1] = LAT * (1 + 0.00);
 
     // kinds[init.size() / 3 - 2] = H;
     // init[init.size() - 6] = LAT * (0 + 0.50);
@@ -178,7 +178,7 @@ int main(int argc, char **argv) {
 
     Force_t f{force_box, kinds, data};
 
-    FindVacancy<1> v{force_box, kinds};
+    FindVacancy<2> v{force_box, kinds};
 
     for (int _ = 0; _ < 3; ++_) {
         v.find(init);
@@ -198,7 +198,7 @@ int main(int argc, char **argv) {
 
     std::vector<LocalMech> possible{};
 
-    Cbuff<GlobalMech> kernal(24);
+    Cbuff<GlobalMech> kernal(32);
 
     v.dump(argv[2], 0, 0, init, kinds);
 
@@ -207,7 +207,7 @@ int main(int argc, char **argv) {
 
         auto init_hash = hash_state(init);
 
-        // v.output(init, f.quasiColourAll(init));
+        v.output(init, f.quasiColourAll(init));
 
         // output(init, f.quasiColourAll(init));
         // dumpH(argv[2], time, init, kinds);
@@ -286,7 +286,7 @@ int main(int argc, char **argv) {
         double diff = std::abs(energy_final - t.mechs[choice.mech_idx].delta_E);
         double frac = std::abs(diff / t.mechs[choice.mech_idx].delta_E);
 
-        VERIFY(frac < 0.20 || diff < 0.01, "Reconstruction error!");
+        VERIFY(frac < 0.20 || diff < 0.037, "Reconstruction error!");
 
         std::cout << "ITER: " << iter++ << "; TIME: " << time << "\n\n";
 

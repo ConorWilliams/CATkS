@@ -76,9 +76,9 @@ x3 = (x3_1 + x3_2 + x3_3) / 3
 
 plotter = plt.loglog
 
-plotter(t3, x3_1, "-", label=r"Monovacancy ($1$V)")
-plotter(t3, x3_2, "-", label=r"Divacancy ($2$V)")
-plotter(t3, x3_3, "-", label=r"f ($2$V)")
+plotter(t3, x3_1, "-", label=r"Vacancy 1")
+plotter(t3, x3_2, "-", label=r"Vacancy 2")
+plotter(t3, x3_3, "-", label=r"Vacancy 3")
 
 
 # plt.legend()
@@ -90,18 +90,23 @@ plt.ylabel(r"$\langle x^2 \rangle$/\si{\metre\squared}")
 fit = lambda x, a: 6 * a * x
 
 
-popt, pcov = curve_fit(fit, t3, x3)
+popt, pcov = curve_fit(fit, t3[1000:], x3[1000:])
 print(popt[0], np.sqrt(pcov[0]))
 
 
 popt, pcov = curve_fit(fit, t3, x3)
-plotter(t3, 6 * popt[0] * t3, label=r"$D = 1.22 \times 10^{-16}$")
+plotter(
+    t3[1000:],
+    6 * popt[0] * t3[1000:],
+    "k--",
+    label=r"$D = 8.92 \times 10^{-14}$",
+)
 
 
 plt.legend()
 
 
 plt.tight_layout()
-plt.savefig(r"/home/cdt1902/dis/thesis/results/Figs/tmp.pdf")
+plt.savefig(r"/home/cdt1902/dis/thesis/results/Figs/trivac.pdf")
 
 plt.show()

@@ -11,7 +11,7 @@ template <std::size_t N>
 class FindVacancy : public CellListSorted<AtomSortBase> {
   private:
     struct Kmean {
-        Eigen::Vector3d pos = Eigen::Vector3d::Zero();
+        Eigen::Vector3d pos = {2.855, 2.855, 2.855};
         Eigen::Vector3d sum = Eigen::Vector3d::Zero();
         std::size_t size = 0;
     };
@@ -68,7 +68,7 @@ class FindVacancy : public CellListSorted<AtomSortBase> {
                     }
                 });
 
-                if (order < 8) {
+                if (order != 8) {
                     under.push_back(atom.pos());
                 }
             }

@@ -48,7 +48,7 @@ def process(data):
 plt.figure(figsize=(7, 3.5))
 
 print("load di")
-divac = np.loadtxt("divac.xyz", dtype=np.float64)
+divac = np.loadtxt("VH1.xyz", dtype=np.float64)
 
 supercell = 2.855700 * 7
 
@@ -68,7 +68,7 @@ ignore = 5
 
 t2 = divac[ignore::, 0]
 
-x_tmp = divac[::, 1::]
+x_tmp = divac[::, 2::]
 delta = x_tmp[:, :3] - x_tmp[:, 3:]
 delta -= supercell * np.floor(0.5 + delta / supercell)
 delta *= delta
@@ -92,9 +92,9 @@ x2 = (x2_1 + x2_2) * 0.5
 
 plotter = plt.loglog
 
-
-plotter(t2, x2_1, "-", label=r"Vacancy 1")
-plotter(t2, x2_2, "-", label=r"Vacancy 2")
+plotter(t2, x2_1, "-", label=r"Divacancy ($2$V)")
+# plotter(x2_2, "-", label=r"Divacancy ($2$V)")
+plotter(t2, delta, label=r"del")
 
 
 plt.legend()
@@ -104,11 +104,6 @@ plt.ylabel(r"$\langle x^2 \rangle$/\si{\metre\squared}")
 
 
 fit = lambda x, a: 6 * a * x
-
-
-popt, pcov = curve_fit(fit, t2, x2)
-print(popt[0])
-plotter(t2, 6 * popt[0] * t2, "k--", label=r"$D = 3.72 \times 10^{-17}$")
 
 
 plt.legend()

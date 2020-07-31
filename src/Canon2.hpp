@@ -91,8 +91,8 @@ template <typename Atom_t> void makeFirstOrigin(std::vector<Atom_t> &ordered) {
 
 // pre H was working at 2.55, 2.7 //
 static constexpr double F_F_BOND = 2.67; // 2.47 -- 2.86 angstrom
-static constexpr double H_H_BOND = 3.00; // 0.25 0.5 0.75 vacancy neigh
-static constexpr double F_H_BOND = 3.10; //
+static constexpr double H_H_BOND = 0;    // 0.25 0.5 0.75 vacancy neigh
+static constexpr double F_H_BOND = 0;    //
 
 static const Eigen::Matrix2d DISTS{
     {F_F_BOND, F_H_BOND},

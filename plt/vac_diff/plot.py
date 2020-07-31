@@ -40,7 +40,7 @@ def process(data):
     off = np.cumsum(off, axis=0)
 
     tmp = data
-    tmp[1:] += supercell * off
+    tmp[1:, :] += supercell * off
 
     return tmp
 
@@ -50,9 +50,8 @@ plt.figure(figsize=(7, 3.5))
 print("load di")
 divac = np.loadtxt("divac.xyz", dtype=np.float64)
 
-supercell = 2.855700 * 7
-
-inv = 1 / supercell
+print("load tri")
+trivac = np.loadtxt("trivac.xyz", dtype=np.float64)
 
 
 def minimage(data):
@@ -62,63 +61,85 @@ def minimage(data):
 print("math")
 
 
-ignore = 3
+supercell = 2.855700 * 7
 
 # ///////////////////////////////
 
-t2 = divac[ignore::, 0]
 
-x_tmp = divac[::, 1::]
-delta = x_tmp[:, :3] - x_tmp[:, 3:]
+delta = divac[:, 1:4] - divac[:, 4:7]
 delta -= supercell * np.floor(0.5 + delta / supercell)
-delta *= delta
-delta = delta[ignore:, :]
-delta = np.sum(delta, axis=1)
-delta = np.sqrt(delta)
+delta = delta * delta
 
+delta = np.sqrt(delta.sum(axis=1))
 
-x2 = process(divac[::, 1::])
+delta = delta[:-1]
 
-x2 -= x2[0, :]
-x2 = x2[ignore:, :]
-x2 = x2 * 1e-10
-x2 *= x2
+time = divac[1:, 0] - divac[:-1, 0]
 
+time /= time.sum()
 
-x2_1 = np.sum(x2[:, :3], axis=1)
-x2_2 = np.sum(x2[:, 3:], axis=1)
+# ///////////////////
 
-x2 = (x2_1 + x2_2) * 0.5
+delta12 = trivac[:, 1:4] - trivac[:, 4:7]
+delta12 -= supercell * np.floor(0.5 + delta12 / supercell)
+delta12 = delta12 * delta12
+delta12 = np.sqrt(delta12.sum(axis=1))
+delta12 = delta12[:-1]
 
-plotter = plt.loglog
+time12 = trivac[1:, 0] - trivac[:-1, 0]
 
-plotter(t2, x2_1, "-", label=r"Divacancy ($2$V)")
-plotter(t2, x2_2, "-", label=r"Divacancy ($2$V)")
-plotter(t2, delta, label=r"del")
+time12 /= time12.sum()
 
+delta23 = trivac[:, 4:7] - trivac[:, 7:10]
+delta23 -= supercell * np.floor(0.5 + delta23 / supercell)
+delta23 = delta23 * delta23
+delta23 = np.sqrt(delta23.sum(axis=1))
+delta23 = delta23[:-1]
 
-plt.legend()
+time23 = trivac[1:, 0] - trivac[:-1, 0]
+time23 /= time23.sum()
 
-plt.xlabel(r"Time/\si{\second}")
-plt.ylabel(r"$\langle x^2 \rangle$/\si{\metre\squared}")
+delta13 = trivac[:, 1:4] - trivac[:, 7:10]
+delta13 -= supercell * np.floor(0.5 + delta13 / supercell)
+delta13 = delta13 * delta13
+delta13 = np.sqrt(delta13.sum(axis=1))
+delta13 = delta13[:-1]
 
+time13 = trivac[1:, 0] - trivac[:-1, 0]
+time13 /= time13.sum()
 
-fit = lambda x, a: 6 * a * x
+f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
 
+sdelta = np.concatenate((delta12, delta23, delta13))
+stime = np.concatenate((time12, time23, time13)) / 3
 
-popt, pcov = curve_fit(fit, t2, x2_1)
-print(popt[0])
-plotter(t2, 6 * popt[0] * t2, label=r"$D = 1.22 \times 10^{-16}$")
+ax2.hist(
+    [delta, sdelta],
+    50,
+    rwidth=1,
+    weights=[time, stime],
+    density=False,
+    label=[r"Di-vacancy", r"Tri-vacancy"],
+)
+ax2.legend()
+ax2.set_ylabel(r"Time fraction")
 
-popt, pcov = curve_fit(fit, t2, x2_2)
-print(popt[0])
-plotter(t2, 6 * popt[0] * t2, label=r"$D = 1.22 \times 10^{-16}$")
+ax1.hist(
+    [delta, sdelta],
+    50,
+    rwidth=1,
+    density=True,
+    label=[r"Di-vacancy", r"Tri-vacancy"],
+)
 
+ax1.legend()
+ax1.set_ylabel(r"Normalised count")
 
-plt.legend()
+plt.xlim([2, 10])
+plt.xlabel(r"Vacancy-Vacancy separation/\si{\angstrom}")
 
 
 plt.tight_layout()
-plt.savefig(r"/home/cdt1902/dis/thesis/results/Figs/divac.pdf")
+plt.savefig(r"/home/cdt1902/dis/thesis/results/Figs/vac_sep.pdf")
 
 plt.show()
