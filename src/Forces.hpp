@@ -10,13 +10,13 @@
 #include <vector>
 
 #include "Box.hpp"
-#include "Cell2.hpp"
+#include "Cell.hpp"
 #include "DumpXYX.hpp"
 #include "EAM.hpp"
 #include "utils.hpp"
 
-#include "Canon2.hpp"
-#include "Cell2.hpp"
+#include "Canon.hpp"
+#include "Cell.hpp"
 
 class FuncEAM2 {
   private:

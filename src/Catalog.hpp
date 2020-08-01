@@ -14,7 +14,7 @@
 
 #include "nlohmann/json.hpp"
 
-#include "Cell2.hpp"
+#include "Cell.hpp"
 #include "threadpool.hpp"
 #include "utils.hpp"
 
@@ -253,8 +253,10 @@ template <typename Canon> class Catalog {
         }
     }
 
-    inline std::pair<Key_t &, Topology &> operator[](std::size_t i) {
-        return {keys[i], catalog[keys[i]]};
+    Topology &operator[](std::size_t i) { return catalog[keys[i]]; }
+
+    Topology const &operator[](std::size_t i) const {
+        return catalog.at(keys[i]);
     }
 
     inline std::size_t size() const { return cell_list.size(); }
@@ -278,7 +280,11 @@ template <typename Canon> class Catalog {
     template <typename F, typename MinImage>
     int update(Vector const &x, F const &f, MinImage const &mi) {
 
-        analyzeTopology(x);
+        auto [freq, count] = analyzeTopology(x);
+
+        std::cout << "Collision frequency @ " << freq << "%\n";
+        std::cout << count << '/' << size() << " new topos, launched ";
+
         // Result of findSaddle(...)
         using result_t = std::vector<std::tuple<Vector, Vector>>;
         //
@@ -299,6 +305,8 @@ template <typename Canon> class Catalog {
                 }));
             }
         }
+
+        std::cout << futures.size() << " threads\n";
 
         std::size_t launched = futures.size() * SPS_PER_THREAD;
         std::size_t sucessful = 0;
@@ -324,11 +332,14 @@ template <typename Canon> class Catalog {
             }
         }
 
-        std::cout << sucessful << '/' << launched
-                  << " searches found conected SPs.\n";
+        if (launched > 0) {
 
-        std::cout << new_mechs << '/' << sucessful
-                  << " SPS discovered new mechanisms.\n";
+            std::cout << sucessful << '/' << launched
+                      << " searches found conected SPs.\n";
+
+            std::cout << new_mechs << '/' << sucessful
+                      << " SPS discovered new mechanisms.\n";
+        }
 
         return new_mechs;
     }
@@ -337,7 +348,8 @@ template <typename Canon> class Catalog {
     void reconstruct(std::size_t idx, Vector &x, Mechanism const &mech) const {
 
         CHECK(orders[idx].size() == mech.ref.data.size(),
-              "wrong num atoms in reconstruction");
+              "wrong num atoms in reconstruction " << orders[idx].size() << ' '
+                                                   << mech.ref.data.size());
 
         Eigen::Matrix3d Tr = transforms[idx].transpose();
 
@@ -350,11 +362,10 @@ template <typename Canon> class Catalog {
         }
     }
 
-  private:
     // For each atom processes its topology such that catalog contains all
     // topologies in x. Also stores the key, transform-matrix & canonicle
     // neighbour order into the corresponding vectors.
-    void analyzeTopology(Vector const &x) {
+    std::pair<double, std::size_t> analyzeTopology(Vector const &x) {
         cell_list.fill(x);
 
         static std::vector<Atom> neigh;
@@ -385,11 +396,10 @@ template <typename Canon> class Catalog {
             }
         }
 
-        std::cout << "Collision frequency @ " << 100.0 * reclassify / size()
-                  << "%\n";
-        std::cout << new_topo << '/' << size() << " topologies are new.\n";
+        return {100.0 * reclassify / size(), new_topo};
     }
 
+  private:
     // Refines topolgial classification until unique position in catalog.
     // return.first true if new topology, return.second is classifcation level
     // required.

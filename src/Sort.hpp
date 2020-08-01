@@ -8,20 +8,17 @@
 void cellSort(Vector &x, std::vector<int> &kinds, Box const &box) {
     CHECK((size_t)x.size() / 3 == kinds.size(), "atom mismatch");
 
-    CellList<AtomBase> cellList{box, kinds};
+    CellListSorted<AtomSortBase> cellList{box, kinds};
 
-    cellList.fillList(x);
-
-    std::sort(cellList.begin(), cellList.end(),
-              [&](AtomBase const &a, AtomBase const &b) -> bool {
-                  return box.lambda(a) < box.lambda(b);
-              });
+    cellList.fill(x);
 
     for (std::size_t i = 0; i < cellList.size(); ++i) {
-        x[3 * i + 0] = cellList[i][0];
-        x[3 * i + 1] = cellList[i][1];
-        x[3 * i + 2] = cellList[i][2];
+        auto j = cellList[i].index();
 
-        kinds[i] = cellList[i].kind();
+        x[3 * j + 0] = cellList[i][0];
+        x[3 * j + 1] = cellList[i][1];
+        x[3 * j + 2] = cellList[i][2];
+
+        kinds[j] = cellList[i].kind();
     }
 }

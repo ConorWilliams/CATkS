@@ -1,6 +1,6 @@
-#define NCHECK
-#define EIGEN_NO_DEBUG
-#define EIGEN_DONT_PARALLELIZE
+// #define NCHECK
+// #define EIGEN_NO_DEBUG
+// #define EIGEN_DONT_PARALLELIZE
 
 /*
  * Move subclasses from classifyer classes to namespaces.
@@ -26,21 +26,16 @@
 #include <iostream>
 #include <limits>
 
-#include "Canon2.hpp"
-#include "Catalog2.hpp"
+#include "Canon.hpp"
+#include "Catalog.hpp"
 #include "Cbuff.hpp"
 #include "Dimer.hpp"
 #include "DumpXYX.hpp"
-#include "Forces2.hpp"
+#include "Forces.hpp"
 #include "Sort.hpp"
+#include "Superbasin.hpp"
 #include "Vacancy.hpp"
 #include "utils.hpp"
-
-inline constexpr double ARRHENIUS_PRE = 5.12e12;
-inline constexpr double TEMP = 300;                              // k
-inline constexpr double KB_T = 1380649.0 / 16021766340.0 * TEMP; // eV K^-1
-
-inline constexpr double INV_KB_T = 1 / KB_T;
 
 enum : uint8_t { Fe = 0, H = 1 };
 
@@ -51,56 +46,13 @@ using Force_t = FuncEAM2;
 
 inline constexpr int len = 7;
 
-double toRate(double active_E) {
-
-    CHECK(active_E > 0, "sp energy < init energy " << active_E);
-
-    return ARRHENIUS_PRE * std::exp(active_E * -INV_KB_T);
-}
-
-struct LocalMech {
-    std::size_t atom_idx;
-    std::size_t topo_hash;
-    std::size_t mech_idx;
-
-    double rate;
-
-    LocalMech(std::size_t atom_idx, std::size_t topo_hash, std::size_t mech_idx,
-              double rate)
-        : atom_idx{atom_idx}, topo_hash{topo_hash},
-          mech_idx(mech_idx), rate{rate} {}
-
-    inline bool operator==(LocalMech const &other) const {
-        return atom_idx == other.atom_idx && topo_hash == other.topo_hash &&
-               mech_idx == other.mech_idx;
-    }
-};
-
-struct GlobalMech {
-    std::array<std::uint64_t, 2> state_hash;
-    LocalMech tran;
-
-    inline bool operator==(GlobalMech const &other) const {
-        return state_hash == other.state_hash && tran == other.tran;
-    }
-};
-
-std::array<std::uint64_t, 2> hash_state(Vector const &x) {
-    std::vector<int> tmp = transform_into(
-        x.begin(), x.end(), [](double x) -> int { return x * (1 / DIST_TOL); });
-
-    std::array<std::uint64_t, 2> hash;
-    MurmurHash3_x86_128(tmp.data(), sizeof(int) * tmp.size(), 0, hash.data());
-    return hash;
-}
-
 int main(int argc, char **argv) {
 
     // CHECK(false, "false");
 
     VERIFY(argc == 3, "need an EAM data file and H dump file");
 
-    Vector init(len * len * len * 3 * 2 + 3 * (-2));
+    Vector init(len * len * len * 3 * 2 + 3 * (1 - 1));
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -111,15 +63,14 @@ int main(int argc, char **argv) {
         for (int j = 0; j < len; ++j) {
             for (int k = 0; k < len; ++k) {
 
-                if ((i == 1 && j == 1 && k == 1) ||
-                    (i == 2 && j == 1 && k == 1) /*||
+                if ((i == 1 && j == 1 && k == 1) /*||
+                    (i == 2 && j == 1 && k == 1) ||
                     (i == 2 && j == 2 && k == 2) */) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
                     init[3 * cell + 1] = (j + 0.5) * LAT;
                     init[3 * cell + 2] = (k + 0.5) * LAT;
 
                     cell += 1;
-
                 } else {
                     init[3 * cell + 0] = i * LAT;
                     init[3 * cell + 1] = j * LAT;
@@ -135,10 +86,10 @@ int main(int argc, char **argv) {
         }
     }
 
-    // kinds[init.size() / 3 - 1] = H;
-    // init[init.size() - 3] = LAT * (1 + 0.50);
-    // init[init.size() - 2] = LAT * (1 + 0.25);
-    // init[init.size() - 1] = LAT * (1 + 0.00);
+    kinds[init.size() / 3 - 1] = H;
+    init[init.size() - 3] = LAT * (1 + 0.50);
+    init[init.size() - 2] = LAT * (1 + 0.25);
+    init[init.size() - 1] = LAT * (1 + 0.00);
 
     // kinds[init.size() / 3 - 2] = H;
     // init[init.size() - 6] = LAT * (0 + 0.50);
@@ -192,24 +143,16 @@ int main(int argc, char **argv) {
 
     std::cout << "After min" << std::endl;
 
-    pcg_extras::seed_seq_from<std::random_device> seed_source;
-    pcg64 rng(seed_source);
-    std::uniform_real_distribution<> uniform_dist(0, 1);
+    KineticMC sb;
 
-    std::vector<LocalMech> possible{};
-
-    Cbuff<GlobalMech> kernal(32);
-
-    v.dump(argv[2], 0, 0, init, kinds);
+    // v.dump(argv[2], 0, 0, init, kinds);
 
     while (iter < 10'000'000) {
         force_box.remap(init);
 
-        auto init_hash = hash_state(init);
+        // v.output(init, f.quasiColourAll(init));
 
-        v.output(init, f.quasiColourAll(init));
-
-        // output(init, f.quasiColourAll(init));
+        output(init, f.quasiColourAll(init));
         // dumpH(argv[2], time, init, kinds);
 
         ////////////////////////////////////////////////////////////
@@ -221,70 +164,24 @@ int main(int argc, char **argv) {
             catalog.write();
         }
 
-        //////////////////////////////////////////////////////////////
-
-        possible.clear();
-
-        for (std::size_t i = 0; i < catalog.size(); ++i) {
-            auto &&[key, topo] = catalog[i];
-
-            auto hash = std::hash<typename Canon_t::Key_t>{}(key);
-
-            for (std::size_t j = 0; j < topo.mechs.size(); ++j) {
-                LocalMech tmp{i, hash, j, toRate(topo.mechs[j].active_E)};
-
-                if (!kernal.contains({init_hash, tmp})) {
-                    possible.emplace_back(std::move(tmp));
-                }
-            }
-        }
-
-        double rate_sum = std::accumulate(
-            possible.begin(), possible.end(), 0.0,
-            [](double sum, LocalMech const &m) { return sum + m.rate; });
-
-        double p1 = uniform_dist(rng);
-
-        LocalMech choice = [&]() {
-            double sum = 0;
-            for (auto &&elem : possible) {
-
-                sum += elem.rate;
-                if (sum > p1 * rate_sum) {
-                    return elem;
-                }
-            }
-            std::cout << "hit end of choice" << std::endl;
-            std::terminate();
-        }();
-
-        kernal.push_back({init_hash, choice});
-
-        ////////////////////////////////////////////////////
-
-        time += -std::log(uniform_dist(rng)) / rate_sum;
-
         const double energy_pre = f(init);
 
-        auto [k, t] = catalog[choice.atom_idx];
+        auto [dt, energy_mem] = sb.advanceState(catalog, init);
 
-        catalog.reconstruct(choice.atom_idx, init, t.mechs[choice.mech_idx]);
+        time += dt;
 
         const double energy_recon = f(init) - energy_pre;
 
         min.findMin(init);
 
         const double energy_final = f(init) - energy_pre;
-        const double rate = choice.rate;
 
-        std::cout << "Memory:  " << t.mechs[choice.mech_idx].delta_E << '\n';
+        std::cout << "Memory:  " << energy_mem << '\n';
         std::cout << "Relaxed: " << energy_final << '\n';
         std::cout << "Recon:   " << energy_recon << '\n';
-        std::cout << "Barrier: " << t.mechs[choice.mech_idx].active_E << '\n';
-        std::cout << "Rate:    " << rate << " : " << rate / rate_sum << '\n';
 
-        double diff = std::abs(energy_final - t.mechs[choice.mech_idx].delta_E);
-        double frac = std::abs(diff / t.mechs[choice.mech_idx].delta_E);
+        double diff = std::abs(energy_final - energy_mem);
+        double frac = std::abs(diff / energy_mem);
 
         VERIFY(frac < 0.20 || diff < 0.037, "Reconstruction error!");
 
@@ -294,7 +191,9 @@ int main(int argc, char **argv) {
             catalog.write();
         }
 
-        v.dump(argv[2], time, t.mechs[choice.mech_idx].active_E, init, kinds);
+        //     v.dump(argv[2], time, 666 /*t.mechs[choice.mech_idx].active_E*/,
+        //     init,
+        //            kinds);
     }
 
     catalog.write();

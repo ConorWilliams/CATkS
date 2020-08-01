@@ -9,20 +9,20 @@
 #include "utils.hpp"
 
 // Helper class to derive atoms from for use in cellList
-class AtomSortBase {
+class AtomBase {
   private:
     int k;
     Eigen::Vector3d r;
-    std::size_t idx;
+    std::size_t n;
 
   public:
-    AtomSortBase(int k, double x, double y, double z, std::size_t idx)
-        : k{k}, r{x, y, z}, idx{idx} {}
+    AtomBase(int k, double x, double y, double z) : k{k}, r{x, y, z}, n{} {}
+    AtomBase(int k, double x, double y, double z, std::size_t)
+        : k{k}, r{x, y, z}, n{} {}
+    AtomBase() = default;
 
-    AtomSortBase() = default;
-
-    inline std::size_t &index() { return idx; }
-    inline std::size_t index() const { return idx; }
+    inline std::size_t &next() { return n; }
+    inline std::size_t next() const { return n; }
 
     inline Eigen::Vector3d const &pos() const { return r; }
 
@@ -32,28 +32,23 @@ class AtomSortBase {
     inline double const &operator[](std::size_t i) const { return r[i]; }
 };
 
-template <typename Atom_t> class CellListSorted {
+template <typename Atom_t> class CellList {
   private:
-    struct Span {
-        Atom_t *begin;
-        Atom_t *end;
-    };
-
     std::vector<int> const &kinds;
-    std::vector<Span> head;
+    Eigen::Array<std::size_t, Eigen::Dynamic, 1> head;
 
   protected:
     Box const &box;
     std::vector<Atom_t> list;
 
   public:
-    CellListSorted(Box const &box, std::vector<int> const &kinds)
+    CellList(Box const &box, std::vector<int> const &kinds)
         : kinds{kinds}, head(box.numCells()), box{box} {
 
         static_assert(std::is_trivially_destructible_v<Atom_t>,
                       "can't clear Atom_t in constant time");
 
-        static_assert(std::is_base_of_v<AtomSortBase, Atom_t>,
+        static_assert(std::is_base_of_v<AtomBase, Atom_t>,
                       "Atom_t must be derived from AtomBase");
     }
 
@@ -68,8 +63,9 @@ template <typename Atom_t> class CellListSorted {
     inline Atom_t &operator[](std::size_t i) { return list[i]; }
     inline Atom_t const &operator[](std::size_t i) const { return list[i]; }
 
-  private:
-    template <typename T> void insertAtoms(T const &x3n) {
+    inline void clearGhosts() { list.resize(kinds.size()); }
+
+    template <typename T> void fillList(T const &x3n) {
         CHECK(static_cast<std::size_t>(x3n.size()) == 3 * kinds.size(),
               "wrong number of atoms");
 
@@ -92,22 +88,16 @@ template <typename Atom_t> class CellListSorted {
         }
     }
 
-    inline void sort() {
-        std::sort(list.begin(), list.end(),
-                  [&](Atom_t const &a, Atom_t const &b) -> bool {
-                      return box.lambda(a) < box.lambda(b);
-                  });
-    }
-
     // Alg 3.1
     void updateHead() {
-        std::fill(head.begin(), head.end(), Span{nullptr, nullptr});
-
-        for (auto &&atom : list) {
-            std::size_t l = box.lambda(atom);
-
-            head[l].begin = head[l].begin == nullptr ? &atom : head[l].begin;
-            head[l].end = (&atom) + 1;
+        for (auto &&elem : head) {
+            elem = list.size();
+        }
+        for (std::size_t i = 0; i < list.size(); ++i) {
+            // update cell list
+            std::size_t lambda = box.lambda(list[i]);
+            list[i].next() = head[lambda];
+            head[lambda] = i;
         }
     }
 
@@ -134,47 +124,67 @@ template <typename Atom_t> class CellListSorted {
         }
     }
 
-  public:
-    template <typename T> void fill(T const &x3n) {
-        insertAtoms(x3n);
-        sort();
-        makeGhosts();
-        updateHead();
-    }
-
-    inline void rebuildGhosts() {
-        list.resize(kinds.size());
-        makeGhosts();
-    }
-
     // applies f() for every neighbour (closer than rcut)
     template <typename F>
     inline void forEachNeigh(Atom_t const &atom, F &&f) const {
 
-        long const l = box.lambda(atom);
+        std::size_t const lambda = box.lambda(atom);
+
+        //    std::cout << lambda << std::endl;
+
+        CHECK(lambda < box.numCells(), "bad lambda " << lambda);
+
+        std::size_t const end = list.size();
         double const cut_sq = box.rcut() * box.rcut();
 
-        double dx, dy, dz;
+        std::size_t index = head[lambda];
 
-        CHECK(l < (long)box.numCells(), "bad lambda " << l);
+        // in same cell as Atom2
+        do {
+            CHECK(index < list.size(), "bad index " << index);
 
-        // in same cell must check not self
-        for (Atom_t *it = head[l].begin; it != head[l].end; ++it) {
-            if (&atom != it) {
-                double r_sq = box.normSq(*it, atom, dx, dy, dz);
+            Atom_t const &neigh = list[index];
+
+            if (&atom != &neigh) {
+                double dx, dy, dz;
+                double r_sq = box.normSq(neigh, atom, dx, dy, dz);
                 if (r_sq < cut_sq) {
-                    f(*it, std::sqrt(r_sq), dx, dy, dz);
+                    f(neigh, std::sqrt(r_sq), dx, dy, dz);
                 }
             }
-        }
+
+            index = neigh.next();
+
+        } while (index != end);
 
         // in adjecent cells -- don't need CHECK against self
-        for (auto i : box.getAdjOff()) {
-            for (Atom_t *it = head[l + i].begin; it != head[l + i].end; ++it) {
-                double r_sq = box.normSq(*it, atom, dx, dy, dz);
+        for (auto off : box.getAdjOff()) {
+
+            std::cerr << std::setprecision(16);
+
+            CHECK(static_cast<long>(lambda) + off >= 0 &&
+                      lambda + off < box.numCells(),
+                  "bad off  " << lambda << ' ' << off << '\n'
+                              << atom.pos());
+
+            index = head[static_cast<long>(lambda) + off];
+
+            // std::cout << "cell_t " << lambda + off << std::endl;
+            while (index != end) {
+
+                CHECK(index < list.size(), "bad index " << index);
+
+                Atom_t const &neigh = list[index];
+
+                double dx, dy, dz;
+
+                double r_sq = box.normSq(neigh, atom, dx, dy, dz);
+
                 if (r_sq < cut_sq) {
-                    f(*it, std::sqrt(r_sq), dx, dy, dz);
+                    f(neigh, std::sqrt(r_sq), dx, dy, dz);
                 }
+
+                index = neigh.next();
             }
         }
     }

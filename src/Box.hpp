@@ -3,6 +3,7 @@
 #include <array>
 #include <cmath>
 
+#include "DumpXYX.hpp"
 #include "utils.hpp"
 
 // Contains info about simulation box and performs Lambda mapping
@@ -185,10 +186,14 @@ class Box {
     }
 
     void remap(Vector &x) const {
-        for (int i = 0; i < x.size() / 3; i += 3) {
+        for (int i = 0; i < x.size(); i += 3) {
             x[i + 0] -= limits(0).len * std::floor(x[i + 0] * limits(0).inv);
             x[i + 1] -= limits(1).len * std::floor(x[i + 1] * limits(1).inv);
             x[i + 2] -= limits(2).len * std::floor(x[i + 2] * limits(2).inv);
+
+            CHECK(x[i + 0] >= 0 && x[i + 0] < limits(0).len, "");
+            CHECK(x[i + 1] >= 0 && x[i + 1] < limits(0).len, "");
+            CHECK(x[i + 2] >= 0 && x[i + 2] < limits(0).len, "");
         }
     }
 };

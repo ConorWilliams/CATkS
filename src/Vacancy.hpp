@@ -3,8 +3,8 @@
 #include <array>
 #include <iomanip>
 
-#include "Canon2.hpp"
-#include "Cell2.hpp"
+#include "Canon.hpp"
+#include "Cell.hpp"
 #include "DumpXYX.hpp"
 
 template <std::size_t N>
