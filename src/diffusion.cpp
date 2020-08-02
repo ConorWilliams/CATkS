@@ -1,6 +1,6 @@
-// #define NCHECK
-// #define EIGEN_NO_DEBUG
-// #define EIGEN_DONT_PARALLELIZE
+#define NCHECK
+#define EIGEN_NO_DEBUG
+#define EIGEN_DONT_PARALLELIZE
 
 /*
  * Move subclasses from classifyer classes to namespaces.
@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
 
     VERIFY(argc == 3, "need an EAM data file and H dump file");
 
-    Vector init(len * len * len * 3 * 2 + 3 * (1 - 1));
+    Vector init(len * len * len * 3 * 2 + 3 * (2 - 1));
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -65,7 +65,7 @@ int main(int argc, char **argv) {
 
                 if ((i == 1 && j == 1 && k == 1) /*||
                     (i == 2 && j == 1 && k == 1) ||
-                    (i == 2 && j == 2 && k == 2) */) {
+                    (i == 3 && j == 1 && k == 1) */) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
                     init[3 * cell + 1] = (j + 0.5) * LAT;
                     init[3 * cell + 2] = (k + 0.5) * LAT;
@@ -91,11 +91,11 @@ int main(int argc, char **argv) {
     init[init.size() - 2] = LAT * (1 + 0.25);
     init[init.size() - 1] = LAT * (1 + 0.00);
 
-    // kinds[init.size() / 3 - 2] = H;
-    // init[init.size() - 6] = LAT * (0 + 0.50);
-    // init[init.size() - 5] = LAT * (1 + 0.25);
-    // init[init.size() - 4] = LAT * (1 + 0.00);
-    //
+    kinds[init.size() / 3 - 2] = H;
+    init[init.size() - 6] = LAT * (0 + 0.50);
+    init[init.size() - 5] = LAT * (1 + 0.25);
+    init[init.size() - 4] = LAT * (1 + 0.00);
+
     // kinds[init.size() / 3 - 3] = H;
     // init[init.size() - 9] = LAT * (4 + 0.50);
     // init[init.size() - 8] = LAT * (1 + 0.25);
@@ -151,7 +151,6 @@ int main(int argc, char **argv) {
         force_box.remap(init);
 
         // v.output(init, f.quasiColourAll(init));
-
         output(init, f.quasiColourAll(init));
         // dumpH(argv[2], time, init, kinds);
 
@@ -164,9 +163,12 @@ int main(int argc, char **argv) {
             catalog.write();
         }
 
+        // init may be changed during superbasin dynamics
+        auto &&[dt, atom, mech] = sb.chooseMechanism(catalog, init);
+
         const double energy_pre = f(init);
 
-        auto [dt, energy_mem] = sb.advanceState(catalog, init);
+        catalog.reconstruct(atom, init, mech);
 
         time += dt;
 
@@ -176,12 +178,15 @@ int main(int argc, char **argv) {
 
         const double energy_final = f(init) - energy_pre;
 
-        std::cout << "Memory:  " << energy_mem << '\n';
+        std::cout << "Forward: " << mech.active_E << '\n';
+        std::cout << "Reverse: " << mech.active_E - mech.delta_E << '\n';
+
+        std::cout << "Memory:  " << mech.delta_E << '\n';
         std::cout << "Relaxed: " << energy_final << '\n';
         std::cout << "Recon:   " << energy_recon << '\n';
 
-        double diff = std::abs(energy_final - energy_mem);
-        double frac = std::abs(diff / energy_mem);
+        double diff = std::abs(energy_final - mech.delta_E);
+        double frac = std::abs(diff / mech.delta_E);
 
         VERIFY(frac < 0.20 || diff < 0.037, "Reconstruction error!");
 

@@ -283,7 +283,7 @@ template <typename Canon> class Catalog {
         auto [freq, count] = analyzeTopology(x);
 
         std::cout << "Collision frequency @ " << freq << "%\n";
-        std::cout << count << '/' << size() << " new topos, launched ";
+        std::cout << count << '/' << size() << " new topos; launched ";
 
         // Result of findSaddle(...)
         using result_t = std::vector<std::tuple<Vector, Vector>>;
