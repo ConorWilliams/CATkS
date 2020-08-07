@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
 
     VERIFY(argc == 3, "need an EAM data file and H dump file");
 
-    Vector init(len * len * len * 3 * 2 + 3 * (2 - 1));
+    Vector init(len * len * len * 3 * 2 + 3 * (1 - 2));
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -63,8 +63,8 @@ int main(int argc, char **argv) {
         for (int j = 0; j < len; ++j) {
             for (int k = 0; k < len; ++k) {
 
-                if ((i == 1 && j == 1 && k == 1) /*||
-                    (i == 2 && j == 1 && k == 1) ||
+                if ((i == 1 && j == 1 && k == 1) ||
+                    (i == 2 && j == 1 && k == 1)/* ||
                     (i == 3 && j == 1 && k == 1) */) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
                     init[3 * cell + 1] = (j + 0.5) * LAT;
@@ -91,10 +91,10 @@ int main(int argc, char **argv) {
     init[init.size() - 2] = LAT * (1 + 0.25);
     init[init.size() - 1] = LAT * (1 + 0.00);
 
-    kinds[init.size() / 3 - 2] = H;
-    init[init.size() - 6] = LAT * (0 + 0.50);
-    init[init.size() - 5] = LAT * (1 + 0.25);
-    init[init.size() - 4] = LAT * (1 + 0.00);
+    // kinds[init.size() / 3 - 2] = H;
+    // init[init.size() - 6] = LAT * (0 + 0.50);
+    // init[init.size() - 5] = LAT * (1 + 0.25);
+    // init[init.size() - 4] = LAT * (1 + 0.00);
 
     // kinds[init.size() / 3 - 3] = H;
     // init[init.size() - 9] = LAT * (4 + 0.50);
@@ -151,7 +151,7 @@ int main(int argc, char **argv) {
         force_box.remap(init);
 
         // v.output(init, f.quasiColourAll(init));
-        output(init, f.quasiColourAll(init));
+        // output(init, f.quasiColourAll(init));
         // dumpH(argv[2], time, init, kinds);
 
         ////////////////////////////////////////////////////////////
@@ -196,9 +196,7 @@ int main(int argc, char **argv) {
             catalog.write();
         }
 
-        //     v.dump(argv[2], time, 666 /*t.mechs[choice.mech_idx].active_E*/,
-        //     init,
-        //            kinds);
+        v.dump(argv[2], time, mech.active_E, init, kinds);
     }
 
     catalog.write();

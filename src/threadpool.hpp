@@ -99,6 +99,7 @@ auto ThreadPool::execute(F &&function, Args &&... args) {
 
     using pkg_t = std::packaged_task<std::invoke_result_t<F, Args...>()>;
 
+    // std::packaged_task contains one-shot lambda
     pkg_t task_pkg(
         [f = std::forward<F>(function),
          largs = std::make_tuple(std::forward<Args>(args)...)]() mutable {

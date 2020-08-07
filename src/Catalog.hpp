@@ -266,7 +266,6 @@ template <typename Canon> class Catalog {
         if (async_write.valid()) {
             async_write.wait();
         }
-
         // Garentee back up incase of exit()
         ignore_result(std::system("mv catalog.json catalog.json.bak"));
 

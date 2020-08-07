@@ -45,6 +45,25 @@ def process(data):
     return tmp
 
 
+from iteration_utilities import grouper
+
+
+def diffusion(t, x):
+    # //////
+    D = []
+
+    blk = 10000
+
+    for group in grouper(zip(t, x), blk):
+        dx = ((group[-1][1] - group[0][1]) ** 2).sum()
+        dt = group[-1][0] - group[0][0]
+        D.append(dx / (6 * dt))
+
+    tmp = np.asarray(D)
+
+    print(tmp.mean(), tmp.std(ddof=1) / np.sqrt(len(tmp)))
+
+
 plt.figure(figsize=(7, 3.5))
 
 print("load mono")
@@ -71,10 +90,11 @@ t1 = data1[ignore::, 0]
 
 disp1 = process(data1[::, 1::])
 disp1 -= disp1[0, :]
-
 disp1 = disp1[ignore:, :]
-
 disp1 = disp1 * 1e-10
+
+diffusion(t1, disp1)
+
 disp1 = disp1 * disp1
 x1 = np.sum(disp1, axis=1)
 diff1 = x1 / (6 * t1)
@@ -95,7 +115,13 @@ fit = lambda x, a: 6 * a * x
 popt, pcov = curve_fit(fit, t1, x1)
 print(popt[0], np.sqrt(pcov[0]))
 
-plotter(t1, 6 * popt[0] * t1, "k--", label=r"$D = 1.22 \times 10^{-16}$")
+plotter(
+    t1,
+    6 * 2.25 * 1e-16 * t1,
+    "k--",
+    label=r"$D = 2.3 \times 10^{-16}$\si{\meter\squared\per\second}",
+)
+
 
 plt.legend()
 

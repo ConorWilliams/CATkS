@@ -45,6 +45,25 @@ def process(data):
     return tmp
 
 
+from iteration_utilities import grouper
+
+
+def diffusion(t, x):
+    # //////
+    D = []
+
+    blk = 10000
+
+    for group in grouper(zip(t, x), blk):
+        dx = ((group[-1][1] - group[0][1]) ** 2).sum()
+        dt = group[-1][0] - group[0][0]
+        D.append(dx / (6 * dt))
+
+    tmp = np.asarray(D)
+
+    print(tmp.mean(), tmp.std(ddof=1) / np.sqrt(len(tmp)))
+
+
 plt.figure(figsize=(7, 3.5))
 
 print("load di")
@@ -78,10 +97,43 @@ delta = np.sqrt(delta)
 
 
 x2 = process(divac[::, 1::])
-
 x2 -= x2[0, :]
 x2 = x2[ignore:, :]
 x2 = x2 * 1e-10
+
+
+xb = []
+tb = []
+di = True
+D = []
+
+life = []
+
+for t, x, d in zip(t2, x2, delta):
+    v1 = x[:3]
+    v2 = x[3:]
+
+    if d < 5.5:
+        xb.append(v1)
+        tb.append(t)
+    else:
+        if len(xb) > 5:
+            dx = ((xb[-1] - xb[0]) ** 2).sum()
+            dt = tb[-1] - tb[0]
+            if dt > 0:
+                life.append(dt)
+                D.append(dx / (6 * dt))
+
+        xb = []
+        tb = []
+
+
+tmp = np.asarray(D)
+print("diff", tmp.mean(), tmp.std(ddof=1) / np.sqrt(len(D)))
+tmp = np.asarray(life)
+print("life", tmp.mean(), tmp.std(ddof=1) / np.sqrt(len(D)))
+
+
 x2 *= x2
 
 
@@ -106,10 +158,10 @@ plt.ylabel(r"$\langle x^2 \rangle$/\si{\metre\squared}")
 fit = lambda x, a: 6 * a * x
 
 
-popt, pcov = curve_fit(fit, t2, x2)
-print(popt[0])
-plotter(t2, 6 * popt[0] * t2, "k--", label=r"$D = 3.72 \times 10^{-17}$")
-
+# popt, pcov = curve_fit(fit, t2, x2)
+# print(popt[0])
+# plotter(t2, 6 * popt[0] * t2, "k--", label=r"$D = 3.72 \times 10^{-17}$")
+#
 
 plt.legend()
 
