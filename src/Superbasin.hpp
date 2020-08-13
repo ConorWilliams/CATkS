@@ -14,7 +14,7 @@ inline constexpr double TEMP = 300;                              // k
 inline constexpr double KB_T = 1380649.0 / 16021766340.0 * TEMP; // eV K^-1
 inline constexpr double INV_KB_T = 1 / KB_T;                     // eV^-1 K
 
-inline constexpr double SUPER_BASIN_TOL = 0.4;           // eV
+inline constexpr double SUPER_BASIN_TOL = 0.3;           // eV
 inline constexpr std::size_t SUPER_BASIN_MIN_SIZE = 2;   // states
 inline constexpr std::size_t SUPER_BASIN_MAX_SIZE = 256; // states
 inline constexpr std::size_t SUPER_BASIN_CACHE_SIZE = 8; // superbasins

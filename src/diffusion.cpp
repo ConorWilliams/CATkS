@@ -64,8 +64,8 @@ int main(int argc, char **argv) {
             for (int k = 0; k < len; ++k) {
 
                 if ((i == 1 && j == 1 && k == 1) ||
-                    (i == 2 && j == 1 && k == 1)/* ||
-                    (i == 3 && j == 1 && k == 1) */) {
+                    (i == 2 && j == 1 && k == 1) /*||
+                    (i == 2 && j == 2 && k == 1) */) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
                     init[3 * cell + 1] = (j + 0.5) * LAT;
                     init[3 * cell + 2] = (k + 0.5) * LAT;
@@ -150,7 +150,7 @@ int main(int argc, char **argv) {
     while (iter < 10'000'000) {
         force_box.remap(init);
 
-        // v.output(init, f.quasiColourAll(init));
+        v.output(init, f.quasiColourAll(init));
         // output(init, f.quasiColourAll(init));
         // dumpH(argv[2], time, init, kinds);
 

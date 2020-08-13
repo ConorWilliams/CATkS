@@ -97,6 +97,7 @@ b = plt.hist(
     ],
 )
 
+b[-2][0] = 0
 
 print(b)
 

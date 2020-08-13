@@ -7,6 +7,7 @@ plt/dump/*
 *.idx
 *.pdf
 *.xyz
+*.npy
 
 # Prerequisites
 *.d

@@ -106,12 +106,13 @@ f = plt.figure(figsize=(10, 7))
 
 contours = plt.contour(X, Y, Z, 22, antialiased=True, cmap="gray")
 
+
 plt.plot(
     nn[::, 0],
     nn[::, 1],
     color="r",
     linestyle="--",
-    label="Path 1",
+    label="Dimer 1",
     antialiased=True,
 )
 plt.quiver(
@@ -186,6 +187,29 @@ plt.quiver(
 )
 
 
+maxima = [(1.98, -0.17), (1.04, 2.1)]
+
+plt.plot(
+    *zip(*maxima),
+    marker="^",
+    color="black",
+    label="Local maxima",
+    markersize=10,
+    linestyle="None"
+)
+
+sp = [(1.52, 2.6), (0.66, 2.05), (1.93, 0.88), (1.88, -1.27)]
+
+plt.plot(
+    *zip(*sp),
+    marker="*",
+    color="red",
+    label="Saddle points",
+    markersize=13,
+    linestyle="None"
+)
+
+
 plt.legend()
 
 
@@ -196,6 +220,6 @@ plt.xlabel(r"$x$/\si{\angstrom}")
 plt.ylabel(r"$y$/\si{\angstrom}")
 
 plt.tight_layout()
-f.savefig(r"/home/cdt1902/dis/pres/pot5.pdf")
+f.savefig(r"/home/cdt1902/dis/thesis/validation/Figs/2d.pdf")
 
 plt.show()

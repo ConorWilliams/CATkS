@@ -48,10 +48,14 @@ def process(data):
 plt.figure(figsize=(7, 3.5))
 
 print("load di")
-divac = np.loadtxt("divac.xyz", dtype=np.float64)
+# divac = np.loadtxt("divac.xyz", dtype=np.float64)
+# np.save("divac", divac)
+divac = np.load("divac.npy")
 
 print("load tri")
-trivac = np.loadtxt("trivac.xyz", dtype=np.float64)
+# trivac = np.loadtxt("trivac.xyz", dtype=np.float64)
+# np.save("trivac", trivac)
+trivac = np.load("trivac.npy")
 
 
 def minimage(data):
@@ -113,23 +117,22 @@ f, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
 sdelta = np.concatenate((delta12, delta23, delta13))
 stime = np.concatenate((time12, time23, time13)) / 3
 
-ax2.hist(
+c = ax2.hist(
     [delta, sdelta],
     50,
-    rwidth=1,
     weights=[time, stime],
     density=False,
     label=[r"Di-vacancy", r"Tri-vacancy"],
 )
 ax2.legend()
 ax2.set_ylabel(r"Time fraction")
+ax2.set_xticks(c[1])
+print(c[1])
+
+plt.xticks(rotation=90)
 
 ax1.hist(
-    [delta, sdelta],
-    50,
-    rwidth=1,
-    density=True,
-    label=[r"Di-vacancy", r"Tri-vacancy"],
+    [delta, sdelta], 50, density=True, label=[r"Di-vacancy", r"Tri-vacancy"]
 )
 
 ax1.legend()

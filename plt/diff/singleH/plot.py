@@ -140,6 +140,6 @@ plt.legend()
 
 
 plt.tight_layout()
-plt.savefig(r"/home/cdt1902/dis/thesis/validation/Figs/1H_diff.pdf")
+# plt.savefig(r"/home/cdt1902/dis/thesis/validation/Figs/1H_diff.pdf")
 
 plt.show()

@@ -45,6 +45,27 @@ def process(data):
     return tmp
 
 
+from iteration_utilities import grouper
+
+
+def diffusion(t, x):
+    # //////
+    D = []
+
+    blk = 10000
+
+    for group in grouper(zip(t, x), blk):
+        dx = ((group[-1][1] - group[0][1]) ** 2).sum()
+        dt = group[-1][0] - group[0][0]
+        D.append(dx / (6 * dt))
+
+    tmp = np.asarray(D)
+
+    print(tmp.mean(), tmp.std(ddof=1) / np.sqrt(len(tmp)))
+
+    return tmp.mean()
+
+
 plt.figure(figsize=(7, 3.5))
 
 
@@ -65,6 +86,13 @@ x3 = process(trivac[::, 1::])
 x3 -= x3[0, :]
 x3 = x3[ignore:, :]
 x3 = x3 * 1e-10
+
+
+x = (x3[:, :3] + x3[:, 3:6] + x3[:, 6:]) / 3
+
+grad = diffusion(t3[1000:], x[1000:])
+
+
 x3 *= x3
 
 x3_1 = np.sum(x3[:, :3], axis=1)
@@ -99,7 +127,7 @@ plotter(
     t3[1000:],
     6 * popt[0] * t3[1000:],
     "k--",
-    label=r"$D = 8.92 \times 10^{-14}$",
+    label=r"$D = 1.8 \times 10^{-13}$",
 )
 
 

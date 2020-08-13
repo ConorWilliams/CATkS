@@ -113,11 +113,12 @@ for t, x, d in zip(t2, x2, delta):
     v1 = x[:3]
     v2 = x[3:]
 
-    if d < 5.5:
+    if d < 6:
         xb.append(v1)
         tb.append(t)
     else:
         if len(xb) > 5:
+            print(len(xb))
             dx = ((xb[-1] - xb[0]) ** 2).sum()
             dt = tb[-1] - tb[0]
             if dt > 0:
