@@ -131,7 +131,7 @@ int main(int argc, char **argv) {
 
     Force_t f{force_box, kinds, data};
 
-    FindVacancy<2> v{force_box, kinds};
+    FindVacancy<1> v{force_box, kinds};
 
     for (int _ = 0; _ < 3; ++_) {
         v.find(init);

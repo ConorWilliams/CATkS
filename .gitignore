@@ -1,6 +1,7 @@
 # Custom
-external/nauty27r1/*
-!external/nauty27r1/nauty27r1
+
+# Ignore all
+external/nauty27r1
 
 build/*
 .ropeproject/*
