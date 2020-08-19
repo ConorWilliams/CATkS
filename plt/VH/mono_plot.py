@@ -93,7 +93,15 @@ diffusion(t, h)
 
 plt.plot(t, (h ** 2).sum(axis=1), label="Hydrogen")
 
-plt.plot(t, (v ** 2).sum(axis=1), label="Vacancy")
+plt.loglog(
+    t,
+    6 * 2.118e-15 * t,
+    "k-.",
+    label=r"$D = 2.1 \times 10^{-15}$\si{\meter\squared\per\second}",
+)
+
+
+plt.plot(t, (v ** 2).sum(axis=1), label="Mono-vacancy")
 
 
 plt.loglog(
@@ -101,13 +109,6 @@ plt.loglog(
     6 * 1.187e-17 * t,
     "k--",
     label=r"$D = 1.2 \times 10^{-17}$\si{\meter\squared\per\second}",
-)
-
-plt.loglog(
-    t,
-    6 * 2.118e-15 * t,
-    "k-.",
-    label=r"$D = 2.1 \times 10^{-15}$\si{\meter\squared\per\second}",
 )
 
 

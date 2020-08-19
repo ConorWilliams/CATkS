@@ -1,5 +1,7 @@
 # Custom
 external/nauty27r1/*
+!external/nauty27r1/nauty27r1
+
 build/*
 .ropeproject/*
 plt/dump/*

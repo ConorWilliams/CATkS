@@ -20,6 +20,8 @@
  *
  * Make Cell have fill & rebuildGhosts only.
  *
+ * binary format for catalog.json
+ *
  */
 
 #include <cmath>
@@ -52,7 +54,7 @@ int main(int argc, char **argv) {
 
     VERIFY(argc == 3, "need an EAM data file and H dump file");
 
-    Vector init(len * len * len * 3 * 2 + 3 * (1 - 2));
+    Vector init(len * len * len * 3 * 2 + 3 * (1 - 1));
     Vector ax(init.size());
 
     std::vector<int> kinds(init.size() / 3, Fe);
@@ -63,8 +65,8 @@ int main(int argc, char **argv) {
         for (int j = 0; j < len; ++j) {
             for (int k = 0; k < len; ++k) {
 
-                if ((i == 1 && j == 1 && k == 1) ||
-                    (i == 2 && j == 1 && k == 1) /*||
+                if ((i == 1 && j == 1 && k == 1) /*||
+                    (i == 2 && j == 1 && k == 1) ||
                     (i == 2 && j == 2 && k == 1) */) {
                     init[3 * cell + 0] = (i + 0.5) * LAT;
                     init[3 * cell + 1] = (j + 0.5) * LAT;

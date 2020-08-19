@@ -53,25 +53,25 @@ v1h1 = np.load("V1H1.npy")
 v2h1 = np.load("V2H1.npy")
 
 
-e1 = v1h1[:980000, 1]
-e2 = v2h1[:980000, 1]
+e1 = v1h1[:, 1]
+e2 = np.hstack([v2h1[:185000, 1], v2h1[930000:, 1]])
 
 print("Mono", len(e1))
 print("Di  ", len(e2))
 
 
-a = plt.hist([e1, e2], 50, label=["Mono-vacancy", "Di-vacancy"], density=False)
+a = plt.hist([e1, e2], 80, label=["Mono-vacancy", "Di-vacancy"], density=True)
 
 
-plt.ylabel(r"Count")
+plt.ylabel(r"Normalised count")
 plt.xlabel(r"Activation energy/\si{\eV}")
 
 plt.legend()
 
 plt.xlim([0, 0.6])
-# plt.ylim([0, 81])
+plt.ylim([0, 23])
 
-plt.yscale("log")
+# plt.yscale("log")
 
 plt.tight_layout()
 plt.savefig(r"/home/cdt1902/dis/thesis/results/Figs/VH_hist.pdf")

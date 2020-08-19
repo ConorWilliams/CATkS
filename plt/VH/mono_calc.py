@@ -33,7 +33,7 @@ count, l = np.histogram(
 )
 print("time", count, count[0] / count.sum())
 
-N_l = 6 * 2 * 7 ** 3 - 12
+N_l = 6 * 2 * 7 ** 3 - 24
 N_t = 6
 
 # theta = fraction of avaliable sites occupied  =~= time fraction one site occupied over total number

@@ -95,35 +95,39 @@ v1 = data[:, 0:3]
 v2 = data[:, 3:6]
 h = data[:, 6:9]
 
-vd = diffusion(t[:185000], v1[:185000])
-vd += diffusion(t[:185000], v2[:185000])
+# vd = diffusion(t[:185000], v1[:185000])
+# vd += diffusion(t[:185000], v2[:185000])
 hd = diffusion(t[:185000], h[:185000])
 
-vd += diffusion(t[930000:], v1[930000:])
-vd += diffusion(t[930000:], v2[930000:])
+# vd += diffusion(t[930000:], v1[930000:])
+# vd += diffusion(t[930000:], v2[930000:])
 hd += diffusion(t[930000:], h[930000:])
 
 
-print(vd / 4, hd / 2)
+print("hduffusion", hd / 2)
 
 plt.loglog(t, (h ** 2).sum(axis=1), label="Hydrogen")
 
-plt.loglog(t, (v1 ** 2).sum(axis=1), label="Vacancy 1")
-
-plt.loglog(t, (v2 ** 2).sum(axis=1), label="Vacancy 2")
-
-
 plt.loglog(
     t,
-    6 * 4.29e-16 * t,
-    "k--",
-    label=r"$D = 4.3 \times 10^{-16}$\si{\meter\squared\per\second}",
+    6 * 4.03e-16 * t,
+    "k-.",
+    label=r"$D = 4.0 \times 10^{-16}$\si{\meter\squared\per\second}",
 )
+
+avg = ((v1 ** 2).sum(axis=1) + (v1 ** 2).sum(axis=1)) / 2
+
+# plt.loglog(t, (v1 ** 2).sum(axis=1), label="Vacancy 1")
+#
+# plt.loglog(t, (v2 ** 2).sum(axis=1), label="Vacancy 2")
+
+plt.loglog(t, avg, label="Di-vacancy")
+
 
 plt.loglog(
     t,
     6 * 3.7e-18 * t,
-    "k-.",
+    "k--",
     label=r"$D = 3.7 \times 10^{-18}$\si{\meter\squared\per\second}",
 )
 
@@ -131,6 +135,8 @@ plt.loglog(
 plt.xlabel(r"Time/\si{\second}")
 plt.ylabel(r"$\langle x^2 \rangle$/\si{\metre\squared}")
 
+plt.xlim([0.0067, 0.2])
+plt.ylim([1e-20, 1e-15])
 
 plt.legend()
 
