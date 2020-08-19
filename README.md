@@ -27,4 +27,6 @@ mkdir dump
 
 Frame for each time step `dump/` will contain a corresponding `.xyz` file of all atomic coordinates (and vacancy centres).
 
-The file `run.out` highlights just vacancies and H atoms, headings: time, activation energy, vacancy coordinates [x, y, z]..., hydrogen coordinates [x, y, z]...
+The file `run.out` highlights just vacancies and H atoms with headings:
+
+time, activation energy, vacancy coordinates [x, y, z]..., hydrogen coordinates [x, y, z]...
